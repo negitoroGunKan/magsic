@@ -63,6 +63,20 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     // Start Screen UI
     const startScreen = document.getElementById('start-screen');
     const btnStartSelect = document.getElementById('btn-start-select');
+    // Pause UI
+    const pauseOverlay = document.getElementById('pause-overlay');
+    const pauseStatusText = document.getElementById('pause-status');
+    const btnResume = document.getElementById('btn-resume');
+    const btnRetry = document.getElementById('btn-retry');
+    const btnQuit = document.getElementById('btn-quit');
+    // Pause UI Button
+    const btnPauseUI = document.getElementById('btn-pause-ui');
+    if (btnPauseUI) {
+        btnPauseUI.addEventListener('click', () => {
+            console.log('Pause button clicked');
+            togglePause();
+        });
+    }
     if (btnCloseResults) {
         btnCloseResults.addEventListener('click', () => {
             resultsOverlay.style.display = 'none';
@@ -293,6 +307,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     let lastTime = 0;
     let currentMode = 'random';
     let isPlaying = false;
+    let currentSongData = null; // For Retry
+    // Pause / Countdown State
+    let isPaused = false;
+    let pausedOffset = 0;
+    let isCountdown = false;
+    let countdownValue = 0;
     // Chart Data
     let chartData = [];
     let nextNoteIndex = 0;
@@ -315,7 +335,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             audioContext.resume();
         }
     }
-    function playAudio() {
+    function playAudio(offset = 0) {
         if (!audioContext || !audioBuffer)
             return;
         if (audioSource) {
@@ -325,11 +345,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         audioSource = audioContext.createBufferSource();
         audioSource.buffer = audioBuffer;
         audioSource.connect(audioContext.destination);
-        audioSource.start(0);
-        audioStartTime = audioContext.currentTime;
+        audioSource.start(0, offset);
+        audioStartTime = audioContext.currentTime - offset;
         audioSource.onended = () => {
-            if (currentMode === 'chart' && isPlaying) {
-                // Song finished
+            // Only trigger if we reached the actual end and are still playing normally
+            if (currentMode === 'chart' && isPlaying && !isPaused && !isCountdown) {
+                console.log('Song ended naturally');
                 setTimeout(showResults, 1000);
                 isPlaying = false;
             }
@@ -337,32 +358,34 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     }
     function stopAudio() {
         if (audioSource) {
+            audioSource.onended = null; // Prevent triggering results on manual stop
             audioSource.stop();
-            audioSource.disconnect();
+            try {
+                audioSource.disconnect();
+            }
+            catch (e) { }
             audioSource = null;
         }
     }
     function getAudioTime() {
         if (!audioContext || !audioSource)
-            return 0;
+            return (isPaused || isCountdown) ? pausedOffset : 0;
+        if (isPaused)
+            return pausedOffset;
+        if (isCountdown)
+            return pausedOffset; // Freeze time during countdown
         // Current time in seconds
         return Math.max(0, audioContext.currentTime - audioStartTime);
     }
-    function spawnNote(laneIndex, speed, isLong = false, duration = 0, initialY = null) {
-        let startY = 0;
-        if (initialY !== null) {
-            startY = initialY;
-        }
-        else {
-            // Default (Random mode): Spawn just above screen
-            // But actually, for visual smoothness, usually 0 (top of screen).
-            // Previous logic: -duration * speed. (Head is above screen?)
-            // Let's stick to 0 for random notes head.
-            startY = -duration * speed;
-        }
+    function getNoteY(scheduledTime) {
+        const currentTimeMs = getAudioTime() * 1000;
+        // Y = HIT_Y - (time_until_hit * speed)
+        return HIT_Y - (scheduledTime - currentTimeMs) * currentNoteSpeed;
+    }
+    function spawnNote(laneIndex, scheduledTime, isLong = false, duration = 0) {
         notes.push({
             laneIndex: laneIndex,
-            y: startY,
+            scheduledTime: scheduledTime,
             active: true,
             isLong: isLong,
             duration: duration,
@@ -373,12 +396,20 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     function update(deltaTime) {
         if (!isPlaying)
             return;
+        if (isPaused)
+            return;
+        if (isCountdown) {
+            updateCountdown();
+            return;
+        }
+        const currentTimeMs = getAudioTime() * 1000;
         // 1. Spawning
         if (currentMode === 'random') {
-            // Random Spawn Logic (simplified for brevity or existing logic)
+            // Random Spawn Logic
             if (Math.random() < 0.02) {
                 const lane = Math.floor(Math.random() * KEYS.length);
-                spawnNote(lane, currentNoteSpeed, Math.random() < 0.2, Math.random() * 500);
+                const spawnAheadTime = HIT_Y / currentNoteSpeed;
+                spawnNote(lane, currentTimeMs + spawnAheadTime, Math.random() < 0.2, Math.random() * 500);
             }
         }
         else {
@@ -395,11 +426,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 // We should spawn if (noteTime - currentTime) * speed < HIT_Y
                 // i.e. noteTime < currentTime + spawnAheadTime
                 if (noteData.time <= currentTimeMs + spawnAheadTime) {
-                    // Calculate precise Y
-                    // Y should be such that at t=noteData.time, Y = HIT_Y.
-                    // Y_now = HIT_Y - (noteTime - currentTime) * speed
-                    const correctY = HIT_Y - (noteData.time - currentTimeMs) * currentNoteSpeed;
-                    spawnNote(noteData.lane, currentNoteSpeed, noteData.duration > 0, noteData.duration, correctY);
+                    spawnNote(noteData.lane, noteData.time, noteData.duration > 0, noteData.duration);
                     nextNoteIndex++;
                 }
                 else {
@@ -411,19 +438,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         notes.forEach(note => {
             if (!note.active)
                 return;
-            // Movement
-            if (!note.beingHeld) {
-                note.y += currentNoteSpeed * deltaTime;
-            }
-            else {
-                note.y += currentNoteSpeed * deltaTime;
-            }
             // MISS Detection Logic
             if (note.isLong && note.beingHeld) {
-                const tailY = note.y - (note.duration * currentNoteSpeed);
-                if (tailY >= HIT_Y) {
+                const tailTime = note.scheduledTime + note.duration;
+                if (currentTimeMs >= tailTime) {
                     note.active = false;
-                    // Held to end -> Perfect! 
                     judgementText = `PERFECT`;
                     judgementColor = '#00ffff';
                     judgementTimer = 1000;
@@ -431,9 +450,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 }
             }
             else if (!note.isLong || !note.processed) { // Check Head
-                const checkY = note.y;
-                const distancePassed = checkY - HIT_Y;
-                const msPassed = distancePassed / currentNoteSpeed;
+                const msPassed = currentTimeMs - note.scheduledTime;
                 if (msPassed > MISS_BOUNDARY && note.active) {
                     note.active = false;
                     judgementText = `MISS`;
@@ -443,15 +460,16 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 }
             }
             else { // Long note processed but lost hold?
-                const tailY = note.y - (note.duration * currentNoteSpeed);
-                if (tailY > canvas.height)
+                const tailTime = note.scheduledTime + note.duration;
+                if (currentTimeMs > tailTime + MISS_BOUNDARY)
                     note.active = false;
             }
         });
         // Cleanup
         for (let i = notes.length - 1; i >= 0; i--) {
             const note = notes[i];
-            const tailY = note.y - (note.duration * currentNoteSpeed);
+            const tailTime = note.scheduledTime + note.duration;
+            const tailY = getNoteY(tailTime);
             if (!note.active || tailY > canvas.height + 100) { // Off screen
                 notes.splice(i, 1);
             }
@@ -582,12 +600,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 else
                     skinImg = SKIN.white;
                 if (note.isLong) {
-                    const tailHeight = note.duration * currentNoteSpeed;
-                    const headY = note.y;
-                    const tailY = headY - tailHeight;
-                    // Simple rect for long note Body (No specific long note skin yet, use alpha color)
+                    const tailTime = note.scheduledTime + note.duration;
+                    const headY = getNoteY(note.scheduledTime);
+                    const tailY = getNoteY(tailTime);
+                    // Set transparency for long notes (50% as requested)
+                    const originalAlpha = ctx.globalAlpha;
+                    ctx.globalAlpha = 0.5;
+                    // Simple rect for long note Body
                     ctx.fillStyle = bodyColor;
-                    ctx.fillRect(x + H_GAP, tailY, w - (H_GAP * 2), tailHeight);
+                    ctx.fillRect(x + H_GAP, tailY, w - (H_GAP * 2), headY - tailY);
                     // Head
                     if (skinImg) {
                         ctx.drawImage(skinImg, x + H_GAP, headY - (drawHeight / 2), w - (H_GAP * 2), drawHeight);
@@ -596,14 +617,16 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                         ctx.fillStyle = config.color;
                         ctx.fillRect(x + H_GAP, headY - (drawHeight / 2), w - (H_GAP * 2), drawHeight);
                     }
+                    ctx.globalAlpha = originalAlpha;
                 }
                 else {
+                    const noteY = getNoteY(note.scheduledTime);
                     if (skinImg) {
-                        ctx.drawImage(skinImg, x + H_GAP, note.y - (drawHeight / 2), w - (H_GAP * 2), drawHeight);
+                        ctx.drawImage(skinImg, x + H_GAP, noteY - (drawHeight / 2), w - (H_GAP * 2), drawHeight);
                     }
                     else {
                         ctx.fillStyle = config.color;
-                        ctx.fillRect(x + H_GAP, note.y - (drawHeight / 2), w - (H_GAP * 2), drawHeight);
+                        ctx.fillRect(x + H_GAP, noteY - (drawHeight / 2), w - (H_GAP * 2), drawHeight);
                     }
                 }
             });
@@ -664,8 +687,90 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             update(deltaTime);
             draw();
         }
+        if (isCountdown && countdownValue > 0 && ctx) {
+            ctx.fillStyle = '#e040fb';
+            ctx.font = 'bold 80px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(countdownValue.toString(), canvas.width / 2, canvas.height / 2);
+        }
         requestAnimationFrame(loop);
     }
+    function togglePause() {
+        console.log(`togglePause() called. isPlaying=${isPlaying}, isCountdown=${isCountdown}, isPaused=${isPaused}`);
+        if (!isPlaying)
+            return;
+        if (isCountdown)
+            return;
+        if (isPaused) {
+            resumeGame();
+        }
+        else {
+            pauseGame();
+        }
+    }
+    function pauseGame() {
+        pausedOffset = getAudioTime();
+        isPaused = true;
+        console.log(`pauseGame: paused at ${pausedOffset.toFixed(3)}s`);
+        stopAudio();
+        pauseStatusText.textContent = "PAUSED";
+        pauseOverlay.style.display = 'flex';
+        btnResume.style.display = 'block';
+    }
+    function resumeGame() {
+        // Start countdown
+        isPaused = false;
+        isCountdown = true;
+        countdownValue = 3;
+        pauseStatusText.textContent = "3";
+        btnResume.style.display = 'none'; // Hide buttons during countdown
+        btnRetry.style.display = 'none';
+        btnQuit.style.display = 'none';
+        const timer = setInterval(() => {
+            countdownValue--;
+            if (countdownValue > 0) {
+                pauseStatusText.textContent = countdownValue.toString();
+            }
+            else {
+                clearInterval(timer);
+                finishCountdown();
+            }
+        }, 1000);
+    }
+    function finishCountdown() {
+        console.log(`finishCountdown: resuming at ${pausedOffset.toFixed(3)}s`);
+        isCountdown = false;
+        isPlaying = true; // Ensure game is active
+        pauseOverlay.style.display = 'none';
+        btnRetry.style.display = 'block'; // Restore display for next pause
+        btnQuit.style.display = 'block';
+        playAudio(pausedOffset);
+    }
+    function updateCountdown() {
+        // No heavy processing needed here, setInterval handles value
+    }
+    function retryGame() {
+        isPaused = false;
+        isCountdown = false;
+        pauseOverlay.style.display = 'none';
+        loadSong(currentSongData); // Restart
+    }
+    function quitGame() {
+        isPaused = false;
+        isCountdown = false;
+        isPlaying = false;
+        stopAudio();
+        pauseOverlay.style.display = 'none';
+        if (startScreen)
+            startScreen.style.display = 'flex';
+        controlsDiv.style.display = 'block';
+        if (btnPauseUI)
+            btnPauseUI.style.display = 'none';
+    }
+    // Add Pause Menu Listeners
+    btnResume.addEventListener('click', resumeGame);
+    btnRetry.addEventListener('click', retryGame);
+    btnQuit.addEventListener('click', quitGame);
     // ==========================================
     // Interaction Handlers
     // ==========================================
@@ -816,6 +921,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     }
     function loadSong(song) {
         return __awaiter(this, void 0, void 0, function* () {
+            currentSongData = song; // Store for Retry
             // 0. Init Audio
             try {
                 initAudio();
@@ -851,6 +957,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 // Controls already hidden by Select button logic
                 if (resultsOverlay)
                     resultsOverlay.style.display = 'none';
+                // Reset pause states
+                isPaused = false;
+                isCountdown = false;
+                pausedOffset = 0;
+                if (btnPauseUI)
+                    btnPauseUI.style.display = 'block';
                 playAudio();
             }
             catch (e) {
@@ -942,19 +1054,25 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             }
             return; // Block game input
         }
+        if (e.key === 'Escape' || e.key === 'Esc' || e.code === 'Escape') {
+            console.log('Escape key pressed, toggling pause...');
+            togglePause();
+            e.preventDefault();
+            return;
+        }
+        if (e.code === 'Space')
+            e.preventDefault();
         const keyIndex = KEYS.indexOf(e.key.toLowerCase());
         if (keyIndex !== -1 && !pressedKeys[keyIndex]) {
             pressedKeys[keyIndex] = true;
             // Hit Detection
             const targetNotes = notes.filter(n => n.active &&
                 n.laneIndex === keyIndex &&
-                !n.processed).sort((a, b) => b.y - a.y); // Sort by proximity (lowest/closest first)
+                !n.processed).sort((a, b) => a.scheduledTime - b.scheduledTime);
             if (targetNotes.length > 0) {
                 const note = targetNotes[0];
-                const noteTime = HIT_Y;
-                const notePos = note.y;
-                const distance = notePos - HIT_Y;
-                const msErrorRaw = distance / currentNoteSpeed;
+                const currentTimeMs = getAudioTime() * 1000;
+                const msErrorRaw = currentTimeMs - note.scheduledTime;
                 const msError = msErrorRaw - globalOffset; // Apply User Offset
                 const absError = Math.abs(msError);
                 if (absError < THRESHOLD_BAD) {
@@ -989,12 +1107,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                         note.active = false;
                     }
                 }
-                else {
-                    // Manual Miss Logic (Too early hit?)
-                    // Current logic: ignore clicks outside window? 
-                    // Or if very close but outside BAD, count as Miss?
-                    // Let's stick to "Ghost inputs" don't count unless close.
-                }
             }
         }
     });
@@ -1007,8 +1119,16 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 const note = heldNotes[keyIndex];
                 heldNotes[keyIndex] = null;
                 note.beingHeld = false;
-                // If release too early?
-                // Visual cleanup handles it
+                // If released before completion, deactivate and count as BAD
+                const tailTime = note.scheduledTime + note.duration;
+                const currentTimeMs = getAudioTime() * 1000;
+                if (currentTimeMs < tailTime - THRESHOLD_PERFECT) {
+                    note.active = false;
+                    judgementText = "MISS\nRELEASE";
+                    judgementColor = "#ff0000";
+                    judgementTimer = 1000;
+                    addHit('miss');
+                }
             }
         }
     });

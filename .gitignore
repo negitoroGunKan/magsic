@@ -14,9 +14,3 @@ yarn-error.log*
 # IDEs
 .vscode/
 .idea/
-
-# Compiled files (Optional: uncomment if you want to ignore generated JS)
-# *.js
-# !hoge.js
-# !magusic.js
-# !editor.js
