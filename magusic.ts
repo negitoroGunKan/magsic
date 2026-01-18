@@ -26,6 +26,16 @@
     const laneWidthInput = document.getElementById('lane-width-input') as HTMLInputElement;
     const laneWidthDisplay = document.getElementById('lane-width-display') as HTMLSpanElement;
 
+    // Auto Play UI
+    const autoPlayCheckbox = document.getElementById('auto-play-checkbox') as HTMLInputElement;
+    let isAutoPlay = false;
+
+    if (autoPlayCheckbox) {
+        autoPlayCheckbox.addEventListener('change', () => {
+            isAutoPlay = autoPlayCheckbox.checked;
+        });
+    }
+
     // Results UI
     const resultsOverlay = document.getElementById('results-overlay') as HTMLDivElement;
     const resPerfect = document.getElementById('res-perfect') as HTMLSpanElement;
@@ -58,6 +68,8 @@
     // Start Screen UI
     const startScreen = document.getElementById('start-screen') as HTMLDivElement;
     const btnStartSelect = document.getElementById('btn-start-select') as HTMLButtonElement;
+    const loadingOverlay = document.getElementById('loading-overlay') as HTMLDivElement;
+    const loadingText = document.getElementById('loading-text') as HTMLParagraphElement;
 
     // Pause UI
     const pauseOverlay = document.getElementById('pause-overlay') as HTMLDivElement;
@@ -376,6 +388,11 @@
     let isCountdown = false;
     let countdownValue = 0;
 
+    // Start Sequence State
+    let isStarting = false;
+    let startSequenceStartTime = 0;
+    const START_DELAY_MS = 3000;
+
     // Chart Data
     let chartData: { time: number, lane: number, duration: number }[] = [];
     let nextNoteIndex = 0;
@@ -395,6 +412,36 @@
     // Input Handling State
     const pressedKeys: boolean[] = new Array(KEYS.length).fill(false);
     const heldNotes: (Note | null)[] = new Array(KEYS.length).fill(null);
+
+    // Hit Effects
+    interface HitEffect {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        color: string;
+        life: number; // 0.0 - 1.0 (1.0 = start, 0.0 = done)
+        maxLife: number; // ms duration (e.g. 300ms)
+    }
+    const hitEffects: HitEffect[] = [];
+    const EFFECT_DURATION = 200; // ms
+
+    function spawnHitEffect(laneIndex: number, color: string) {
+        const config = LANE_CONFIGS[laneIndex];
+        if (!config) return;
+
+        // Rectangle frame effect
+        // Stating center at HIT_Y
+        hitEffects.push({
+            x: config.x,
+            y: HIT_Y - 15, // Centered on hit line (approx note height is small)
+            width: config.width,
+            height: 30, // Frame height
+            color: color,
+            life: 1.0,
+            maxLife: EFFECT_DURATION
+        });
+    }
 
     // ==========================================
     // Core Game Functions
@@ -441,6 +488,12 @@
     }
 
     function getAudioTime(): number {
+        if (isStarting) {
+            const now = performance.now();
+            // Returns seconds: -3.0 to 0.0
+            return (now - startSequenceStartTime - START_DELAY_MS) / 1000;
+        }
+
         if (!audioContext || !audioSource) return (isPaused || isCountdown) ? pausedOffset : 0;
         if (isPaused) return pausedOffset;
         if (isCountdown) return pausedOffset; // Freeze time during countdown
@@ -451,6 +504,7 @@
     function getNoteY(scheduledTime: number): number {
         const currentTimeMs = getAudioTime() * 1000;
         // Y = HIT_Y - (time_until_hit * speed)
+        // If currentTimeMs < 0, time_until_hit is larger, so Y is smaller (higher up)
         return HIT_Y - (scheduledTime - currentTimeMs) * currentNoteSpeed;
     }
 
@@ -469,10 +523,7 @@
     function update(deltaTime: number) {
         if (!isPlaying) return;
         if (isPaused) return;
-        if (isCountdown) {
-            updateCountdown();
-            return;
-        }
+        // if (isCountdown) return; // REMOVED: We want spawning to happen during countdown!
 
         const currentTimeMs = getAudioTime() * 1000;
 
@@ -507,6 +558,16 @@
             }
         }
 
+        // Check for Start Sequence End
+        if (isStarting && currentTimeMs >= 0) {
+            console.log('Start Delay Finished. Playing Audio.');
+            isStarting = false;
+            playAudio(0);
+        }
+
+        // If Countdown (Pause Resume), stop movement
+        if (isCountdown) return;
+
         // 2. Logic (Move & Miss)
         notes.forEach(note => {
             if (!note.active) return;
@@ -516,11 +577,47 @@
                 const tailTime = note.scheduledTime + note.duration;
                 if (currentTimeMs >= tailTime) {
                     note.active = false;
-                    judgementText = `PERFECT`;
                     judgementColor = '#00ffff';
                     judgementTimer = 1000;
                     addHit('perfect');
+                    spawnHitEffect(note.laneIndex, '#00ffff');
                 }
+            } else if (isAutoPlay && !note.isLong && !note.processed && currentTimeMs >= note.scheduledTime) {
+                // AUTO PLAY HIT (Head)
+                note.active = false;
+                judgementText = `PERFECT\nAUTO`;
+                judgementColor = '#00ffff'; // Cyan for perfect
+                judgementTimer = 1000;
+                addHit('perfect');
+                spawnHitEffect(note.laneIndex, '#00ffff');
+
+                // Simulate Key Press Visual
+                pressedKeys[note.laneIndex] = true;
+                setTimeout(() => pressedKeys[note.laneIndex] = false, 50);
+
+            } else if (isAutoPlay && note.isLong && !note.processed && currentTimeMs >= note.scheduledTime && !note.beingHeld) {
+                // AUTO PLAY HOLD START
+                note.processed = true;
+                note.beingHeld = true;
+                heldNotes[note.laneIndex] = note;
+
+                judgementText = `PERFECT\nAUTO`;
+                judgementColor = '#00ffff';
+                judgementTimer = 1000;
+                addHit('perfect'); // Count head? 
+                spawnHitEffect(note.laneIndex, '#00ffff');
+
+                // Visualize Hold
+                pressedKeys[note.laneIndex] = true;
+                // We don't release key yet
+
+            } else if (isAutoPlay && note.isLong && note.beingHeld && currentTimeMs >= note.scheduledTime + note.duration) {
+                // AUTO PLAY HOLD END
+                // The first block (line 536 in original) handles the end of hold if it's being held.
+                // But we need to ensure the key is released.
+                pressedKeys[note.laneIndex] = false;
+                // Logic above (lines 536-544) will catch the completion and add 'perfect'.
+
             } else if (!note.isLong || !note.processed) { // Check Head
                 const msPassed = currentTimeMs - note.scheduledTime;
 
@@ -544,6 +641,18 @@
             const tailY = getNoteY(tailTime);
             if (!note.active || tailY > canvas.height + 100) { // Off screen
                 notes.splice(i, 1);
+            }
+        }
+
+        // Update Hit Effects
+        for (let i = hitEffects.length - 1; i >= 0; i--) {
+            const effect = hitEffects[i];
+            // Decrease life based on deltaTime?
+            // Life is 1.0 -> 0.0
+            // We need to decrease by deltaTime / maxLife
+            effect.life -= deltaTime / effect.maxLife;
+            if (effect.life <= 0) {
+                hitEffects.splice(i, 1);
             }
         }
 
@@ -596,7 +705,36 @@
         ctx.beginPath();
         ctx.moveTo(0, HIT_Y);
         ctx.lineTo(canvas.width, HIT_Y);
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(0, HIT_Y);
+        ctx.lineTo(canvas.width, HIT_Y);
         ctx.stroke();
+
+        // Draw Hit Effects (Below Label, Above Lines)
+        ctx.save();
+        hitEffects.forEach(effect => {
+            ctx.strokeStyle = effect.color;
+            ctx.lineWidth = 4;
+            ctx.globalAlpha = effect.life; // Fade out
+
+            // Effect: Expanding Rectangle or just blinking frame?
+            // User requested "Rectangular frame-like effect"
+            // Let's expand slightly as it fades
+            const expand = (1.0 - effect.life) * 20; // 0 -> 20px expansion
+            const x = effect.x - expand / 2;
+            const w = effect.width + expand;
+            const h = effect.height + expand / 2;
+            const y = effect.y - expand / 4;
+
+            ctx.strokeRect(x, y, w, h);
+
+            // Inner fill with low opacity
+            ctx.fillStyle = effect.color;
+            ctx.globalAlpha = effect.life * 0.3;
+            ctx.fillRect(x, y, w, h);
+        });
+        ctx.restore();
 
         // Draw Key Feedback (Dynamic)
         pressedKeys.forEach((pkg, index) => {
@@ -1007,7 +1145,12 @@
 
     async function loadSong(song: any) {
         currentSongData = song; // Store for Retry
-        // 0. Init Audio
+        // 0. Init Audio & Show Loading
+        if (loadingOverlay) {
+            loadingOverlay.style.display = 'flex';
+            if (loadingText) loadingText.textContent = `LOADING...`;
+        }
+
         try { initAudio(); } catch (e) { alert(e); return; }
 
         // 1. Fetch Audio & Chart
@@ -1029,9 +1172,12 @@
             }
             chartData = parseChart(json);
 
-            // 2. Start Game
+            // 2. Start Game Logic (with Loading & Countdown)
+
+            // Hide Loading
+            if (loadingOverlay) loadingOverlay.style.display = 'none';
+
             currentMode = 'chart';
-            isPlaying = true;
             resetStats();
             notes.length = 0;
             nextNoteIndex = 0;
@@ -1039,18 +1185,35 @@
             songSelectOverlay.style.display = 'none'; // Close UI
             // Controls already hidden by Select button logic
             if (resultsOverlay) resultsOverlay.style.display = 'none';
+            if (startScreen) startScreen.style.display = 'none';
 
             // Reset pause states
             isPaused = false;
-            isCountdown = false;
+            isCountdown = false; // Will trigger via startCountdown
             pausedOffset = 0;
             if (btnPauseUI) btnPauseUI.style.display = 'block';
 
-            playAudio();
+            // Start Countdown instead of immediate play
+            startCountdown();
 
         } catch (e) {
+            if (loadingOverlay) loadingOverlay.style.display = 'none';
+            if (loadingOverlay) loadingOverlay.style.display = 'none';
             alert('Error loading song: ' + e);
         }
+    }
+
+    function startCountdown() {
+        console.log('Initiating 3s Start Sequence (Falling Notes)...');
+
+        isPlaying = true;
+        isPaused = false;
+        isCountdown = false;
+
+        isStarting = true;
+        startSequenceStartTime = performance.now();
+
+        // Audio will be triggered in update() when getAudioTime() >= 0
     }
 
     function parseChart(json: any): { time: number, lane: number, duration: number }[] {
@@ -1187,18 +1350,22 @@
                         judgementText = `PERFECT\n${sign}${Math.floor(msError)}ms`;
                         judgementColor = '#00ffff';
                         addHit('perfect', msError);
+                        spawnHitEffect(note.laneIndex, '#00ffff');
                     } else if (absError < THRESHOLD_GREAT) {
                         judgementText = `GREAT\n${sign}${Math.floor(msError)}ms`;
                         judgementColor = '#ffeb3b';
                         addHit('great', msError);
+                        spawnHitEffect(note.laneIndex, '#ffeb3b');
                     } else if (absError < THRESHOLD_NICE) {
                         judgementText = `NICE\n${sign}${Math.floor(msError)}ms`;
                         judgementColor = '#00ff00';
                         addHit('nice', msError);
+                        spawnHitEffect(note.laneIndex, '#00ff00');
                     } else {
                         judgementText = `BAD\n${sign}${Math.floor(msError)}ms`;
                         judgementColor = '#ffae00';
                         addHit('bad', msError);
+                        // No effect for BAD? optional
                     }
                     judgementTimer = 1000;
 

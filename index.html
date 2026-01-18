@@ -71,6 +71,26 @@
 </head>
 
 <body>
+    <!-- Loading Overlay -->
+    <div id="loading-overlay"
+        style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:200; flex-direction:column; justify-content:center; align-items:center;">
+        <div
+            style="width:50px; height:50px; border:5px solid #333; border-top:5px solid #e040fb; border-radius:50%; animation:spin 1s linear infinite;">
+        </div>
+        <p id="loading-text" style="color:white; margin-top:20px; font-size:1.5em; letter-spacing:2px;">LOADING...</p>
+        <style>
+            @keyframes spin {
+                0% {
+                    transform: rotate(0deg);
+                }
+
+                100% {
+                    transform: rotate(360deg);
+                }
+            }
+        </style>
+    </div>
+
     <!-- Start Screen -->
     <div id="start-screen"
         style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10;">
@@ -98,6 +118,11 @@
         <h3>Game Mode</h3>
         <button id="btn-random">Start Random Mode</button>
         <hr style="border-color: #555;">
+        <label style="cursor: pointer; display: flex; align-items: center; gap: 10px;">
+            <input type="checkbox" id="auto-play-checkbox" style="width: 20px; height: 20px;">
+            <span style="font-weight: bold; color: #00ffff;">AUTO PLAY</span>
+        </label>
+        <br>
         <label>
             Audio: <input type="file" id="audio-input" accept="audio/*">
         </label>

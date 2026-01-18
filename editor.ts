@@ -3,6 +3,10 @@
     const KEYS = ['e', 'd', 'r', 'f', ' ', 'u', 'j', 'i', 'k'];
     const LANE_COUNT = KEYS.length;
 
+    // DEBUG: Confirm script execution
+    // alert('Editor Script Attached'); // Commented out to reduce noise, but good for first check
+
+
     // State
     const audio = new Audio();
 
@@ -70,6 +74,113 @@
             audio.currentTime = 0;
         }
     });
+
+    // Song Selection Logic
+    const songSelect = document.getElementById('song-select') as HTMLSelectElement;
+    const btnLoadSong = document.getElementById('btn-load-song') as HTMLButtonElement;
+    let songList: any[] = [];
+
+    // Load Song List
+    async function loadEditorSongList() {
+        try {
+            const res = await fetch('songs/list.json');
+            songList = await res.json();
+
+            if (songSelect) {
+                songSelect.innerHTML = '<option value="">-- Select Song --</option>';
+                songList.forEach((song, index) => {
+                    const opt = document.createElement('option');
+                    opt.value = index.toString();
+                    opt.textContent = `${song.title} - ${song.artist}`;
+                    songSelect.appendChild(opt);
+                });
+                // alert(`Loaded ${songList.length} songs into list.`);
+            }
+        } catch (e) {
+            console.error('Failed to load song list', e);
+            alert('Failed to load song list: ' + e);
+            if (statusDiv) statusDiv.textContent = 'Status: Failed to load song list.';
+        }
+    }
+    loadEditorSongList();
+
+    if (btnLoadSong && songSelect) {
+        btnLoadSong.addEventListener('click', async () => {
+            const index = parseInt(songSelect.value);
+            if (isNaN(index) || !songList[index]) {
+                alert('Please select a song from the list first.');
+                return;
+            }
+
+            const song = songList[index];
+            statusDiv.textContent = `Status: Loading ${song.title}...`;
+            // alert(`Loading ${song.title}...`);
+
+            try {
+                // 1. Load Audio
+                audio.src = `songs/${song.folder}/${song.audio}`;
+
+                // 2. Load Chart (if exists)
+                const chartRes = await fetch(`songs/${song.folder}/${song.chart}`);
+                if (chartRes.ok) {
+                    const chartText = await chartRes.text();
+                    let text = chartText;
+                    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+
+                    const json = JSON.parse(text);
+                    importChartJSON(json);
+                } else {
+                    // Start fresh if no chart
+                    recordedNotes.length = 0;
+                    bpmInput.value = song.bpm;
+                    offsetInput.value = '0';
+                    statusDiv.textContent = `Status: Loaded ${song.title} (New Chart)`;
+                }
+
+            } catch (e) {
+                alert('Error loading song: ' + e);
+            }
+        });
+    }
+
+    function importChartJSON(json: any) {
+        try {
+            const bpm = json.bpm || parseFloat(bpmInput.value) || 120;
+            const offset = json.offset || 0;
+
+            // Apply BPM/Offset
+            bpmInput.value = bpm;
+            offsetInput.value = offset;
+
+            const msPerBeat = 60000 / bpm;
+
+            // Clear existing
+            recordedNotes.length = 0;
+
+            // Import Notes
+            if (Array.isArray(json.notes)) {
+                json.notes.forEach((n: any) => {
+                    const time = offset + (n.beat * msPerBeat);
+                    const duration = (n.duration || 0) * msPerBeat;
+                    recordedNotes.push({
+                        time: time,
+                        lane: n.lane,
+                        duration: duration
+                    });
+                });
+            }
+
+            statusDiv.textContent = `Status: Loaded Chart (${recordedNotes.length} notes)`;
+            alert(`Loaded ${recordedNotes.length} notes successfully!`);
+
+            // Seek to start
+            audio.currentTime = 0;
+            scrollTime = 0;
+
+        } catch (err) {
+            alert('Error parsing JSON: ' + err);
+        }
+    }
 
     function startCountdown(): Promise<void> {
         return new Promise((resolve) => {
@@ -289,42 +400,7 @@
                 reader.onload = (e) => {
                     try {
                         const json = JSON.parse(e.target?.result as string);
-
-                        // Validate basic structure (Relaxed)
-                        // Allow missing BPM (use default or current)
-                        // Allow missing notes (empty)
-
-                        const bpm = json.bpm || parseFloat(bpmInput.value) || 120;
-                        const offset = json.offset || 0;
-
-                        // Apply BPM/Offset
-                        bpmInput.value = bpm;
-                        offsetInput.value = offset;
-
-                        const msPerBeat = 60000 / bpm;
-
-                        // Clear existing
-                        recordedNotes.length = 0;
-
-                        // Import Notes
-                        if (Array.isArray(json.notes)) {
-                            json.notes.forEach((n: any) => {
-                                const time = offset + (n.beat * msPerBeat);
-                                const duration = (n.duration || 0) * msPerBeat;
-                                recordedNotes.push({
-                                    time: time,
-                                    lane: n.lane,
-                                    duration: duration
-                                });
-                            });
-                        }
-
-                        statusDiv.textContent = `Status: Imported ${recordedNotes.length} notes`;
-
-                        // Seek to start
-                        audio.currentTime = 0;
-                        scrollTime = 0;
-
+                        importChartJSON(json);
                     } catch (err) {
                         alert('Error parsing JSON: ' + err);
                     }
@@ -621,8 +697,8 @@
         ctx.stroke();
     }
 
-    // Export Logic
-    btnExport.addEventListener('click', () => {
+    // Export Logic Helper
+    function getChartJSONString() {
         const bpm = parseFloat(bpmInput.value) || 110;
         const offset = parseFloat(offsetInput.value) || 0;
         const msPerBeat = 60000 / bpm;
@@ -630,10 +706,8 @@
         // Convert MS to Beats
         const notes = recordedNotes.map(note => {
             const rawBeat = (note.time - offset) / msPerBeat;
-            // Round to 3 decimals
             const beat = Math.round(rawBeat * 1000) / 1000;
 
-            // Convert duration to beats
             const rawDur = note.duration / msPerBeat;
             const durBeat = Math.round(rawDur * 1000) / 1000;
 
@@ -649,8 +723,96 @@
             offset: offset,
             notes: notes
         };
+        return JSON.stringify(json, null, 2);
+    }
 
-        txtOutput.value = JSON.stringify(json, null, 2);
+    // Export Button
+    btnExport.addEventListener('click', () => {
+        txtOutput.value = getChartJSONString();
     });
+
+    // Download Logic
+    const btnDownload = document.getElementById('btn-download') as HTMLButtonElement;
+    if (btnDownload) {
+        btnDownload.addEventListener('click', () => {
+            // Auto-export current state
+            const content = getChartJSONString();
+            txtOutput.value = content; // Update text area too for visibility
+
+            // Get filename
+            let defaultName = 'chart.json';
+            if (songSelect && songList) {
+                const index = parseInt(songSelect.value);
+                if (!isNaN(index) && songList[index]) {
+                    const song = songList[index];
+                    defaultName = song.chart || 'chart.json';
+                }
+            }
+
+            const filename = prompt('Enter filename to save as:', defaultName);
+            if (!filename) return;
+
+            const blob = new Blob([content], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+    }
+
+    // Save to Disk (Server) Logic
+    const btnSaveDisk = document.getElementById('btn-save-disk') as HTMLButtonElement;
+    if (btnSaveDisk) {
+        btnSaveDisk.addEventListener('click', async () => {
+            // Auto-export
+            const content = getChartJSONString();
+            txtOutput.value = content;
+
+            // Determine Target Path
+            let targetPath = '';
+            // We need the relative path from root, e.g. "songs/熱異常/netsu_ijo_chart.txt"
+            if (songSelect && songList) {
+                const index = parseInt(songSelect.value);
+                if (!isNaN(index) && songList[index]) {
+                    const song = songList[index];
+                    const chartName = song.chart || 'chart.txt';
+                    targetPath = `songs/${song.folder}/${chartName}`;
+                }
+            }
+
+            if (!targetPath) {
+                alert('Please load a song first from the list so we know where to save.');
+                return;
+            }
+
+            if (!confirm(`Save to "${targetPath}"? This will overwrite the file.`)) return;
+
+            try {
+                const res = await fetch('/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        path: targetPath,
+                        content: content
+                    })
+                });
+
+                if (res.ok) {
+                    alert('Saved successfully!');
+                    statusDiv.textContent = `Status: Saved to ${targetPath}`;
+                } else {
+                    const errText = await res.text();
+                    alert('Save Failed: ' + errText);
+                }
+            } catch (e) {
+                alert('Save Error: ' + e);
+                console.error(e);
+            }
+        });
+    }
 
 })();

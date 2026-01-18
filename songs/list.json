@@ -5,8 +5,8 @@
         "artist": "いよわ",
         "bpm": 183,
         "folder": "熱異常",
-        "audio": "audio.mp3",
-        "chart": "chart.json"
+        "audio": "netsu_ijo.mp3",
+        "chart": "netsu_ijo_chart.txt"
     },
     {
         "id": "50jing",
