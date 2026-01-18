@@ -115,6 +115,13 @@
         btnSelectSong.addEventListener('click', openSongSelect);
     }
 
+    if (btnCloseSelect) {
+        btnCloseSelect.addEventListener('click', () => {
+            songSelectOverlay.style.display = 'none';
+            if (startScreen) startScreen.style.display = 'flex';
+        });
+    }
+
     // ... Skipping lines, moving to btnRandom ...
 
     // Deleted duplicate handler block
@@ -225,6 +232,23 @@
     const MISS_BOUNDARY = 150;
 
     // Stats
+    interface Song {
+        id: string;
+        title: string;
+        artist: string;
+        bpm: number;
+        folder: string;
+        audio: string;
+        chart: string;
+        video?: string; // Optional video
+    }
+
+    let audio: HTMLAudioElement = new Audio();
+    // Video Element
+    let bgVideo: HTMLVideoElement | null = null;
+    let isVideoReady = false;
+
+    let chart: any = null;
     interface GameStats {
         perfect: number;
         great: number;
@@ -547,8 +571,8 @@
             while (nextNoteIndex < chartData.length) {
                 const noteData = chartData[nextNoteIndex];
                 // Check if note is roughly within screen or just passed top
-                // We should spawn if (noteTime - currentTime) * speed < HIT_Y
-                // i.e. noteTime < currentTime + spawnAheadTime
+                // We should spawn if (noteData.time - currentTime) * speed < HIT_Y
+                // i.e. noteData.time < currentTime + spawnAheadTime
                 if (noteData.time <= currentTimeMs + spawnAheadTime) {
                     spawnNote(noteData.lane, noteData.time, noteData.duration > 0, noteData.duration);
                     nextNoteIndex++;
@@ -563,6 +587,7 @@
             console.log('Start Delay Finished. Playing Audio.');
             isStarting = false;
             playAudio(0);
+            if (bgVideo && isVideoReady) bgVideo.play(); // Start video when audio starts
         }
 
         // If Countdown (Pause Resume), stop movement
@@ -581,6 +606,11 @@
                     judgementTimer = 1000;
                     addHit('perfect');
                     spawnHitEffect(note.laneIndex, '#00ffff');
+
+                    if (isAutoPlay) {
+                        pressedKeys[note.laneIndex] = false;
+                        heldNotes[note.laneIndex] = null;
+                    }
                 }
             } else if (isAutoPlay && !note.isLong && !note.processed && currentTimeMs >= note.scheduledTime) {
                 // AUTO PLAY HIT (Head)
@@ -664,10 +694,20 @@
 
         // Clear / Draw Background
         if (!isPlaying && SKIN.titleBg) {
+            // Title Screen BG (Static)
             ctx.drawImage(SKIN.titleBg, 0, 0, canvas.width, canvas.height);
-        } else if (isPlaying && SKIN.gameBg) {
-            ctx.drawImage(SKIN.gameBg, 0, 0, canvas.width, canvas.height);
-            // Alpha dark overlay for playability?
+        } else if (isPlaying) {
+            // Game BG
+            if (bgVideo && isVideoReady) {
+                // Draw Video Frame
+                // Maintain Aspect Ratio? Or Fill? Fill for now.
+                ctx.drawImage(bgVideo, 0, 0, canvas.width, canvas.height);
+            } else if (SKIN.gameBg) {
+                // Fallback Image
+                ctx.drawImage(SKIN.gameBg, 0, 0, canvas.width, canvas.height);
+            }
+
+            // Alpha dark overlay for playability
             ctx.fillStyle = 'rgba(0,0,0,0.5)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         } else {
@@ -826,15 +866,16 @@
                     ctx!.fillStyle = bodyColor;
                     ctx!.fillRect(x + H_GAP, tailY, w - (H_GAP * 2), headY - tailY);
 
-                    // Head
+                    // Reset Alpha for Head to be fully visible
+                    ctx!.globalAlpha = originalAlpha;
+
+                    // Head (Draw as normal note)
                     if (skinImg) {
                         ctx!.drawImage(skinImg, x + H_GAP, headY - (drawHeight / 2), w - (H_GAP * 2), drawHeight);
                     } else {
                         ctx!.fillStyle = config.color;
                         ctx!.fillRect(x + H_GAP, headY - (drawHeight / 2), w - (H_GAP * 2), drawHeight);
                     }
-
-                    ctx!.globalAlpha = originalAlpha;
                 } else {
                     const noteY = getNoteY(note.scheduledTime);
                     if (skinImg) {
@@ -931,6 +972,7 @@
         isPaused = true;
         console.log(`pauseGame: paused at ${pausedOffset.toFixed(3)}s`);
         stopAudio();
+        if (bgVideo) bgVideo.pause(); // Pause video
 
         pauseStatusText.textContent = "PAUSED";
         pauseOverlay.style.display = 'flex';
@@ -967,6 +1009,10 @@
         btnRetry.style.display = 'block'; // Restore display for next pause
         btnQuit.style.display = 'block';
         playAudio(pausedOffset);
+        if (bgVideo && isVideoReady) {
+            bgVideo.currentTime = pausedOffset; // Sync video to audio
+            bgVideo.play();
+        }
     }
 
     function updateCountdown() {
@@ -985,6 +1031,7 @@
         isCountdown = false;
         isPlaying = false;
         stopAudio();
+        if (bgVideo) bgVideo.pause(); // Stop video
         pauseOverlay.style.display = 'none';
         if (startScreen) startScreen.style.display = 'flex';
         controlsDiv.style.display = 'block';
@@ -1112,7 +1159,7 @@
     // Chart Helpers
     async function loadSongList() {
         try {
-            const res = await fetch('songs/list.json');
+            const res = await fetch(`songs/list.json?t=${Date.now()}`);
             const list = await res.json();
 
             songListDiv.innerHTML = '';
@@ -1143,7 +1190,7 @@
         }
     }
 
-    async function loadSong(song: any) {
+    async function loadSong(song: Song) {
         currentSongData = song; // Store for Retry
         // 0. Init Audio & Show Loading
         if (loadingOverlay) {
@@ -1153,8 +1200,36 @@
 
         try { initAudio(); } catch (e) { alert(e); return; }
 
+        playClickSound(); // Sound on Play
+
         // 1. Fetch Audio & Chart
         try {
+            // Load Audio
+            console.log(`Loading audio: songs/${song.folder}/${song.audio}`);
+
+            // Clean up previous video
+            if (bgVideo) {
+                bgVideo.pause();
+                bgVideo.src = "";
+                bgVideo = null;
+            }
+            isVideoReady = false;
+
+            // Load Video if exists
+            if (song.video) {
+                console.log(`Loading video: songs/${song.folder}/${song.video}`);
+                bgVideo = document.createElement('video');
+                bgVideo.src = `songs/${song.folder}/${song.video}`;
+                bgVideo.muted = true; // Audio handles sound
+                bgVideo.loop = false;
+                bgVideo.preload = 'auto';
+                bgVideo.addEventListener('canplay', () => {
+                    isVideoReady = true;
+                    console.log('Video ready');
+                });
+                bgVideo.load();
+            }
+
             const audioRes = await fetch(`songs/${song.folder}/${song.audio}`);
             const audioBuf = await audioRes.arrayBuffer();
             audioBuffer = await audioContext!.decodeAudioData(audioBuf);
@@ -1408,5 +1483,33 @@
 
     // Start Loop
     requestAnimationFrame(loop);
+
+    // Sound Effect Helper
+    const sfxDecision = new Audio('assets/decision.mp3');
+    // Preload
+    sfxDecision.load();
+
+    function playClickSound() {
+        // Reset and play
+        sfxDecision.currentTime = 0;
+        sfxDecision.play().catch(e => {
+            // Ignore auto-play blocking errors until interaction
+            // console.log('SFX Play blocked', e);
+        });
+    }
+
+    // Attach to UI Buttons
+    const uiButtons = [
+        btnSelectSong, btnCloseSelect, btnStartSelect,
+        btnResume, btnRetry, btnQuit, btnCloseResults,
+        btnPauseUI, btnCalibrate, btnCancelCalibration,
+        btnOptionsToggle
+    ];
+
+    uiButtons.forEach(btn => {
+        if (btn) {
+            btn.addEventListener('click', playClickSound);
+        }
+    });
 
 })();

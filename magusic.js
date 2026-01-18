@@ -114,6 +114,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     if (btnSelectSong) {
         btnSelectSong.addEventListener('click', openSongSelect);
     }
+    if (btnCloseSelect) {
+        btnCloseSelect.addEventListener('click', () => {
+            songSelectOverlay.style.display = 'none';
+            if (startScreen)
+                startScreen.style.display = 'flex';
+        });
+    }
     // ... Skipping lines, moving to btnRandom ...
     // Deleted duplicate handler block
     // Input handling logic removed from here (it exists at the bottom)
@@ -197,6 +204,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     const THRESHOLD_NICE = 100;
     const THRESHOLD_BAD = 133;
     const MISS_BOUNDARY = 150;
+    let audio = new Audio();
+    // Video Element
+    let bgVideo = null;
+    let isVideoReady = false;
+    let chart = null;
     let stats = {
         perfect: 0, great: 0, nice: 0, bad: 0, miss: 0, combo: 0, maxCombo: 0, totalErrorMs: 0, hitCount: 0
     };
@@ -458,8 +470,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             while (nextNoteIndex < chartData.length) {
                 const noteData = chartData[nextNoteIndex];
                 // Check if note is roughly within screen or just passed top
-                // We should spawn if (noteTime - currentTime) * speed < HIT_Y
-                // i.e. noteTime < currentTime + spawnAheadTime
+                // We should spawn if (noteData.time - currentTime) * speed < HIT_Y
+                // i.e. noteData.time < currentTime + spawnAheadTime
                 if (noteData.time <= currentTimeMs + spawnAheadTime) {
                     spawnNote(noteData.lane, noteData.time, noteData.duration > 0, noteData.duration);
                     nextNoteIndex++;
@@ -474,6 +486,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             console.log('Start Delay Finished. Playing Audio.');
             isStarting = false;
             playAudio(0);
+            if (bgVideo && isVideoReady)
+                bgVideo.play(); // Start video when audio starts
         }
         // If Countdown (Pause Resume), stop movement
         if (isCountdown)
@@ -491,6 +505,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     judgementTimer = 1000;
                     addHit('perfect');
                     spawnHitEffect(note.laneIndex, '#00ffff');
+                    if (isAutoPlay) {
+                        pressedKeys[note.laneIndex] = false;
+                        heldNotes[note.laneIndex] = null;
+                    }
                 }
             }
             else if (isAutoPlay && !note.isLong && !note.processed && currentTimeMs >= note.scheduledTime) {
@@ -570,11 +588,21 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             return;
         // Clear / Draw Background
         if (!isPlaying && SKIN.titleBg) {
+            // Title Screen BG (Static)
             ctx.drawImage(SKIN.titleBg, 0, 0, canvas.width, canvas.height);
         }
-        else if (isPlaying && SKIN.gameBg) {
-            ctx.drawImage(SKIN.gameBg, 0, 0, canvas.width, canvas.height);
-            // Alpha dark overlay for playability?
+        else if (isPlaying) {
+            // Game BG
+            if (bgVideo && isVideoReady) {
+                // Draw Video Frame
+                // Maintain Aspect Ratio? Or Fill? Fill for now.
+                ctx.drawImage(bgVideo, 0, 0, canvas.width, canvas.height);
+            }
+            else if (SKIN.gameBg) {
+                // Fallback Image
+                ctx.drawImage(SKIN.gameBg, 0, 0, canvas.width, canvas.height);
+            }
+            // Alpha dark overlay for playability
             ctx.fillStyle = 'rgba(0,0,0,0.5)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
@@ -722,7 +750,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     // Simple rect for long note Body
                     ctx.fillStyle = bodyColor;
                     ctx.fillRect(x + H_GAP, tailY, w - (H_GAP * 2), headY - tailY);
-                    // Head
+                    // Reset Alpha for Head to be fully visible
+                    ctx.globalAlpha = originalAlpha;
+                    // Head (Draw as normal note)
                     if (skinImg) {
                         ctx.drawImage(skinImg, x + H_GAP, headY - (drawHeight / 2), w - (H_GAP * 2), drawHeight);
                     }
@@ -730,7 +760,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                         ctx.fillStyle = config.color;
                         ctx.fillRect(x + H_GAP, headY - (drawHeight / 2), w - (H_GAP * 2), drawHeight);
                     }
-                    ctx.globalAlpha = originalAlpha;
                 }
                 else {
                     const noteY = getNoteY(note.scheduledTime);
@@ -826,6 +855,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         isPaused = true;
         console.log(`pauseGame: paused at ${pausedOffset.toFixed(3)}s`);
         stopAudio();
+        if (bgVideo)
+            bgVideo.pause(); // Pause video
         pauseStatusText.textContent = "PAUSED";
         pauseOverlay.style.display = 'flex';
         btnResume.style.display = 'block';
@@ -858,6 +889,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         btnRetry.style.display = 'block'; // Restore display for next pause
         btnQuit.style.display = 'block';
         playAudio(pausedOffset);
+        if (bgVideo && isVideoReady) {
+            bgVideo.currentTime = pausedOffset; // Sync video to audio
+            bgVideo.play();
+        }
     }
     function updateCountdown() {
         // No heavy processing needed here, setInterval handles value
@@ -873,6 +908,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         isCountdown = false;
         isPlaying = false;
         stopAudio();
+        if (bgVideo)
+            bgVideo.pause(); // Stop video
         pauseOverlay.style.display = 'none';
         if (startScreen)
             startScreen.style.display = 'flex';
@@ -1003,7 +1040,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     function loadSongList() {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                const res = yield fetch('songs/list.json');
+                const res = yield fetch(`songs/list.json?t=${Date.now()}`);
                 const list = yield res.json();
                 songListDiv.innerHTML = '';
                 list.forEach((song) => {
@@ -1048,8 +1085,32 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 alert(e);
                 return;
             }
+            playClickSound(); // Sound on Play
             // 1. Fetch Audio & Chart
             try {
+                // Load Audio
+                console.log(`Loading audio: songs/${song.folder}/${song.audio}`);
+                // Clean up previous video
+                if (bgVideo) {
+                    bgVideo.pause();
+                    bgVideo.src = "";
+                    bgVideo = null;
+                }
+                isVideoReady = false;
+                // Load Video if exists
+                if (song.video) {
+                    console.log(`Loading video: songs/${song.folder}/${song.video}`);
+                    bgVideo = document.createElement('video');
+                    bgVideo.src = `songs/${song.folder}/${song.video}`;
+                    bgVideo.muted = true; // Audio handles sound
+                    bgVideo.loop = false;
+                    bgVideo.preload = 'auto';
+                    bgVideo.addEventListener('canplay', () => {
+                        isVideoReady = true;
+                        console.log('Video ready');
+                    });
+                    bgVideo.load();
+                }
                 const audioRes = yield fetch(`songs/${song.folder}/${song.audio}`);
                 const audioBuf = yield audioRes.arrayBuffer();
                 audioBuffer = yield audioContext.decodeAudioData(audioBuf);
@@ -1274,4 +1335,28 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
     // Start Loop
     requestAnimationFrame(loop);
+    // Sound Effect Helper
+    const sfxDecision = new Audio('assets/decision.mp3');
+    // Preload
+    sfxDecision.load();
+    function playClickSound() {
+        // Reset and play
+        sfxDecision.currentTime = 0;
+        sfxDecision.play().catch(e => {
+            // Ignore auto-play blocking errors until interaction
+            // console.log('SFX Play blocked', e);
+        });
+    }
+    // Attach to UI Buttons
+    const uiButtons = [
+        btnSelectSong, btnCloseSelect, btnStartSelect,
+        btnResume, btnRetry, btnQuit, btnCloseResults,
+        btnPauseUI, btnCalibrate, btnCancelCalibration,
+        btnOptionsToggle
+    ];
+    uiButtons.forEach(btn => {
+        if (btn) {
+            btn.addEventListener('click', playClickSound);
+        }
+    });
 })();

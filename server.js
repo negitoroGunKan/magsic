@@ -16,6 +16,9 @@ const mimeTypes = {
     '.mp3': 'audio/mpeg',
     '.txt': 'text/plain',
     '.ico': 'image/x-icon',
+    '.mp4': 'video/mp4',
+    '.webm': 'video/webm',
+    '.ogv': 'video/ogg',
 };
 
 const server = http.createServer((req, res) => {

@@ -6,7 +6,8 @@
         "bpm": 183,
         "folder": "netsu_ijo",
         "audio": "netsu_ijo.mp3",
-        "chart": "netsu_ijo_chart.txt"
+        "video": "pv.mp4",
+        "chart": "chart.json"
     },
     {
         "id": "50jing",
