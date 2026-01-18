@@ -1,0 +1,20 @@
+[
+    {
+        "id": "demo1",
+        "title": "Example Song",
+        "artist": "Unknown",
+        "bpm": 120,
+        "folder": "demo",
+        "audio": "audio.mp3",
+        "chart": "chart.json"
+    },
+    {
+        "id": "50jing",
+        "title": "ジングル50",
+        "artist": "freedova",
+        "bpm": 110,
+        "folder": "ジングル50",
+        "audio": "50jingaudio.mp3",
+        "chart": "50jingchart.json"
+    }
+]

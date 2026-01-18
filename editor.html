@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magusic Chart Editor</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: white;
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #333;
+            border-radius: 8px;
+        }
+
+        label {
+            display: inline-block;
+            width: 100px;
+            margin-bottom: 5px;
+        }
+
+        input,
+        button {
+            padding: 5px;
+            margin-bottom: 5px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 200px;
+            background: #222;
+            color: #0f0;
+            font-family: monospace;
+            border: 1px solid #444;
+        }
+
+        #status {
+            color: #00bcd4;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .recording {
+            color: #ff0000;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .key-guide {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #aaa;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Magusic Chart Editor</h1>
+
+        <!-- Countdown Overlay -->
+        <div id="countdown-overlay"
+            style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); font-size:100px; font-weight:bold; color:white; text-shadow:2px 2px 4px black; pointer-events:none; z-index: 100;">
+            3
+        </div>
+
+        <div class="control-group">
+            <h3>1. Setup</h3>
+            <label>Audio File:</label>
+            <input type="file" id="audio-input" accept="audio/*"><br>
+
+            <label>BPM:</label>
+            <input type="number" id="bpm" value="110" step="0.01" style="width: 80px;">
+            <button id="btn-tap-bpm" style="margin-left: 5px;">TAP</button>
+            <button id="btn-bpm-minus" style="margin-left: 5px;">-1</button>
+            <button id="btn-bpm-plus" style="margin-left: 5px;">+1</button>
+            <br>
+
+            <label>Offset (ms):</label>
+            <input type="number" id="offset" value="0"><br>
+        </div>
+
+        <div class="control-group">
+            <h3>2. Recording</h3>
+            <button id="btn-play">Play / Pause</button>
+            <button id="btn-reset"
+                style="background-color: #d32f2f; color: white; border: none; padding: 5px 10px; margin-left: 10px;">Reset</button>
+            <label style="width: auto; margin-left: 20px;">
+                <input type="checkbox" id="chk-record"> Record Key Presses
+            </label>
+            <div id="status">Status: Ready</div>
+            <div class="key-guide">
+                Controls: E, D, R, F, Space, U, J, I, K
+            </div>
+        </div>
+
+        <div class="control-group">
+            <h3>3. Visual Editor (Piano Roll)</h3>
+            <div id="visual-editor-container"
+                style="position: relative; height: 600px; background: #222; overflow: hidden; border: 1px solid #555;">
+                <canvas id="editor-canvas" width="800" height="600"></canvas>
+                <div id="grid-controls"
+                    style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 5px; border-radius: 4px;">
+                    <label style="width: auto; color: white;">Snap:
+                        <select id="snap-select" style="background: #333; color: white; border: 1px solid #555;">
+                            <option value="4">1/4</option>
+                            <option value="8">1/8</option>
+                            <option value="16" selected>1/16</option>
+                            <option value="32">1/32</option>
+                        </select>
+                    </label>
+                    <br>
+                    <label style="width: auto; color: white;">Zoom:
+                        <input type="range" id="zoom-range" min="0.5" max="3.0" step="0.1" value="1.0"
+                            style="width: 100px;">
+                    </label>
+                    <hr style="border-color: #555; margin: 5px 0;">
+                    <div style="color: white; margin-bottom: 5px;">Note Type:</div>
+                    <label style="width: auto; color: white; margin-right: 10px;">
+                        <input type="radio" name="note-type" value="tap" checked> Tap
+                    </label>
+                    <label style="width: auto; color: white;">
+                        <input type="radio" name="note-type" value="hold"> Hold
+                    </label>
+                </div>
+                <!-- Playhead Indicator (Red Line) -->
+                <div id="playhead-line"
+                    style="position: absolute; bottom: 100px; left: 0; width: 100%; height: 2px; background: #ff0000; pointer-events: none; opacity: 0.7;">
+                </div>
+            </div>
+            <p style="font-size: 0.8em; color: #aaa; margin-top: 5px;">
+                Scroll: Seek | Click Grid: Add/Remove Note | Space: Toggle Play
+            </p>
+        </div>
+
+        <div class="control-group">
+            <h3>4. Import / Export</h3>
+            <input type="file" id="import-input" style="display: none;">
+            <button id="btn-import" onclick="document.getElementById('import-input').click()">Import JSON</button>
+            <button id="btn-export">Export to JSON</button>
+            <p>Result:</p>
+            <textarea id="output"></textarea>
+            <button onclick="navigator.clipboard.writeText(document.getElementById('output').value)">Copy to
+                Clipboard</button>
+        </div>
+    </div>
+    <script src="editor.js"></script>
+</body>
+
+</html>

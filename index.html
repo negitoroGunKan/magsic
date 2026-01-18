@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Circular Motion Sprite</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #1a1a1a;
+            /* Dark premium background */
+            color: #ffffff;
+            font-family: sans-serif;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* Options Drawer Animation */
+        #controls {
+            position: fixed !important;
+            /* Override inline */
+            top: 0;
+            right: 0;
+            width: 300px;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95) !important;
+            padding: 20px !important;
+            box-sizing: border-box;
+            /* padding included in width */
+            border-left: 1px solid #333;
+            transform: translateX(100%);
+            /* Hidden by default */
+            transition: transform 0.3s ease-out;
+            z-index: 50;
+            /* Above canvas/overlays */
+            display: block;
+            /* Default state */
+        }
+
+        #controls.open {
+            transform: translateX(0);
+        }
+
+        /* Option Toggle Button */
+        #btn-options-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 50px;
+            height: auto;
+            /* Preserve aspect ratio */
+            cursor: pointer;
+            z-index: 60;
+            /* Above drawer */
+            transition: transform 0.2s;
+            filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.5));
+        }
+
+        #btn-options-toggle:hover {
+            transform: scale(1.1);
+        }
+
+        #btn-options-toggle:active {
+            transform: scale(0.9);
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Start Screen -->
+    <div id="start-screen"
+        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10;">
+        <h1 style="font-size: 4em; color: #fff; text-shadow: 0 0 20px #e040fb; margin-bottom: 50px;">MAGUSIC</h1>
+        <button id="btn-start-select"
+            style="padding: 20px 40px; font-size: 2em; background: #e040fb; color: white; border: none; border-radius: 50px; cursor: pointer; box-shadow: 0 0 20px rgba(224, 64, 251, 0.5); transition: transform 0.2s;">
+            SELECT SONG
+        </button>
+        <p style="margin-top:20px; color:#aaa;">or click Gear Icon for Options</p>
+    </div>
+
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Option Toggle Button -->
+    <img id="btn-options-toggle" src="assets/opsion.png" alt="Options">
+
+    <!-- Options Drawer -->
+    <div id="controls">
+        <h3>Game Mode</h3>
+        <button id="btn-random">Start Random Mode</button>
+        <hr style="border-color: #555;">
+        <label>
+            Audio: <input type="file" id="audio-input" accept="audio/*">
+        </label>
+        <br><br>
+        <label>
+            Chart (JSON): <input type="file" id="chart-input">
+        </label>
+        <br><br>
+        <label>
+            Speed: <span id="speed-display">2.5</span> (Base: 0.5)
+            <input type="range" id="speed-input" min="1.0" max="5.0" step="0.1" value="2.5" style="width: 200px;">
+        </label>
+        <br><br>
+        <label>
+            Lane Width: <span id="lane-width-display">100</span>px
+            <input type="range" id="lane-width-input" min="30" max="200" step="10" value="100" style="width: 200px;">
+        </label>
+        <br><br>
+        <br><br>
+        <label>
+            Offset: <span id="offset-display">0</span> ms <span style="font-size:10px; color:#aaa">(Result (+) &rarr;
+                Move (+))</span>
+            <input type="range" id="offset-input" min="-500" max="500" step="1" value="0" style="width: 200px;">
+        </label>
+        <button id="btn-calibrate" style="margin-left: 10px;">Calibrate</button>
+        <br><br>
+        <button id="btn-select-song"
+            style="background:#e040fb; color:white; border:none; padding:10px 20px; font-size:16px; cursor:pointer; margin-right:10px;">Select
+            Song</button>
+        <button id="btn-chart">Start from File</button>
+        <p style="font-size: 12px; color: #aaa;">No JSON? Auto-generates BPM 110.</p>
+        <hr style="border-color: #555;">
+        <a href="editor.html" target="_blank" style="color: #00bcd4; text-decoration: none; font-size: 14px;">>> Open
+            Chart Editor</a>
+    </div>
+
+    <!-- Results Overlay -->
+    <div id="results-overlay"
+        style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.9); padding:40px; border:2px solid #00bcd4; border-radius:10px; text-align:center; z-index:100;">
+        <h2 style="color:white; margin-top:0;">RESULT</h2>
+        <div style="text-align:left; color:white; font-family:monospace; font-size:1.2em; line-height:1.5;">
+            <p style="color:#00ffff">PERFECT: <span id="res-perfect">0</span></p>
+            <p style="color:#ffeb3b">GREAT: <span id="res-great">0</span></p>
+            <p style="color:#00ff00">NICE: <span id="res-nice">0</span></p>
+            <p style="color:#ffae00">BAD: <span id="res-bad">0</span></p>
+            <p style="color:#ff0000">MISS: <span id="res-miss">0</span></p>
+            <hr style="border-color:#555;">
+            <p>MAX COMBO: <span id="res-combo">0</span></p>
+            <hr style="border-color:#555;">
+            <p style="font-size: 0.8em; color: #aaa;">AVG DISTANCE: <span id="res-avg" style="color:white">0</span> ms
+            </p>
+        </div>
+        <button id="btn-close-results"
+            style="margin-top:20px; padding:10px 20px; font-size:1.1em; cursor:pointer;">Close</button>
+    </div>
+
+    <!-- Song Select Overlay -->
+    <div id="song-select-overlay"
+        style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:30; padding:50px; box-sizing:border-box; overflow-y:auto;">
+        <h2 style="color:#fff; text-align:center;">SELECT SONG</h2>
+        <div id="song-list" style="max-width:800px; margin:0 auto;">
+            <!-- Song Items injected here -->
+        </div>
+        <button id="btn-close-select"
+            style="display:block; margin:20px auto; padding:15px 30px; font-size:1.2em; cursor:pointer;">Cancel</button>
+    </div>
+
+    <!-- Calibration Overlay -->
+    <div id="calibration-overlay"
+        style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:40; flex-direction:column; justify-content:center; align-items:center;">
+        <h2 style="color:#fff; font-size: 2em; margin-bottom: 20px;">Audio Calibration</h2>
+        <div id="calibration-visual"
+            style="width: 200px; height: 200px; border-radius: 50%; background: #333; margin-bottom: 30px;">
+        </div>
+        <p style="color:white; font-size: 1.5em; margin-bottom: 20px;">Tap SPACE to the beat!</p>
+        <p id="calibration-status" style="color: #aaa;">Initializing...</p>
+        <button id="btn-cancel-calibration" style="margin-top: 20px; padding: 10px 20px;">Cancel</button>
+    </div>
+    <script src="magusic.js"></script>
+</body>
+
+</html>

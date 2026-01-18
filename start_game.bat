@@ -1,0 +1,6 @@
+@echo off
+echo Starting Magusic Game Server...
+echo Opening Game and Editor in Chrome...
+start chrome "http://localhost:8080"
+start chrome "http://localhost:8080/editor.html"
+call npx -y http-server -p 8080 -c-1

@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDEs
+.vscode/
+.idea/
+
+# Compiled files (Optional: uncomment if you want to ignore generated JS)
+# *.js
+# !hoge.js
+# !magusic.js
+# !editor.js
