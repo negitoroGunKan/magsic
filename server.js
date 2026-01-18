@@ -22,7 +22,13 @@ const server = http.createServer((req, res) => {
     console.log(`${req.method} ${req.url}`);
 
     const parsedUrl = url.parse(req.url, true);
-    let pathname = parsedUrl.pathname;
+    let pathname;
+    try {
+        pathname = decodeURIComponent(parsedUrl.pathname);
+    } catch (e) {
+        console.error('URI Decode Error:', e);
+        pathname = parsedUrl.pathname;
+    }
 
     // API: Save Chart
     if (req.method === 'POST' && pathname === '/save') {
@@ -71,8 +77,12 @@ const server = http.createServer((req, res) => {
     const ext = path.extname(safePath);
     let fsPath = path.join(ROOT, safePath);
 
+    console.log(`Requested: ${pathname} -> Decoded: ${safePath}`);
+    console.log(`Attempting to read: ${fsPath}`);
+
     fs.readFile(fsPath, (err, data) => {
         if (err) {
+            console.error(`Error reading ${fsPath}:`, err.code);
             res.writeHead(404);
             res.end('Not Found');
         } else {

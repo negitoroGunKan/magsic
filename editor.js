@@ -20,6 +20,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     const activeHolds = {}; // lane -> startTime (ms)
     let isPlaying = false;
     let isRecording = false;
+    // Scrolling Strings
+    let isUpPressed = false;
+    let isDownPressed = false;
     // Visual Editor State
     let scrollTime = 0; // Current rendered time (LERP)
     let targetScrollTime = 0; // Target time (set by Audio or Scroll)
@@ -234,6 +237,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     window.addEventListener('keydown', (e) => {
         if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)
             return;
+        // Navigation (Prevent default scroll)
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            isUpPressed = true;
+        }
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            isDownPressed = true;
+        }
         if (e.key === ' ') {
             e.preventDefault();
             if (!e.repeat)
@@ -255,6 +267,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         }
     });
     window.addEventListener('keyup', (e) => {
+        if (e.key === 'ArrowUp')
+            isUpPressed = false;
+        if (e.key === 'ArrowDown')
+            isDownPressed = false;
+        if (!isPlaying || !isRecording)
+            return;
         if (!isPlaying || !isRecording)
             return;
         const key = e.key.toLowerCase();
@@ -460,6 +478,18 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     // Render Loop
     function loop() {
         updateVisuals();
+        // Handle Keyboard Scrolling
+        if (!isPlaying) {
+            const scrollSpeed = 5 * (1 / zoomLevel) * 16; // Base speed
+            if (isUpPressed) {
+                targetScrollTime += scrollSpeed;
+            }
+            if (isDownPressed) {
+                targetScrollTime -= scrollSpeed;
+            }
+            // Clamp
+            targetScrollTime = Math.max(0, Math.min((audio.duration || 600) * 1000, targetScrollTime));
+        }
         requestAnimationFrame(loop);
     }
     requestAnimationFrame(loop);
