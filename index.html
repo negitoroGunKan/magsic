@@ -93,13 +93,14 @@
 
     <!-- Start Screen -->
     <div id="start-screen"
-        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10;">
-        <h1 style="font-size: 4em; color: #fff; text-shadow: 0 0 20px #e040fb; margin-bottom: 50px;">MAGUSIC</h1>
+        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10;">
+        <img src="assets/initial2.png" alt="MagsicBeat" style="max-width: 900px; width: 80%; margin-bottom: 20px;">
+        <p style="color: #fff; font-size: 1.2em; margin-bottom: 30px; letter-spacing: 1px;">initial 1.2.1</p>
         <button id="btn-start-select"
             style="padding: 20px 40px; font-size: 2em; background: #e040fb; color: white; border: none; border-radius: 50px; cursor: pointer; box-shadow: 0 0 20px rgba(224, 64, 251, 0.5); transition: transform 0.2s;">
             SELECT SONG
         </button>
-        <p style="margin-top:20px; color:#aaa;">or click Gear Icon for Options</p>
+        <p style="margin-top:20px; color:#aaa; font-size: 0.9em;">MagsicBeat initial 1.2.1</p>
     </div>
 
     <canvas id="game-canvas"></canvas>
@@ -122,6 +123,19 @@
             <input type="checkbox" id="auto-play-checkbox" style="width: 20px; height: 20px;">
             <span style="font-weight: bold; color: #00ffff;">AUTO PLAY</span>
         </label>
+        <br>
+        <div style="margin-bottom: 10px;">
+            <span style="font-weight: bold; color: #fff;">Layout Type:</span><br>
+            <label style="cursor: pointer; margin-right: 15px;">
+                <input type="radio" name="layout-type" value="type-a"> Type A (Paired)
+            </label>
+            <label style="cursor: pointer; margin-right: 15px;">
+                <input type="radio" name="layout-type" value="type-b"> Type B (Linear)
+            </label>
+            <label style="cursor: pointer;">
+                <input type="radio" name="layout-type" value="default" checked> Default (Chart)
+            </label>
+        </div>
         <br>
         <label>
             Audio: <input type="file" id="audio-input" accept="audio/*">
@@ -181,7 +195,7 @@
 
     <!-- Song Select Overlay -->
     <div id="song-select-overlay"
-        style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:30; padding:50px; box-sizing:border-box; overflow-y:auto;">
+        style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background: #000; z-index:30; padding:50px; box-sizing:border-box; overflow-y:auto;">
         <h2 style="color:#fff; text-align:center;">SELECT SONG</h2>
         <div id="song-list" style="max-width:800px; margin:0 auto;">
             <!-- Song Items injected here -->

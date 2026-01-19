@@ -53,10 +53,33 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     const resCombo = document.getElementById('res-combo');
     const resAvg = document.getElementById('res-avg');
     const btnCloseResults = document.getElementById('btn-close-results');
+    // Score Display (In-game)
+    const scoreDisplay = document.getElementById('score-display');
+    let rawScore = 0;
+    let lostScore = 0;
+    let totalMaxScore = 1;
     // Offset Controls
     const offsetInput = document.getElementById('offset-input');
     const offsetDisplay = document.getElementById('offset-display');
     let globalOffset = 0;
+    // Layout Selector
+    let currentLayoutType = 'default';
+    let targetLayoutType = 'type-a'; // The layout we should be in
+    // Lane State for Interpolation
+    let LERP_SPEED = 0.15; // Smoothness factor
+    let currentLaneWidthState = 100; // Track width for resize logic
+    const layoutRadios = document.getElementsByName('layout-type');
+    layoutRadios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            currentLayoutType = e.target.value;
+            console.log('Layout changed to:', currentLayoutType);
+            // If explicit type-a/b is chosen, it overrides chart
+            if (currentLayoutType !== 'default') {
+                targetLayoutType = currentLayoutType;
+            }
+            resize();
+        });
+    });
     // Calibration UI
     const calibrationOverlay = document.getElementById('calibration-overlay');
     const btnCalibrate = document.getElementById('btn-calibrate');
@@ -205,15 +228,21 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     const THRESHOLD_BAD = 133;
     const MISS_BOUNDARY = 150;
     let audio = new Audio();
-    // Video Element
     let bgVideo = null;
     let isVideoReady = false;
     let chart = null;
     let stats = {
-        perfect: 0, great: 0, nice: 0, bad: 0, miss: 0, combo: 0, maxCombo: 0, totalErrorMs: 0, hitCount: 0
+        perfect: 0, great: 0, nice: 0, bad: 0, miss: 0, combo: 0, maxCombo: 0, totalErrorMs: 0, hitCount: 0, score: 0
     };
+    const SCORE_WEIGHTS = { perfect: 9, great: 8, nice: 2, bad: 1, miss: 0 };
     function resetStats() {
-        stats = { perfect: 0, great: 0, nice: 0, bad: 0, miss: 0, combo: 0, maxCombo: 0, totalErrorMs: 0, hitCount: 0 };
+        stats = { perfect: 0, great: 0, nice: 0, bad: 0, miss: 0, combo: 0, maxCombo: 0, totalErrorMs: 0, hitCount: 0, score: 0 };
+        rawScore = 0;
+        lostScore = 0;
+        // Calculate Max Score based on current chart (Long Note = Head(9) + Tail(9) = 18)
+        totalMaxScore = (chartData && chartData.length > 0)
+            ? chartData.reduce((acc, n) => acc + (n.duration > 0 ? 18 : 9), 0)
+            : 1;
     }
     function addHit(type, errorMs = 0) {
         stats[type]++;
@@ -230,6 +259,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 stats.maxCombo = stats.combo;
             }
         }
+        // Scoring Logic (Subtraction)
+        const weight = SCORE_WEIGHTS[type];
+        const loss = 9 - weight;
+        lostScore += loss;
+        rawScore += weight;
     }
     // Calibration State
     let isCalibrating = false;
@@ -341,6 +375,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     const START_DELAY_MS = 3000;
     // Chart Data
     let chartData = [];
+    let layoutChanges = [];
     let nextNoteIndex = 0;
     let VISUAL_LANES = [];
     // Judgement Feedback
@@ -444,12 +479,28 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         });
     }
     function update(deltaTime) {
-        if (!isPlaying)
+        if (!isPlaying || isPaused || isCountdown)
             return;
-        if (isPaused)
-            return;
-        // if (isCountdown) return; // REMOVED: We want spawning to happen during countdown!
-        const currentTimeMs = getAudioTime() * 1000;
+        const currentTime = getAudioTime(); // In seconds
+        const currentTimeMs = currentTime * 1000;
+        // 0. Update Layout Targets (Default Mode)
+        if (currentLayoutType === 'default' && layoutChanges.length > 0) {
+            let activeType = 'type-a'; // Default
+            for (const lc of layoutChanges) {
+                if (currentTimeMs >= lc.time) { // Convert ms to seconds for comparison
+                    activeType = lc.type;
+                }
+                else {
+                    break;
+                }
+            }
+            if (targetLayoutType !== activeType) {
+                targetLayoutType = activeType;
+                recalculateTargets();
+            }
+        }
+        // 0b. Smooth Interpolation
+        updateLaneInterpolation();
         // 1. Spawning
         if (currentMode === 'random') {
             // Random Spawn Logic
@@ -461,7 +512,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         }
         else {
             // Chart Spawn Logic
-            const currentTimeMs = getAudioTime() * 1000;
             // Spawn ahead: look for notes that will arrive at HIT_Y within window.
             // But we can look arbitrarily far ahead? No, usually screen height.
             // If we use screen height, we only spawn what is on screen.
@@ -482,7 +532,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             }
         }
         // Check for Start Sequence End
-        if (isStarting && currentTimeMs >= 0) {
+        if (isStarting && currentTime >= 0) {
             console.log('Start Delay Finished. Playing Audio.');
             isStarting = false;
             playAudio(0);
@@ -552,6 +602,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     judgementColor = '#ff0000';
                     judgementTimer = 1000;
                     addHit('miss');
+                    if (note.isLong)
+                        addHit('miss'); // Penalize tail too for complete ignore
                 }
             }
             else { // Long note processed but lost hold?
@@ -565,7 +617,23 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             const note = notes[i];
             const tailTime = note.scheduledTime + note.duration;
             const tailY = getNoteY(tailTime);
-            if (!note.active || tailY > canvas.height + 100) { // Off screen
+            // 1. Check if Off Screen
+            if (tailY > canvas.height + 100) {
+                // If it's still active and going off screen, it's a MISS!
+                // (Fix for high speed notes skipping the time-based miss check)
+                if (note.active) {
+                    note.active = false;
+                    judgementText = `MISS`;
+                    judgementColor = '#ff0000';
+                    judgementTimer = 1000;
+                    addHit('miss');
+                    if (note.isLong)
+                        addHit('miss'); // Penalize tail
+                }
+                notes.splice(i, 1);
+            }
+            // 2. Check if already processed (inactive)
+            else if (!note.active) {
                 notes.splice(i, 1);
             }
         }
@@ -687,6 +755,17 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 }
             }
         });
+        // Draw Judgement Counts (Side)
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.textAlign = 'left';
+        ctx.font = '20px monospace';
+        const statsStartY = 150;
+        const statsLineH = 30;
+        ctx.fillText(`PERFECT: ${stats.perfect}`, 20, statsStartY);
+        ctx.fillText(`GREAT:   ${stats.great}`, 20, statsStartY + statsLineH);
+        ctx.fillText(`NICE:    ${stats.nice}`, 20, statsStartY + statsLineH * 2);
+        ctx.fillText(`BAD:     ${stats.bad}`, 20, statsStartY + statsLineH * 3);
+        ctx.fillText(`MISS:    ${stats.miss}`, 20, statsStartY + statsLineH * 4);
         // Draw Labels
         ctx.fillStyle = '#fff';
         ctx.textAlign = 'center';
@@ -702,14 +781,45 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 ctx.fillText(c.label, c.x + c.width / 2, yPos);
             }
         });
-        // Draw Combo
+        // Draw Combo & Score
         if (stats.combo > 0) {
             ctx.fillStyle = '#fff';
             ctx.font = 'bold 60px Arial';
             ctx.textAlign = 'center';
             ctx.globalAlpha = 0.3;
             ctx.fillText(stats.combo.toString(), canvas.width / 2, canvas.height / 2);
+            // Subtraction Score Display (Under Combo)
+            // Example: 100.0000%
+            let pct = ((totalMaxScore - lostScore) / totalMaxScore) * 100;
+            if (pct < 0)
+                pct = 0;
+            const scoreText = pct.toFixed(4) + '%';
+            ctx.font = 'bold 30px Arial';
+            ctx.fillText(scoreText, canvas.width / 2, (canvas.height / 2) + 50);
             ctx.globalAlpha = 1.0;
+        }
+        // Draw Judgement Stats (Left of Lanes)
+        if (laneStartX > 150) { // Only if there's space
+            const statsX = laneStartX - 140;
+            const statsStartTime = canvas.height / 2 - 100;
+            const lineHeight = 35;
+            ctx.textAlign = 'right';
+            ctx.font = 'bold 24px Arial';
+            // Perfect
+            ctx.fillStyle = '#00ffff';
+            ctx.fillText(`PERFECT: ${stats.perfect}`, statsX, statsStartTime);
+            // Great
+            ctx.fillStyle = '#ffeb3b';
+            ctx.fillText(`GREAT: ${stats.great}`, statsX, statsStartTime + lineHeight);
+            // Nice
+            ctx.fillStyle = '#00ff00';
+            ctx.fillText(`NICE: ${stats.nice}`, statsX, statsStartTime + lineHeight * 2);
+            // Bad
+            ctx.fillStyle = '#ffae00';
+            ctx.fillText(`BAD: ${stats.bad}`, statsX, statsStartTime + lineHeight * 3);
+            // Miss
+            ctx.fillStyle = '#ff0000';
+            ctx.fillText(`MISS: ${stats.miss}`, statsX, statsStartTime + lineHeight * 4);
         }
         // Draw Notes (Multi-pass: White -> Blue -> Space)
         function drawNotesForLane(targetLaneIdx) {
@@ -901,7 +1011,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         isPaused = false;
         isCountdown = false;
         pauseOverlay.style.display = 'none';
-        loadSong(currentSongData); // Restart
+        if (currentSongData && currentChartFilename) {
+            loadSong(currentSongData, currentChartFilename); // Restart
+        }
     }
     function quitGame() {
         isPaused = false;
@@ -925,23 +1037,66 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     // Interaction Handlers
     // ==========================================
     function showResults() {
-        if (resPerfect)
-            resPerfect.textContent = stats.perfect.toString();
-        if (resGreat)
-            resGreat.textContent = stats.great.toString();
-        if (resNice)
-            resNice.textContent = stats.nice.toString();
-        if (resBad)
-            resBad.textContent = stats.bad.toString();
-        if (resMiss)
-            resMiss.textContent = stats.miss.toString();
-        if (resCombo)
-            resCombo.textContent = stats.maxCombo.toString();
-        if (resAvg) {
-            const avg = stats.hitCount > 0 ? (stats.totalErrorMs / stats.hitCount).toFixed(1) : '0';
-            resAvg.textContent = avg;
-        }
-        resultsOverlay.style.display = 'block';
+        return __awaiter(this, void 0, void 0, function* () {
+            if (resPerfect)
+                resPerfect.textContent = stats.perfect.toString();
+            if (resGreat)
+                resGreat.textContent = stats.great.toString();
+            if (resNice)
+                resNice.textContent = stats.nice.toString();
+            if (resBad)
+                resBad.textContent = stats.bad.toString();
+            if (resMiss)
+                resMiss.textContent = stats.miss.toString();
+            if (resCombo)
+                resCombo.textContent = stats.maxCombo.toString();
+            if (resAvg) {
+                const avg = stats.hitCount > 0 ? (stats.totalErrorMs / stats.hitCount).toFixed(1) : '0';
+                resAvg.textContent = avg;
+            }
+            // Calculate Final Scaled Score (0 - 1,000,000)
+            const finalRatio = totalMaxScore > 0 ? (totalMaxScore - lostScore) / totalMaxScore : 0;
+            const scaledScore = Math.floor(finalRatio * 1000000);
+            // Calculate Rank
+            let rank = 'D';
+            if (finalRatio >= 0.95)
+                rank = 'S';
+            else if (finalRatio >= 0.9)
+                rank = 'A';
+            else if (finalRatio >= 0.8)
+                rank = 'B';
+            else if (finalRatio >= 0.7)
+                rank = 'C';
+            resultsOverlay.style.display = 'block';
+            // Send to Server
+            if (currentSongData) {
+                try {
+                    const response = yield fetch('/api/score', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            songId: currentSongData.id,
+                            difficulty: currentChartFilename, // Use filename as diff identifier
+                            score: scaledScore,
+                            rank: rank,
+                            layout: currentLayoutType, // Include layout type
+                            combo: stats.maxCombo,
+                            perfect: stats.perfect,
+                            great: stats.great,
+                            nice: stats.nice,
+                            bad: stats.bad,
+                            miss: stats.miss,
+                            percentage: (finalRatio * 100).toFixed(4)
+                        })
+                    });
+                    if (!response.ok)
+                        console.error('Failed to save score');
+                }
+                catch (e) {
+                    console.error('Error sending score:', e);
+                }
+            }
+        });
     }
     if (speedInput && speedDisplay) {
         speedInput.addEventListener('input', () => {
@@ -1037,30 +1192,123 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         }));
     }
     // Chart Helpers
+    const DIFF_ORDER = ['no', 'st', 'ad', 'pr', 'et'];
+    const DIFF_LABELS = {
+        'no': 'Normal', 'st': 'Standard', 'ad': 'Advanced', 'pr': 'Provecta', 'et': 'Eternal'
+    };
+    const DIFF_COLORS = {
+        'no': '#4caf50', 'st': '#2196f3', 'ad': '#ffeb3b', 'pr': '#ff5722', 'et': '#9c27b0'
+    };
     function loadSongList() {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const res = yield fetch(`songs/list.json?t=${Date.now()}`);
                 const list = yield res.json();
+                // Fetch High Scores
+                let allScores = {};
+                try {
+                    const scoresRes = yield fetch(`scores.json?t=${Date.now()}`);
+                    if (scoresRes.ok) {
+                        allScores = yield scoresRes.json();
+                    }
+                }
+                catch (e) {
+                    console.error('Failed to fetch scores.json', e);
+                }
                 songListDiv.innerHTML = '';
                 list.forEach((song) => {
                     const div = document.createElement('div');
                     div.style.background = '#333';
-                    div.style.padding = '20px';
+                    div.style.padding = '15px';
                     div.style.marginBottom = '10px';
-                    div.style.cursor = 'pointer';
                     div.style.border = '1px solid #555';
                     div.style.display = 'flex';
-                    div.style.justifyContent = 'space-between';
-                    div.style.alignItems = 'center';
+                    div.style.flexDirection = 'column';
+                    div.style.gap = '10px';
+                    // Header
                     div.innerHTML = `
-                    <div>
-                        <div style="font-size:1.2em; color:white; font-weight:bold;">${song.title}</div>
-                        <div style="font-size:0.9em; color:#aaa;">${song.artist} | BPM: ${song.bpm}</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <div style="font-size:1.2em; color:white; font-weight:bold;">${song.title}</div>
+                            <div style="font-size:0.9em; color:#aaa;">${song.artist} | BPM: ${song.bpm}</div>
+                        </div>
                     </div>
-                    <div style="color:#e040fb; font-weight:bold;">PLAY &rarr;</div>
                 `;
-                    div.onclick = () => loadSong(song);
+                    // Difficulty Buttons Container
+                    const btnContainer = document.createElement('div');
+                    btnContainer.style.display = 'flex';
+                    btnContainer.style.gap = '15px';
+                    btnContainer.style.marginTop = '5px';
+                    btnContainer.style.flexWrap = 'wrap';
+                    // Render Buttons
+                    if (song.charts) {
+                        DIFF_ORDER.forEach(diffKey => {
+                            if (song.charts && song.charts[diffKey]) {
+                                const filename = song.charts[diffKey];
+                                const btnWrapper = document.createElement('div');
+                                btnWrapper.style.display = 'flex';
+                                btnWrapper.style.flexDirection = 'column';
+                                btnWrapper.style.alignItems = 'center';
+                                btnWrapper.style.gap = '5px';
+                                const btn = document.createElement('button');
+                                btn.style.border = 'none';
+                                btn.style.background = 'transparent';
+                                btn.style.cursor = 'pointer';
+                                btn.style.padding = '0';
+                                const img = document.createElement('img');
+                                img.src = `assets/diff_${diffKey}.png`;
+                                img.alt = DIFF_LABELS[diffKey] || diffKey.toUpperCase();
+                                img.style.height = '40px'; // Adjust size as needed
+                                img.style.display = 'block';
+                                // Fallback to text if image missing
+                                img.onerror = () => {
+                                    img.style.display = 'none';
+                                    btn.textContent = DIFF_LABELS[diffKey] || diffKey.toUpperCase();
+                                    btn.style.padding = '5px 10px';
+                                    btn.style.borderRadius = '4px';
+                                    btn.style.color = '#fff';
+                                    btn.style.fontWeight = 'bold';
+                                    btn.style.background = DIFF_COLORS[diffKey] || '#777';
+                                };
+                                btn.appendChild(img);
+                                btn.onclick = (e) => {
+                                    e.stopPropagation();
+                                    loadSong(song, filename);
+                                };
+                                btnWrapper.appendChild(btn);
+                                // High Score Label
+                                const songScores = allScores[song.id] || [];
+                                const bestScore = songScores
+                                    .filter((s) => s.difficulty === filename)
+                                    .sort((a, b) => b.score - a.score)[0];
+                                if (bestScore) {
+                                    const scoreDiv = document.createElement('div');
+                                    scoreDiv.style.fontSize = '12px';
+                                    scoreDiv.style.color = '#00ffff';
+                                    scoreDiv.style.fontFamily = 'monospace';
+                                    scoreDiv.textContent = bestScore.score.toLocaleString();
+                                    btnWrapper.appendChild(scoreDiv);
+                                }
+                                btnContainer.appendChild(btnWrapper);
+                            }
+                        });
+                    }
+                    else if (song.chart) {
+                        // Legacy Fallback
+                        const btn = document.createElement('button');
+                        btn.textContent = 'PLAY';
+                        btn.style.padding = '5px 15px';
+                        btn.style.background = '#e040fb';
+                        btn.style.border = 'none';
+                        btn.style.color = 'white';
+                        btn.style.cursor = 'pointer';
+                        btn.onclick = (e) => {
+                            e.stopPropagation();
+                            loadSong(song, song.chart);
+                        };
+                        btnContainer.appendChild(btn);
+                    }
+                    div.appendChild(btnContainer);
                     songListDiv.appendChild(div);
                 });
             }
@@ -1069,9 +1317,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             }
         });
     }
-    function loadSong(song) {
+    // State for Retry
+    let currentChartFilename = '';
+    function loadSong(song, chartFilename) {
         return __awaiter(this, void 0, void 0, function* () {
             currentSongData = song; // Store for Retry
+            currentChartFilename = chartFilename;
             // 0. Init Audio & Show Loading
             if (loadingOverlay) {
                 loadingOverlay.style.display = 'flex';
@@ -1114,7 +1365,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 const audioRes = yield fetch(`songs/${song.folder}/${song.audio}`);
                 const audioBuf = yield audioRes.arrayBuffer();
                 audioBuffer = yield audioContext.decodeAudioData(audioBuf);
-                const chartRes = yield fetch(`songs/${song.folder}/${song.chart}`);
+                const chartRes = yield fetch(`songs/${song.folder}/${chartFilename}`);
                 const chartText = yield chartRes.text();
                 // BOM removal not typically needed for fetch unless file saved with BOM
                 let text = chartText;
@@ -1168,14 +1419,29 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         // Audio will be triggered in update() when getAudioTime() >= 0
     }
     function parseChart(json) {
-        const bpm = json.bpm || 110;
+        const bpm = json.bpm || 120;
         const offset = json.offset || 0;
         const msPerBeat = 60000 / bpm;
-        return json.notes.map((n) => ({
-            time: (n.beat * msPerBeat) + offset,
+        // Parse Notes
+        const notes = json.notes.map((n) => ({
+            time: offset + (n.beat * msPerBeat),
             lane: n.lane,
-            duration: n.duration ? n.duration * msPerBeat : 0
+            duration: (n.duration || 0) * msPerBeat,
+            isLong: (n.duration > 0),
+            hit: false
         })).sort((a, b) => a.time - b.time);
+        // Parse Layout Changes
+        layoutChanges = [];
+        if (Array.isArray(json.layoutChanges)) {
+            json.layoutChanges.forEach((lc) => {
+                layoutChanges.push({
+                    time: offset + (lc.beat * msPerBeat),
+                    type: lc.type
+                });
+            });
+            layoutChanges.sort((a, b) => a.time - b.time);
+        }
+        return notes;
     }
     function generateAutoChart(bpm, durationSec) {
         const msPerBeat = 60000 / bpm;
@@ -1186,57 +1452,105 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             data.push({
                 time: i * msPerBeat,
                 lane: laneMap[i % 4],
-                duration: 0
+                duration: 0,
+                isLong: false,
+                hit: false
             });
         }
         return data;
     }
+    // Target structures for interpolation
+    let VISUAL_LANE_TARGETS = [];
+    let LANE_CONFIG_TARGETS = [];
     // Resize handling
     function resize() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
         HIT_Y = canvas.height - 100;
-        // 1. Calculate Visual Lanes (Static Background 4 cols)
-        VISUAL_LANES = [];
-        LANE_CONFIGS = [];
-        const totalPlayWidth = currentLaneWidth * 4;
-        laneStartX = (canvas.width - totalPlayWidth) / 2;
-        // Populate 4 main lanes
-        for (let i = 0; i < 4; i++) {
-            VISUAL_LANES.push({
-                x: laneStartX + (i * currentLaneWidth),
-                width: currentLaneWidth
-            });
+        currentLaneWidthState = currentLaneWidth;
+        recalculateTargets();
+        // If it's the first time or we want immediate snap, sync
+        if (VISUAL_LANES.length === 0) {
+            VISUAL_LANES = JSON.parse(JSON.stringify(VISUAL_LANE_TARGETS));
+            LANE_CONFIGS = JSON.parse(JSON.stringify(LANE_CONFIG_TARGETS));
         }
-        const assignLane = (keyIndex, laneVisIndex, label, color, xOffset = 0, widthScale = 1.0) => {
-            LANE_CONFIGS[keyIndex] = {
-                x: laneStartX + (laneVisIndex * currentLaneWidth) + xOffset,
-                width: currentLaneWidth * widthScale,
-                color: color,
-                label: label
-            };
+    }
+    function recalculateTargets() {
+        const tempWidth = currentLaneWidth;
+        const getLayoutData = (type) => {
+            const vLanes = [];
+            const lConfigs = [];
+            if (type === 'type-a') {
+                const totalPlayWidth = tempWidth * 4;
+                const sx = (canvas.width - totalPlayWidth) / 2;
+                for (let i = 0; i < 4; i++) {
+                    vLanes.push({ x: sx + (i * tempWidth), width: tempWidth });
+                }
+                const assign = (keyIdx, visIdx, lbl, clr, xOff = 0, wScale = 1.0) => {
+                    lConfigs[keyIdx] = { x: sx + (visIdx * tempWidth) + xOff, width: tempWidth * wScale, color: clr, label: lbl };
+                };
+                const blueScale = 0.85;
+                assign(0, 0, '', '#7CA4FF', 0, blueScale);
+                assign(1, 0, 'E/D', '#ffffff');
+                assign(2, 1, '', '#7CA4FF', 0, blueScale);
+                assign(3, 1, 'R/F', '#ffffff');
+                lConfigs[4] = { x: sx, width: totalPlayWidth, color: '#e040fb', label: 'SPACE' };
+                assign(5, 2, '', '#7CA4FF', 0, blueScale);
+                assign(6, 2, 'U/J', '#ffffff');
+                assign(7, 3, '', '#7CA4FF', 0, blueScale);
+                assign(8, 3, 'I/K', '#ffffff');
+            }
+            else {
+                const bScale = 0.7, wScale = 1.0;
+                const totalScale = (4 * bScale) + (4 * wScale);
+                const totalPlayWidth = tempWidth * totalScale;
+                const sx = (canvas.width - totalPlayWidth) / 2;
+                const ord = [
+                    { idx: 0, label: 'E', color: '#7CA4FF', scale: bScale },
+                    { idx: 1, label: 'D', color: '#ffffff', scale: wScale },
+                    { idx: 2, label: 'R', color: '#7CA4FF', scale: bScale },
+                    { idx: 3, label: 'F', color: '#ffffff', scale: wScale },
+                    { idx: 5, label: 'U', color: '#7CA4FF', scale: bScale },
+                    { idx: 6, label: 'J', color: '#ffffff', scale: wScale },
+                    { idx: 7, label: 'I', color: '#7CA4FF', scale: bScale },
+                    { idx: 8, label: 'K', color: '#ffffff', scale: wScale }
+                ];
+                let cx = sx;
+                ord.forEach(item => {
+                    const w = tempWidth * item.scale;
+                    vLanes.push({ x: cx, width: w });
+                    lConfigs[item.idx] = { x: cx, width: w, color: item.color, label: item.label };
+                    cx += w;
+                });
+                lConfigs[4] = { x: sx, width: totalPlayWidth, color: '#e040fb', label: 'SPACE' };
+            }
+            return { vLanes, lConfigs };
         };
-        const blueOffset = 0;
-        const blueScale = 0.85;
-        // E (0) & D (1) -> Lane 0
-        assignLane(0, 0, '', '#7CA4FF', blueOffset, blueScale);
-        assignLane(1, 0, 'E/D', '#ffffff');
-        // R (2) & F (3) -> Lane 1
-        assignLane(2, 1, '', '#7CA4FF', blueOffset, blueScale);
-        assignLane(3, 1, 'R/F', '#ffffff');
-        // Space (4) - Full Width
-        LANE_CONFIGS[4] = {
-            x: laneStartX,
-            width: totalPlayWidth,
-            color: '#e040fb',
-            label: 'SPACE'
-        };
-        // U (5) & J (6) -> Lane 2
-        assignLane(5, 2, '', '#7CA4FF', blueOffset, blueScale);
-        assignLane(6, 2, 'U/J', '#ffffff');
-        // I (7) & K (8) -> Lane 3
-        assignLane(7, 3, '', '#7CA4FF', blueOffset, blueScale);
-        assignLane(8, 3, 'I/K', '#ffffff');
+        const targets = getLayoutData(targetLayoutType);
+        VISUAL_LANE_TARGETS = targets.vLanes;
+        LANE_CONFIG_TARGETS = targets.lConfigs;
+    }
+    function updateLaneInterpolation() {
+        // Linear Interpolate VISUAL_LANES and LANE_CONFIGS towards targets
+        const lerp = (cur, tar) => cur + (tar - cur) * LERP_SPEED;
+        // Visual Lanes
+        if (VISUAL_LANES.length !== VISUAL_LANE_TARGETS.length) {
+            // If length changed (e.g. Type A (4) -> Type B (8)), we just snap or rebuild
+            VISUAL_LANES = JSON.parse(JSON.stringify(VISUAL_LANE_TARGETS));
+        }
+        else {
+            for (let i = 0; i < VISUAL_LANES.length; i++) {
+                VISUAL_LANES[i].x = lerp(VISUAL_LANES[i].x, VISUAL_LANE_TARGETS[i].x);
+                VISUAL_LANES[i].width = lerp(VISUAL_LANES[i].width, VISUAL_LANE_TARGETS[i].width);
+            }
+        }
+        // Lane Configs
+        for (let i = 0; i < LANE_CONFIGS.length; i++) {
+            if (!LANE_CONFIGS[i] || !LANE_CONFIG_TARGETS[i])
+                continue;
+            LANE_CONFIGS[i].x = lerp(LANE_CONFIGS[i].x, LANE_CONFIG_TARGETS[i].x);
+            LANE_CONFIGS[i].width = lerp(LANE_CONFIGS[i].width, LANE_CONFIG_TARGETS[i].width);
+        }
     }
     window.addEventListener('resize', resize);
     resize();

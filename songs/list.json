@@ -7,7 +7,13 @@
         "folder": "netsu_ijo",
         "audio": "netsu_ijo.mp3",
         "video": "pv.mp4",
-        "chart": "chart.json"
+        "charts": {
+            "no": "netsu_ijo_no.json",
+            "st": "netsu_ijo_st.json",
+            "ad": "netsu_ijo_ad.json",
+            "pr": "netsu_ijo_pr.json",
+            "et": "netsu_ijo_et.json"
+        }
     },
     {
         "id": "50jing",
@@ -16,6 +22,8 @@
         "bpm": 110,
         "folder": "ジングル50",
         "audio": "50jingaudio.mp3",
-        "chart": "50jingchart.json"
+        "charts": {
+            "st": "50jingchart.json"
+        }
     }
 ]

@@ -72,6 +72,49 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // API: Save Score
+    if (req.method === 'POST' && pathname === '/api/score') {
+        let body = '';
+        req.on('data', chunk => body += chunk.toString());
+        req.on('end', () => {
+            try {
+                const newScore = JSON.parse(body);
+                const scoresPath = path.join(ROOT, 'scores.json');
+
+                let scores = {};
+                if (fs.existsSync(scoresPath)) {
+                    try {
+                        scores = JSON.parse(fs.readFileSync(scoresPath, 'utf8'));
+                    } catch (e) {
+                        console.error('Error parsing scores.json', e);
+                    }
+                }
+
+                const songId = newScore.songId;
+                if (!scores[songId]) scores[songId] = [];
+                scores[songId].push(newScore);
+
+                // Sort by score desc
+                scores[songId].sort((a, b) => b.score - a.score);
+
+                fs.writeFile(scoresPath, JSON.stringify(scores, null, 2), err => {
+                    if (err) {
+                        res.writeHead(500);
+                        res.end('Error saving score');
+                    } else {
+                        res.writeHead(200);
+                        res.end('Score saved');
+                    }
+                });
+            } catch (e) {
+                console.error(e);
+                res.writeHead(400);
+                res.end('Bad Request');
+            }
+        });
+        return;
+    }
+
     // Static File Serving
     if (pathname === '/') pathname = '/index.html';
 
