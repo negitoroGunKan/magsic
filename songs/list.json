@@ -25,5 +25,35 @@
         "charts": {
             "st": "50jingchart.json"
         }
+    },
+    {
+        "id": "shoshitsu",
+        "title": "初音ミクの消失",
+        "artist": "cosMo@暴走P",
+        "bpm": 240,
+        "folder": "shoshitsu",
+        "audio": "shoshitsu.wav",
+        "charts": {
+            "no": "shoshitsu_no.json",
+            "st": "shoshitsu_st.json",
+            "ad": "shoshitsu_ad.json",
+            "pr": "shoshitsu_pr.json",
+            "et": "shoshitsu_et.json"
+        }
+    },
+    {
+        "id": "knight_of_nights",
+        "title": "ナイトオブナイツ",
+        "artist": "ビートまりお",
+        "bpm": 180,
+        "folder": "knight_of_nights",
+        "audio": "knight_of_nights.wav",
+        "charts": {
+            "no": "knights_no.json",
+            "st": "knights_st.json",
+            "ad": "knights_ad.json",
+            "pr": "knights_pr.json",
+            "et": "knights_et.json"
+        }
     }
 ]

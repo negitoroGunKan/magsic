@@ -3,6 +3,16 @@
   "offset": 88,
   "notes": [
     {
+      "beat": -0.25,
+      "lane": 0,
+      "duration": 0
+    },
+    {
+      "beat": 0,
+      "lane": 0,
+      "duration": 0
+    },
+    {
       "beat": 0,
       "lane": 4,
       "duration": 1
@@ -25,6 +35,11 @@
     {
       "beat": 2,
       "lane": 7,
+      "duration": 0
+    },
+    {
+      "beat": 2.5,
+      "lane": 0,
       "duration": 0
     },
     {

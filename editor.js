@@ -136,7 +136,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 // 1. Load Audio
                 audio.src = `songs/${song.folder}/${song.audio}`;
                 // 2. Load Chart
-                const chartRes = yield fetch(`songs/${song.folder}/${opt.filename}`);
+                const chartRes = yield fetch(`songs/${song.folder}/${opt.filename}?t=${Date.now()}`);
                 if (chartRes.ok) {
                     const chartText = yield chartRes.text();
                     let text = chartText;

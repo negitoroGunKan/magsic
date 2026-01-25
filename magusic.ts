@@ -339,10 +339,12 @@
         }
 
         // Scoring Logic (Subtraction)
-        const weight = SCORE_WEIGHTS[type];
-        const loss = 9 - weight;
-        lostScore += loss;
-        rawScore += weight;
+        if (!isAutoPlay) {
+            const weight = SCORE_WEIGHTS[type];
+            const loss = 9 - weight;
+            lostScore += loss;
+            rawScore += weight;
+        }
     }
 
 
@@ -932,13 +934,16 @@
             ctx.fillText(stats.combo.toString(), canvas.width / 2, canvas.height / 2);
 
             // Subtraction Score Display (Under Combo)
-            // Example: 100.0000%
-            let pct = ((totalMaxScore - lostScore) / totalMaxScore) * 100;
-            if (pct < 0) pct = 0;
-            const scoreText = pct.toFixed(4) + '%';
-
+            // If AutoPlay, show label instead of score
             ctx.font = 'bold 30px Arial';
-            ctx.fillText(scoreText, canvas.width / 2, (canvas.height / 2) + 50);
+            if (isAutoPlay) {
+                ctx.fillText('AUTO PLAY', canvas.width / 2, (canvas.height / 2) + 50);
+            } else {
+                let pct = ((totalMaxScore - lostScore) / totalMaxScore) * 100;
+                if (pct < 0) pct = 0;
+                const scoreText = pct.toFixed(4) + '%';
+                ctx.fillText(scoreText, canvas.width / 2, (canvas.height / 2) + 50);
+            }
 
             ctx.globalAlpha = 1.0;
         }
@@ -988,7 +993,7 @@
                 const w = config.width;
                 const H_GAP = 2; // Horizontal Gap (shrink width)
 
-                // Determine Note Height (Space is thinner)
+                // Determine Note Height (Blue is same size, Space is thinner)
                 let drawHeight = NOTE_HEIGHT;
                 if (note.laneIndex === 4) {
                     drawHeight = 3;
@@ -1035,14 +1040,14 @@
             });
         }
 
-        // Pass 1: White Notes (1, 3, 6, 8)
+        // Pass 1: Space (4) - Behind
+        drawNotesForLane(4);
+
+        // Pass 2: White Notes (1, 3, 6, 8)
         [1, 3, 6, 8].forEach(idx => drawNotesForLane(idx));
 
-        // Pass 2: Blue Notes (0, 2, 5, 7) - On Top
+        // Pass 3: Blue Notes (0, 2, 5, 7) - On Top
         [0, 2, 5, 7].forEach(idx => drawNotesForLane(idx));
-
-        // Pass 3: Space (4)
-        drawNotesForLane(4);
 
         // Draw Judgement
         if (judgementTimer > 0) {
@@ -1222,8 +1227,8 @@
 
         resultsOverlay.style.display = 'block';
 
-        // Send to Server
-        if (currentSongData) {
+        // Send to Server (Skip if AutoPlay)
+        if (currentSongData && !isAutoPlay) {
             try {
                 const response = await fetch('/api/score', {
                     method: 'POST',
@@ -1531,7 +1536,7 @@
             const audioBuf = await audioRes.arrayBuffer();
             audioBuffer = await audioContext!.decodeAudioData(audioBuf);
 
-            const chartRes = await fetch(`songs/${song.folder}/${chartFilename}`);
+            const chartRes = await fetch(`songs/${song.folder}/${chartFilename}?t=${Date.now()}`);
             const chartText = await chartRes.text();
             // BOM removal not typically needed for fetch unless file saved with BOM
             let text = chartText;
@@ -1673,7 +1678,7 @@
                 const assign = (keyIdx: number, visIdx: number, lbl: string, clr: string, xOff = 0, wScale = 1.0) => {
                     lConfigs[keyIdx] = { x: sx + (visIdx * tempWidth) + xOff, width: tempWidth * wScale, color: clr, label: lbl };
                 };
-                const blueScale = 0.85;
+                const blueScale = 1.0; // Same size as white
                 assign(0, 0, '', '#7CA4FF', 0, blueScale);
                 assign(1, 0, 'E/D', '#ffffff');
                 assign(2, 1, '', '#7CA4FF', 0, blueScale);
@@ -1685,20 +1690,22 @@
                 assign(8, 3, 'I/K', '#ffffff');
 
             } else {
-                const bScale = 0.7, wScale = 1.0;
+                const bScale = 1.0, wScale = 1.0; // bScale same as wScale
+                const pairGap = tempWidth * 0.02; // Reduced from 0.1
+                const groupGap = tempWidth * 0.1; // Reduced from 0.4
                 const totalScale = (4 * bScale) + (4 * wScale);
-                const totalPlayWidth = tempWidth * totalScale;
+                const totalPlayWidth = (tempWidth * totalScale) + (4 * pairGap) + (3 * groupGap);
                 const sx = (canvas.width - totalPlayWidth) / 2;
 
                 const ord = [
-                    { idx: 0, label: 'E', color: '#7CA4FF', scale: bScale },
-                    { idx: 1, label: 'D', color: '#ffffff', scale: wScale },
-                    { idx: 2, label: 'R', color: '#7CA4FF', scale: bScale },
-                    { idx: 3, label: 'F', color: '#ffffff', scale: wScale },
-                    { idx: 5, label: 'U', color: '#7CA4FF', scale: bScale },
-                    { idx: 6, label: 'J', color: '#ffffff', scale: wScale },
-                    { idx: 7, label: 'I', color: '#7CA4FF', scale: bScale },
-                    { idx: 8, label: 'K', color: '#ffffff', scale: wScale }
+                    { idx: 0, label: 'E', color: '#7CA4FF', scale: bScale, gapAfter: pairGap },
+                    { idx: 1, label: 'D', color: '#ffffff', scale: wScale, gapAfter: groupGap },
+                    { idx: 2, label: 'R', color: '#7CA4FF', scale: bScale, gapAfter: pairGap },
+                    { idx: 3, label: 'F', color: '#ffffff', scale: wScale, gapAfter: groupGap },
+                    { idx: 5, label: 'U', color: '#7CA4FF', scale: bScale, gapAfter: pairGap },
+                    { idx: 6, label: 'J', color: '#ffffff', scale: wScale, gapAfter: groupGap },
+                    { idx: 7, label: 'I', color: '#7CA4FF', scale: bScale, gapAfter: pairGap },
+                    { idx: 8, label: 'K', color: '#ffffff', scale: wScale, gapAfter: 0 }
                 ];
 
                 let cx = sx;
@@ -1706,7 +1713,7 @@
                     const w = tempWidth * item.scale;
                     vLanes.push({ x: cx, width: w });
                     lConfigs[item.idx] = { x: cx, width: w, color: item.color, label: item.label };
-                    cx += w;
+                    cx += w + item.gapAfter;
                 });
                 lConfigs[4] = { x: sx, width: totalPlayWidth, color: '#e040fb', label: 'SPACE' };
             }
@@ -1738,6 +1745,9 @@
             if (!LANE_CONFIGS[i] || !LANE_CONFIG_TARGETS[i]) continue;
             LANE_CONFIGS[i].x = lerp(LANE_CONFIGS[i].x, LANE_CONFIG_TARGETS[i].x);
             LANE_CONFIGS[i].width = lerp(LANE_CONFIGS[i].width, LANE_CONFIG_TARGETS[i].width);
+            // Snap label and color
+            LANE_CONFIGS[i].label = LANE_CONFIG_TARGETS[i].label;
+            LANE_CONFIGS[i].color = LANE_CONFIG_TARGETS[i].color;
         }
     }
     window.addEventListener('resize', resize);

@@ -163,7 +163,7 @@
                 audio.src = `songs/${song.folder}/${song.audio}`;
 
                 // 2. Load Chart
-                const chartRes = await fetch(`songs/${song.folder}/${opt.filename}`);
+                const chartRes = await fetch(`songs/${song.folder}/${opt.filename}?t=${Date.now()}`);
                 if (chartRes.ok) {
                     const chartText = await chartRes.text();
                     let text = chartText;

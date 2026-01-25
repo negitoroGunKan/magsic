@@ -14,6 +14,7 @@ const mimeTypes = {
     '.png': 'image/png',
     '.jpg': 'image/jpg',
     '.mp3': 'audio/mpeg',
+    '.wav': 'audio/wav',
     '.txt': 'text/plain',
     '.ico': 'image/x-icon',
     '.mp4': 'video/mp4',
@@ -133,7 +134,10 @@ const server = http.createServer((req, res) => {
             res.end('Not Found');
         } else {
             const contentType = mimeTypes[ext] || 'application/octet-stream';
-            res.writeHead(200, { 'Content-Type': contentType });
+            res.writeHead(200, {
+                'Content-Type': contentType,
+                'Cache-Control': 'no-cache, no-store, must-revalidate'
+            });
             res.end(data);
         }
     });
