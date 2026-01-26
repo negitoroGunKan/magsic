@@ -93,6 +93,10 @@ const server = http.createServer((req, res) => {
 
                 const songId = newScore.songId;
                 if (!scores[songId]) scores[songId] = [];
+
+                // Add playerName support (default to 'Guest' if missing)
+                if (!newScore.playerName) newScore.playerName = 'Guest';
+
                 scores[songId].push(newScore);
 
                 // Sort by score desc
@@ -112,6 +116,103 @@ const server = http.createServer((req, res) => {
                 res.writeHead(400);
                 res.end('Bad Request');
             }
+        });
+        return;
+    }
+
+    const { exec } = require('child_process');
+
+    // API: List Files (Recursive)
+    if (req.method === 'GET' && pathname === '/api/files/list') {
+        const getFiles = (dir) => {
+            let results = [];
+            const list = fs.readdirSync(dir, { withFileTypes: true });
+            list.forEach(dirent => {
+                const resPath = path.join(dir, dirent.name);
+                if (dirent.isDirectory()) {
+                    if (dirent.name !== 'node_modules' && !dirent.name.startsWith('.')) {
+                        results = results.concat(getFiles(resPath));
+                    }
+                } else {
+                    if (!dirent.name.startsWith('.')) {
+                        results.push(path.relative(ROOT, resPath).replace(/\\/g, '/'));
+                    }
+                }
+            });
+            return results;
+        };
+
+        try {
+            const fileList = getFiles(ROOT);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(fileList));
+        } catch (e) {
+            console.error(e);
+            res.writeHead(500);
+            res.end('Error reading files: ' + e);
+        }
+        return;
+    }
+
+    // API: Read Any File
+    if (req.method === 'GET' && pathname === '/api/files/read') {
+        const target = parsedUrl.query.file;
+        if (!target) { res.writeHead(400); res.end('Missing file param'); return; }
+        const filePath = path.join(ROOT, target);
+
+        fs.readFile(filePath, (err, data) => {
+            if (err) {
+                res.writeHead(404);
+                res.end('File not found');
+            } else {
+                // If it's an image, send as base64 for editor preview? Or just let editor load by URL
+                // Actually for text editor, we assume text.
+                // Binary files check
+                const ext = path.extname(target).toLowerCase();
+                const isImage = ['.png', '.jpg', '.jpeg', '.gif', '.ico'].includes(ext);
+
+                if (isImage) {
+                    res.writeHead(200, { 'Content-Type': mimeTypes[ext] });
+                    res.end(data);
+                } else {
+                    res.writeHead(200, { 'Content-Type': 'text/plain' });
+                    res.end(data);
+                }
+            }
+        });
+        return;
+    }
+
+    // API: Save Any File
+    if (req.method === 'POST' && pathname === '/api/files/save') {
+        const target = parsedUrl.query.file;
+        if (!target) { res.writeHead(400); res.end('Missing file param'); return; }
+
+        let body = [];
+        req.on('data', chunk => body.push(chunk));
+        req.on('end', () => {
+            const buffer = Buffer.concat(body);
+            const filePath = path.join(ROOT, target);
+
+            fs.writeFile(filePath, buffer, err => {
+                if (err) {
+                    res.writeHead(500);
+                    res.end('Error writing file');
+                } else {
+                    // If TS file, compile
+                    if (target.endsWith('.ts')) {
+                        exec('npx tsc magusic.ts --target es2016 --lib es2016,dom --outFile magusic.js', (error, stdout, stderr) => {
+                            let msg = 'Saved & Compiled!';
+                            if (error) msg = `Saved but Compile Error:\n${stderr || error.message}`;
+                            res.writeHead(200);
+                            res.end(msg);
+                        });
+                    } else {
+                        res.writeHead(200);
+                        res.end('File Saved');
+                    }
+                }
+            });
         });
         return;
     }

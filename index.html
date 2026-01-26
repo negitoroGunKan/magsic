@@ -96,11 +96,36 @@
         style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10;">
         <img src="assets/initial2.png" alt="MagsicBeat" style="max-width: 900px; width: 80%; margin-bottom: 20px;">
         <p style="color: #fff; font-size: 1.2em; margin-bottom: 30px; letter-spacing: 1px;">initial 1.2.1</p>
+
+        <!-- Player Select Display -->
+        <div id="player-display"
+            style="color: #00ffff; margin-bottom: 20px; font-size: 1.2em; cursor: pointer; border: 1px solid #00ffff; padding: 5px 15px; border-radius: 20px;">
+            Player: Guest ▼
+        </div>
+
         <button id="btn-start-select"
             style="padding: 20px 40px; font-size: 2em; background: #e040fb; color: white; border: none; border-radius: 50px; cursor: pointer; box-shadow: 0 0 20px rgba(224, 64, 251, 0.5); transition: transform 0.2s;">
             SELECT SONG
         </button>
         <p style="margin-top:20px; color:#aaa; font-size: 0.9em;">MagsicBeat initial 1.2.1</p>
+    </div>
+
+    <!-- Player Selection Overlay -->
+    <div id="player-select-overlay"
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:200; flex-direction:column; justify-content:center; align-items:center;">
+        <h2 style="color:white; margin-bottom:20px;">Select Player</h2>
+        <div id="player-list"
+            style="display:flex; flex-direction:column; gap:10px; max-height:300px; overflow-y:auto; width:300px; margin-bottom:20px;">
+            <!-- Player buttons injected here -->
+        </div>
+        <div style="display:flex; gap:10px;">
+            <input type="text" id="new-player-name" placeholder="New Player Name"
+                style="padding:10px; border-radius:5px; border:none;">
+            <button id="btn-add-player"
+                style="padding:10px 20px; background:#00bcd4; color:white; border:none; border-radius:5px;">Add</button>
+        </div>
+        <button id="btn-close-player"
+            style="margin-top:20px; padding:10px; background:transparent; border:1px solid #aaa; color:#aaa; cursor:pointer;">Close</button>
     </div>
 
     <canvas id="game-canvas"></canvas>
@@ -195,13 +220,21 @@
 
     <!-- Song Select Overlay -->
     <div id="song-select-overlay"
-        style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background: #000; z-index:30; padding:50px; box-sizing:border-box; overflow-y:auto;">
-        <h2 style="color:#fff; text-align:center;">SELECT SONG</h2>
-        <div id="song-list" style="max-width:800px; margin:0 auto;">
-            <!-- Song Items injected here -->
+        style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 20; flex-direction: column; padding: 20px; box-sizing: border-box;">
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+            <h2 style="color: #fff; margin: 0; text-shadow: 0 0 10px #e040fb;">SELECT SONG</h2>
+            <div style="display:flex; gap:15px; align-items:center;">
+                <div id="player-display-in-select"
+                    style="color: #00bcd4; font-size: 1em; cursor: pointer; border: 1px solid #00bcd4; padding: 5px 10px; border-radius: 15px;">
+                    Player: Guest ▼
+                </div>
+                <button id="btn-close-select"
+                    style="background:none; border: 1px solid #777; color:#fff; padding: 5px 15px; cursor:pointer;">CLOSE</button>
+            </div>
         </div>
-        <button id="btn-close-select"
-            style="display:block; margin:20px auto; padding:15px 30px; font-size:1.2em; cursor:pointer;">Cancel</button>
+
+        <div id="song-list" style="flex: 1; overflow-y: auto;"></div>
     </div>
 
     <!-- Calibration Overlay -->

@@ -142,6 +142,158 @@
         btnSelectSong.addEventListener('click', openSongSelect);
     }
 
+    // Player Management Logic
+    let currentPlayer = localStorage.getItem('magsic_player') || 'Guest';
+    const playerDisplay = document.getElementById('player-display');
+    const playerDisplayInSelect = document.getElementById('player-display-in-select'); // New button
+    const playerSelectOverlay = document.getElementById('player-select-overlay');
+    const playerListDiv = document.getElementById('player-list');
+    const btnAddPlayer = document.getElementById('btn-add-player');
+    const newPlayerNameInput = document.getElementById('new-player-name') as HTMLInputElement;
+    const btnClosePlayer = document.getElementById('btn-close-player');
+
+    // Init Player UI
+    if (playerDisplay) playerDisplay.textContent = `Player: ${currentPlayer} ▼`;
+    if (playerDisplayInSelect) playerDisplayInSelect.textContent = `Player: ${currentPlayer} ▼`;
+
+    // --- Per-Player Settings Logic ---
+    function loadPlayerSettings() {
+        const key = `magsic_settings_${currentPlayer}`;
+        try {
+            const saved = localStorage.getItem(key);
+            if (saved) {
+                const settings = JSON.parse(saved);
+
+                // Speed
+                if (settings.speed) {
+                    const multiplier = parseFloat(settings.speed);
+                    if (!isNaN(multiplier)) {
+                        currentNoteSpeed = BASE_NOTE_SPEED * multiplier;
+                        if (speedInput) speedInput.value = multiplier.toString();
+                        if (speedDisplay) speedDisplay.textContent = multiplier.toFixed(1);
+                    }
+                }
+
+                // Offset
+                if (settings.offset !== undefined) {
+                    const off = parseInt(settings.offset);
+                    if (!isNaN(off)) {
+                        globalOffset = off;
+                        if (offsetInput) offsetInput.value = off.toString();
+                        if (offsetDisplay) offsetDisplay.textContent = off.toString();
+                    }
+                }
+            } else {
+                // Default fallback if no settings for this user
+                // Maybe keep current global? or reset to default?
+                // Let's reset to defaults for new users
+                currentNoteSpeed = BASE_NOTE_SPEED * 2.5;
+                if (speedInput) speedInput.value = '2.5';
+                if (speedDisplay) speedDisplay.textContent = '2.5';
+
+                globalOffset = 0;
+                if (offsetInput) offsetInput.value = '0';
+                if (offsetDisplay) offsetDisplay.textContent = '0';
+            }
+        } catch (e) {
+            console.error('Failed to load settings', e);
+        }
+    }
+
+    function savePlayerSettings() {
+        const key = `magsic_settings_${currentPlayer}`;
+        const multiplier = speedInput ? parseFloat(speedInput.value) : 2.5;
+        const off = offsetInput ? parseInt(offsetInput.value) : 0;
+
+        const settings = {
+            speed: multiplier,
+            offset: off
+        };
+        localStorage.setItem(key, JSON.stringify(settings));
+    }
+
+    // Load initially
+    loadPlayerSettings();
+
+    function updatePlayerList() {
+        if (!playerListDiv) return;
+        playerListDiv.innerHTML = '';
+
+        let players = JSON.parse(localStorage.getItem('magsic_players_list') || '["Guest"]');
+
+        players.forEach((name: string) => {
+            const div = document.createElement('div');
+            div.textContent = name;
+            div.style.padding = '10px';
+            div.style.background = '#333';
+            div.style.color = 'white';
+            div.style.cursor = 'pointer';
+            div.style.border = '1px solid #555';
+
+            if (name === currentPlayer) {
+                div.style.background = '#00bcd4';
+                div.style.fontWeight = 'bold';
+            }
+
+            div.onclick = () => {
+                currentPlayer = name;
+                localStorage.setItem('magsic_player', currentPlayer);
+                if (playerDisplay) playerDisplay.textContent = `Player: ${currentPlayer} ▼`;
+                if (playerDisplayInSelect) playerDisplayInSelect.textContent = `Player: ${currentPlayer} ▼`;
+
+                loadPlayerSettings(); // <--- Load settings for new player
+
+                updatePlayerList(); // Refresh highlight
+
+                // Refresh song list to show new player's scores if open
+                if (songSelectOverlay && songSelectOverlay.style.display !== 'none') {
+                    loadSongList();
+                }
+            };
+            playerListDiv.appendChild(div);
+        });
+    }
+
+    if (playerDisplay) {
+        playerDisplay.addEventListener('click', () => {
+            if (playerSelectOverlay) {
+                playerSelectOverlay.style.display = 'flex';
+                updatePlayerList();
+            }
+        });
+    }
+
+    // Listener for the new button
+    if (playerDisplayInSelect) {
+        playerDisplayInSelect.addEventListener('click', () => {
+            if (playerSelectOverlay) {
+                playerSelectOverlay.style.display = 'flex';
+                updatePlayerList();
+            }
+        });
+    }
+
+    if (btnAddPlayer && newPlayerNameInput) {
+        btnAddPlayer.addEventListener('click', () => {
+            const name = newPlayerNameInput.value.trim();
+            if (name) {
+                let players = JSON.parse(localStorage.getItem('magsic_players_list') || '["Guest"]');
+                if (!players.includes(name)) {
+                    players.push(name);
+                    localStorage.setItem('magsic_players_list', JSON.stringify(players));
+                    newPlayerNameInput.value = '';
+                    updatePlayerList();
+                }
+            }
+        });
+    }
+
+    if (btnClosePlayer && playerSelectOverlay) {
+        btnClosePlayer.addEventListener('click', () => {
+            playerSelectOverlay.style.display = 'none';
+        });
+    }
+
     if (btnCloseSelect) {
         btnCloseSelect.addEventListener('click', () => {
             songSelectOverlay.style.display = 'none';
@@ -171,6 +323,7 @@
             const val = parseInt(offsetInput.value);
             globalOffset = val;
             offsetDisplay.textContent = val.toString();
+            savePlayerSettings(); // <--- Save on change
         });
     }
 
@@ -1260,6 +1413,7 @@
             const multiplier = parseFloat(speedInput.value);
             currentNoteSpeed = BASE_NOTE_SPEED * multiplier;
             speedDisplay.textContent = multiplier.toFixed(1);
+            savePlayerSettings(); // <--- Save on change
         });
     }
 
@@ -1268,6 +1422,7 @@
             currentLaneWidth = parseInt(laneWidthInput.value);
             laneWidthDisplay.textContent = currentLaneWidth.toString();
             resize();
+            savePlayerSettings(); // <--- Save on change
         });
     }
 
@@ -1427,7 +1582,6 @@
 
                             // Fallback to text if image missing
                             img.onerror = () => {
-                                img.style.display = 'none';
                                 btn.textContent = DIFF_LABELS[diffKey] || diffKey.toUpperCase();
                                 btn.style.padding = '5px 10px';
                                 btn.style.borderRadius = '4px';
@@ -1447,16 +1601,30 @@
 
                             // High Score Label
                             const songScores = allScores[song.id] || [];
-                            const bestScore = songScores
+
+                            // Overall Best
+                            const overallBest = songScores
                                 .filter((s: any) => s.difficulty === filename)
                                 .sort((a: any, b: any) => b.score - a.score)[0];
 
-                            if (bestScore) {
+                            // Personal Best
+                            const myBest = songScores
+                                .filter((s: any) => s.difficulty === filename && s.playerName === currentPlayer)
+                                .sort((a: any, b: any) => b.score - a.score)[0];
+
+                            if (overallBest || myBest) {
                                 const scoreDiv = document.createElement('div');
-                                scoreDiv.style.fontSize = '12px';
-                                scoreDiv.style.color = '#00ffff';
+                                scoreDiv.style.fontSize = '10px';
+                                scoreDiv.style.color = '#ccc';
                                 scoreDiv.style.fontFamily = 'monospace';
-                                scoreDiv.textContent = bestScore.score.toLocaleString();
+                                scoreDiv.style.marginTop = '2px';
+
+                                let text = '';
+                                if (myBest) text += `My: ${myBest.score.toLocaleString()}`;
+                                if (overallBest && (!myBest || overallBest.score > myBest.score)) {
+                                    text += ` (Top: ${overallBest.score.toLocaleString()} ${overallBest.playerName})`;
+                                }
+                                scoreDiv.textContent = text;
                                 btnWrapper.appendChild(scoreDiv);
                             }
 

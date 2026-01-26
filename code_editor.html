@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magusic File Manager</title>
+    <style>
+        body {
+            background: #1e1e1e;
+            color: #fff;
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            font-family: sans-serif;
+        }
+
+        #sidebar {
+            width: 250px;
+            background: #252526;
+            border-right: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #file-list {
+            flex-grow: 1;
+            overflow-y: auto;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        #file-list li {
+            padding: 8px 15px;
+            cursor: pointer;
+            color: #ccc;
+            font-size: 14px;
+        }
+
+        #file-list li:hover {
+            background: #2a2d2e;
+            color: #fff;
+        }
+
+        #file-list li.active {
+            background: #37373d;
+            color: #fff;
+            font-weight: bold;
+        }
+
+        #main {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            background: #1e1e1e;
+        }
+
+        #header {
+            height: 40px;
+            background: #2d2d2d;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            border-bottom: 1px solid #333;
+        }
+
+        #file-name {
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        #status {
+            font-size: 12px;
+            color: #aaa;
+            margin-right: 15px;
+        }
+
+        button {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 5px 15px;
+            cursor: pointer;
+            border-radius: 2px;
+        }
+
+        button:hover {
+            background: #1177bb;
+        }
+
+        #editor-container {
+            flex-grow: 1;
+            position: relative;
+        }
+
+        textarea {
+            width: 100%;
+            height: 100%;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border: none;
+            padding: 10px;
+            box-sizing: border-box;
+            resize: none;
+            outline: none;
+            font-family: 'Consolas', monospace;
+            font-size: 14px;
+        }
+
+        #image-preview {
+            display: none;
+            width: 100%;
+            height: 100%;
+            background: #1e1e1e;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #image-preview img {
+            max-width: 90%;
+            max-height: 90%;
+            border: 1px solid #555;
+            background: repeating-conic-gradient(#333 0% 25%, #444 0% 50%) 50% / 20px 20px;
+        }
+
+        /* Checkerboard for transparency */
+    </style>
+</head>
+
+<body>
+
+    <div id="sidebar">
+        <div style="padding: 10px; font-weight: bold; border-bottom: 1px solid #333;">Files</div>
+        <ul id="file-list"></ul>
+    </div>
+
+    <div id="main">
+        <div id="header">
+            <span id="file-name">Select a file...</span>
+            <div>
+                <span id="status"></span>
+                <button id="btn-save" onclick="saveCurrentFile()" style="display:none;">Save</button>
+            </div>
+        </div>
+
+        <div id="editor-container">
+            <textarea id="code-area" spellcheck="false" style="display:none;"></textarea>
+            <div id="image-preview"><img id="preview-img"></div>
+
+            <!-- Simple drag/drop upload zone for images -->
+            <input type="file" id="file-upload" style="display:none;" onchange="uploadImage(this)">
+            <button id="btn-upload" onclick="document.getElementById('file-upload').click()"
+                style="position:absolute; bottom:20px; right:20px; display:none; background:#333;">Upload Image
+                Overwrite</button>
+        </div>
+    </div>
+
+    <script>
+        const fileListEl = document.getElementById('file-list');
+        const codeArea = document.getElementById('code-area');
+        const imgPreview = document.getElementById('image-preview');
+        const previewImg = document.getElementById('preview-img');
+        const fileNameEl = document.getElementById('file-name');
+        const btnSave = document.getElementById('btn-save');
+        const btnUpload = document.getElementById('btn-upload');
+        const statusEl = document.getElementById('status');
+        const fileUploadInput = document.getElementById('file-upload');
+
+        let currentFile = null;
+
+        // Fetch File List & Render Tree
+        fetch('/api/files/list')
+            .then(r => r.json())
+            .then(files => {
+                const tree = buildTree(files);
+                renderTree(tree, fileListEl);
+            });
+
+        function buildTree(paths) {
+            const root = {};
+            paths.forEach(pathStr => {
+                const parts = pathStr.split('/');
+                let current = root;
+                parts.forEach((part, i) => {
+                    if (!current[part]) {
+                        current[part] = (i === parts.length - 1) ? null : {}; // null means file
+                    }
+                    current = current[part];
+                });
+            });
+            return root;
+        }
+
+        function renderTree(node, container, prefix = '') {
+            const sortedKeys = Object.keys(node).sort((a, b) => {
+                const isDirA = node[a] !== null;
+                const isDirB = node[b] !== null;
+                if (isDirA && !isDirB) return -1;
+                if (!isDirA && isDirB) return 1;
+                return a.localeCompare(b);
+            });
+
+            sortedKeys.forEach(key => {
+                const isDir = node[key] !== null;
+                const fullPath = prefix ? prefix + '/' + key : key;
+
+                const li = document.createElement('li');
+
+                if (isDir) {
+                    // Directory
+                    const span = document.createElement('span');
+                    span.textContent = '📁 ' + key;
+                    span.style.fontWeight = 'bold';
+                    span.style.cursor = 'pointer';
+                    li.appendChild(span);
+
+                    const ul = document.createElement('ul');
+                    ul.style.display = 'none'; // Collapsed by default
+                    ul.style.paddingLeft = '15px';
+                    ul.style.listStyle = 'none';
+                    renderTree(node[key], ul, fullPath);
+                    li.appendChild(ul);
+
+                    span.onclick = (e) => {
+                        e.stopPropagation();
+                        ul.style.display = ul.style.display === 'none' ? 'block' : 'none';
+                        span.textContent = (ul.style.display === 'none' ? '📁 ' : '📂 ') + key;
+                    };
+                } else {
+                    // File
+                    li.textContent = '📄 ' + key;
+                    li.style.cursor = 'pointer';
+                    li.onclick = (e) => {
+                        e.stopPropagation();
+                        loadFile(fullPath, li);
+                    };
+                }
+                container.appendChild(li);
+            });
+        }
+
+        function loadFile(file, liElement) {
+            currentFile = file;
+            fileNameEl.textContent = file;
+
+            // Highlight active
+            document.querySelectorAll('li').forEach(l => l.style.color = '#ccc');
+            liElement.style.color = '#fff';
+
+            const ext = file.split('.').pop().toLowerCase();
+            const isImage = ['png', 'jpg', 'jpeg', 'gif', 'ico'].includes(ext);
+
+            if (isImage) {
+                // Image Mode
+                codeArea.style.display = 'none';
+                imgPreview.style.display = 'flex';
+                btnSave.style.display = 'none';
+                btnUpload.style.display = 'block';
+
+                // Add timestamp to break cache
+                previewImg.src = file + '?t=' + Date.now();
+                statusEl.textContent = 'Image Preview';
+            } else {
+                // Text Mode
+                imgPreview.style.display = 'none';
+                codeArea.style.display = 'block';
+                btnUpload.style.display = 'none';
+                btnSave.style.display = 'inline-block';
+
+                statusEl.textContent = 'Loading...';
+                fetch('/api/files/read?file=' + encodeURIComponent(file))
+                    .then(r => r.text())
+                    .then(text => {
+                        codeArea.value = text;
+                        statusEl.textContent = 'Loaded';
+                    });
+            }
+        }
+
+        function saveCurrentFile() {
+            if (!currentFile) return;
+            statusEl.textContent = 'Saving...';
+
+            fetch('/api/files/save?file=' + encodeURIComponent(currentFile), {
+                method: 'POST',
+                body: codeArea.value
+            })
+                .then(r => r.text())
+                .then(msg => {
+                    statusEl.textContent = msg;
+                    setTimeout(() => statusEl.textContent = '', 3000);
+                });
+        }
+
+        function uploadImage(input) {
+            if (!input.files || !input.files[0]) return;
+            const file = input.files[0];
+
+            statusEl.textContent = 'Uploading...';
+
+            fetch('/api/files/save?file=' + encodeURIComponent(currentFile), {
+                method: 'POST',
+                body: file
+            })
+                .then(r => r.text())
+                .then(msg => {
+                    statusEl.textContent = msg;
+                    // Reload preview
+                    previewImg.src = currentFile + '?t=' + Date.now();
+                });
+        }
+
+        // Tab support
+        codeArea.addEventListener('keydown', e => {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const start = codeArea.selectionStart;
+                const end = codeArea.selectionEnd;
+                codeArea.setRangeText('    ', start, end, 'end');
+            }
+        });
+    </script>
+</body>
+
+</html>
