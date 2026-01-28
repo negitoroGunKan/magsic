@@ -180,7 +180,27 @@
             <input type="range" id="lane-width-input" min="30" max="200" step="10" value="100" style="width: 200px;">
         </label>
         <br><br>
-        <br><br>
+
+        <h3 style="color:#e040fb; margin:0 0 5px 0;">MODIFIERS</h3>
+        <div style="margin-bottom:10px;">
+            <label>ASSIST:</label><br>
+            <select id="assist-select"
+                style="width:200px; padding:5px; background:#222; color:white; border:1px solid #555;">
+                <option value="none">None</option>
+                <option value="blue_to_white">Blue -> White</option>
+                <option value="space_boost">Space Boost</option>
+            </select>
+        </div>
+        <div style="margin-bottom:20px;">
+            <label>RANDOM:</label><br>
+            <select id="random-select"
+                style="width:200px; padding:5px; background:#222; color:white; border:1px solid #555;">
+                <option value="none">None</option>
+                <option value="shuffle_color">Shuffle (Color)</option>
+                <option value="shuffle_chaos">Shuffle (Chaos)</option>
+            </select>
+        </div>
+
         <label>
             Offset: <span id="offset-display">0</span> ms <span style="font-size:10px; color:#aaa">(Result (+) &rarr;
                 Move (+))</span>

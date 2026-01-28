@@ -26,6 +26,10 @@
     const laneWidthInput = document.getElementById('lane-width-input') as HTMLInputElement;
     const laneWidthDisplay = document.getElementById('lane-width-display') as HTMLSpanElement;
 
+    // Modifiers UI
+    const assistSelect = document.getElementById('assist-select') as HTMLSelectElement;
+    const randomSelect = document.getElementById('random-select') as HTMLSelectElement;
+
     // Auto Play UI
     const autoPlayCheckbox = document.getElementById('auto-play-checkbox') as HTMLInputElement;
     let isAutoPlay = false;
@@ -466,7 +470,18 @@
     const SCORE_WEIGHTS = { perfect: 9, great: 8, nice: 2, bad: 1, miss: 0 };
 
     function resetStats() {
-        stats = { perfect: 0, great: 0, nice: 0, bad: 0, miss: 0, combo: 0, maxCombo: 0, totalErrorMs: 0, hitCount: 0, score: 0 };
+        stats = {
+            perfect: 0,
+            great: 0,
+            nice: 0,
+            bad: 0,
+            miss: 0,
+            combo: 0,
+            maxCombo: 0,
+            score: 0,
+            hitCount: 0,
+            totalErrorMs: 0
+        };
         rawScore = 0;
         lostScore = 0;
         // Calculate Max Score based on current chart (Long Note = Head(9) + Tail(9) = 18)
@@ -474,6 +489,7 @@
             ? chartData.reduce((acc, n) => acc + (n.duration > 0 ? 18 : 9), 0)
             : 1;
     }
+
 
     function addHit(type: 'perfect' | 'great' | 'nice' | 'bad' | 'miss', errorMs: number = 0) {
         stats[type]++;
@@ -1128,7 +1144,43 @@
 
             // Miss
             ctx.fillStyle = '#ff0000';
+            // Miss
+            ctx.fillStyle = '#ff0000';
             ctx.fillText(`MISS: ${stats.miss}`, statsX, statsStartTime + lineHeight * 4);
+        }
+
+        // Draw Health Gauge (Vertical, Left of Stats or Lanes)
+        // Let's put it to the far left of lanes, or between stats and lanes?
+        // Stats are at laneStartX - 140. Let's put bar at laneStartX - 20 ?
+        if (laneStartX > 30) {
+            const barW = 15;
+            const barH = 400; // Fixed height
+            const barX = laneStartX - 25;
+            const barY = (canvas.height / 2) - 200; // Centered vertically relative to play area?
+
+            // Background
+            ctx.fillStyle = '#333';
+            ctx.fillRect(barX, barY, barW, barH);
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(barX, barY, barW, barH);
+
+            // Fill
+            const fillH = (currentHealth / 100) * barH;
+            const fillY = barY + (barH - fillH);
+
+            // Color based on health
+            if (currentHealth > 50) ctx.fillStyle = '#00ff00'; // Green
+            else if (currentHealth > 20) ctx.fillStyle = '#ffff00'; // Yellow
+            else ctx.fillStyle = '#ff0000'; // Red
+
+            ctx.fillRect(barX, fillY, barW, fillH);
+
+            // Text Label
+            ctx.fillStyle = '#fff';
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${Math.floor(currentHealth)}%`, barX + barW / 2, barY + barH + 15);
         }
 
         // Draw Notes (Multi-pass: White -> Blue -> Space)
@@ -1391,7 +1443,10 @@
                         difficulty: currentChartFilename, // Use filename as diff identifier
                         score: scaledScore,
                         rank: rank,
-                        layout: currentLayoutType, // Include layout type
+                        layout: currentLayoutType,
+                        modifiers: (assistSelect?.value !== 'none' || randomSelect?.value !== 'none')
+                            ? `A:${assistSelect?.value} R:${randomSelect?.value}`
+                            : 'none',
                         combo: stats.maxCombo,
                         perfect: stats.perfect,
                         great: stats.great,
@@ -1717,6 +1772,16 @@
             }
             chartData = parseChart(json);
 
+            // Apply Modifiers
+            if (assistSelect && randomSelect) {
+                const assistMode = assistSelect.value;
+                const randomMode = randomSelect.value;
+                if (assistMode !== 'none' || randomMode !== 'none') {
+                    console.log(`Applying Modifiers: Assist=${assistMode}, Random=${randomMode}`);
+                    chartData = applyModifiers(chartData, assistMode, randomMode);
+                }
+            }
+
             // 2. Start Game Logic (with Loading & Countdown)
 
             // Hide Loading
@@ -1788,6 +1853,88 @@
         }
 
         return notes;
+    }
+
+    function applyModifiers(notes: ChartNote[], assist: string, random: string): ChartNote[] {
+        let modified = JSON.parse(JSON.stringify(notes)); // Deep copy
+
+        // 1. Random (Lane Shuffle)
+        // Map original lanes to new lanes
+        let laneMap = [0, 1, 2, 3, 4, 5, 6, 7, 8]; // Identity
+
+        if (random === 'shuffle_color') {
+            // Shuffle Blues [0, 2, 5, 7] independent of Whites [1, 3, 6, 8]
+            const blues = [0, 2, 5, 7];
+            const whites = [1, 3, 6, 8];
+
+            // Helper shuffle
+            const shuffle = (arr: number[]) => {
+                for (let i = arr.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [arr[i], arr[j]] = [arr[j], arr[i]];
+                }
+                return arr;
+            };
+
+            const newBlues = shuffle([...blues]);
+            const newWhites = shuffle([...whites]);
+
+            // Assign back to map
+            // Original Blue at index i goes to New Blue at index i?
+            // No, we need to map "Lane X" -> "Lane Y".
+            // Since original chart has fixed lanes, we map semantic position?
+            // Actually, we just want to swap them around.
+            // Map: if note is in blues[i], move to newBlues[i].
+
+            blues.forEach((original, i) => { laneMap[original] = newBlues[i]; });
+            whites.forEach((original, i) => { laneMap[original] = newWhites[i]; });
+
+        } else if (random === 'shuffle_chaos') {
+            // Shuffle all except Space (4)
+            const lanes = [0, 1, 2, 3, 5, 6, 7, 8];
+            const newLanes = [0, 1, 2, 3, 5, 6, 7, 8];
+            // Fisher-Yates
+            for (let i = newLanes.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [newLanes[i], newLanes[j]] = [newLanes[j], newLanes[i]];
+            }
+
+            lanes.forEach((original, i) => { laneMap[original] = newLanes[i]; });
+        }
+
+        // Apply Shuffle
+        if (random !== 'none') {
+            modified.forEach((n: any) => {
+                if (n.lane !== 4) { // Don't move space usually
+                    n.lane = laneMap[n.lane];
+                }
+            });
+        }
+
+        // 2. Assist
+        if (assist === 'blue_to_white') {
+            // Convert Blue to nearest White
+            // 0(e)->1(d), 2(r)->3(f), 5(u)->6(j), 7(i)->8(k)
+            const map: { [key: number]: number } = { 0: 1, 2: 3, 5: 6, 7: 8 };
+            modified.forEach((n: any) => {
+                if (map[n.lane] !== undefined) {
+                    n.lane = map[n.lane];
+                }
+            });
+        } else if (assist === 'space_boost') {
+            // Convert random % of non-space notes to space
+            // Let's say 20%? or maybe simplify complex streams?
+            // "Increase space, decrease others"
+            modified.forEach((n: any) => {
+                if (n.lane !== 4) {
+                    if (Math.random() < 0.25) { // 25% chance
+                        n.lane = 4;
+                    }
+                }
+            });
+        }
+
+        return modified;
     }
 
     function generateAutoChart(bpm: number, durationSec: number): ChartNote[] {

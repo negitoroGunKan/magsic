@@ -61,6 +61,22 @@
       "miss": 9,
       "percentage": "90.5864",
       "playerName": "Guest"
+    },
+    {
+      "songId": "50jing",
+      "difficulty": "50jingchart.json",
+      "score": 810185,
+      "rank": "B",
+      "layout": "default",
+      "modifiers": "A:blue_to_white R:none",
+      "combo": 68,
+      "perfect": 81,
+      "great": 37,
+      "nice": 12,
+      "bad": 1,
+      "miss": 13,
+      "percentage": "81.0185",
+      "playerName": "Guest"
     }
   ]
 }

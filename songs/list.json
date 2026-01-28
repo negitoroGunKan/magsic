@@ -55,5 +55,20 @@
             "pr": "knights_pr.json",
             "et": "knights_et.json"
         }
+    },
+    {
+        "id": "calamity_fortune",
+        "title": "Calamity Fortune",
+        "artist": "LeaF",
+        "bpm": 200,
+        "folder": "Calamiy Fortune",
+        "audio": "calamity fortune.wav",
+        "charts": {
+            "no": "calamity_no.json",
+            "st": "calamity_st.json",
+            "ad": "calamity_ad.json",
+            "pr": "calamity_pr.json",
+            "et": "calamity_et.json"
+        }
     }
 ]

@@ -1,0 +1,237 @@
+{
+  "bpm": 200,
+  "offset": 443,
+  "notes": [
+    {
+      "beat": 4,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 4,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 4.5,
+      "lane": 5,
+      "duration": 0
+    },
+    {
+      "beat": 5,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 5,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 5.5,
+      "lane": 2,
+      "duration": 0
+    },
+    {
+      "beat": 6,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 6,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 6.5,
+      "lane": 5,
+      "duration": 0
+    },
+    {
+      "beat": 7,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 7,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 7.5,
+      "lane": 2,
+      "duration": 0
+    },
+    {
+      "beat": 8,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 8,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 8.5,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 9,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 9,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 9.5,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 9.75,
+      "lane": 2,
+      "duration": 0
+    },
+    {
+      "beat": 10,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 10.25,
+      "lane": 2,
+      "duration": 0
+    },
+    {
+      "beat": 10.5,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 11,
+      "lane": 0,
+      "duration": 0
+    },
+    {
+      "beat": 11,
+      "lane": 7,
+      "duration": 0
+    },
+    {
+      "beat": 12,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 12,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 12.5,
+      "lane": 5,
+      "duration": 0
+    },
+    {
+      "beat": 13,
+      "lane": 0,
+      "duration": 0
+    },
+    {
+      "beat": 13,
+      "lane": 7,
+      "duration": 0
+    },
+    {
+      "beat": 13.5,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 14,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 14,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 14.5,
+      "lane": 5,
+      "duration": 0
+    },
+    {
+      "beat": 15,
+      "lane": 0,
+      "duration": 0
+    },
+    {
+      "beat": 15,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 15.5,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 16,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 16,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 16.5,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 16.5,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 17,
+      "lane": 5,
+      "duration": 0
+    },
+    {
+      "beat": 17,
+      "lane": 7,
+      "duration": 0
+    },
+    {
+      "beat": 17.5,
+      "lane": 0,
+      "duration": 0
+    },
+    {
+      "beat": 17.5,
+      "lane": 2,
+      "duration": 0
+    },
+    {
+      "beat": 18,
+      "lane": 3,
+      "duration": 1
+    },
+    {
+      "beat": 18,
+      "lane": 6,
+      "duration": 1
+    }
+  ],
+  "layoutChanges": []
+}
