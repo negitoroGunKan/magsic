@@ -174,12 +174,30 @@
             Speed: <span id="speed-display">2.5</span> (Base: 0.5)
             <input type="range" id="speed-input" min="1.0" max="5.0" step="0.1" value="2.5" style="width: 200px;">
         </label>
-        <br><br>
         <label>
             Lane Width: <span id="lane-width-display">100</span>px
-            <input type="range" id="lane-width-input" min="30" max="200" step="10" value="100" style="width: 200px;">
+            <input type="range" id="lane-width-input" min="50" max="200" step="5" value="100" style="width: 200px;">
         </label>
         <br><br>
+        <div style="border: 1px solid #555; padding: 10px; border-radius: 5px; background: rgba(255,255,255,0.05);">
+            <h3 style="color:#00ffff; margin:0 0 10px 0; font-size: 1em;">LANE COVER</h3>
+            <label style="cursor: pointer; display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                <input type="checkbox" id="lane-cover-checkbox" style="width: 18px; height: 18px;">
+                <span style="font-weight: bold; color: #fff;">Enable Cover</span>
+            </label>
+            <label style="font-size: 0.9em;">
+                Height: <span id="lane-cover-height-display">300</span>px
+                <input type="range" id="lane-cover-height-input" min="0" max="600" step="10" value="300"
+                    style="width: 100%;">
+            </label>
+            <br>
+            <label style="font-size: 0.9em;">
+                Visual Speed: x<span id="lane-cover-speed-display">1.0</span>
+                <input type="range" id="lane-cover-speed-input" min="0.5" max="3.0" step="0.1" value="1.0"
+                    style="width: 100%;">
+            </label>
+        </div>
+        <br>
 
         <h3 style="color:#e040fb; margin:0 0 5px 0;">MODIFIERS</h3>
         <div style="margin-bottom:10px;">

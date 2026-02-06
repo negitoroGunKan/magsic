@@ -37,6 +37,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     // Modifiers UI
     const assistSelect = document.getElementById('assist-select');
     const randomSelect = document.getElementById('random-select');
+    // Lane Cover UI
+    const laneCoverCheckbox = document.getElementById('lane-cover-checkbox');
+    const laneCoverHeightInput = document.getElementById('lane-cover-height-input');
+    const laneCoverHeightDisplay = document.getElementById('lane-cover-height-display');
+    const laneCoverSpeedInput = document.getElementById('lane-cover-speed-input');
+    const laneCoverSpeedDisplay = document.getElementById('lane-cover-speed-display');
+    let isLaneCoverEnabled = false;
+    let laneCoverHeight = 300;
+    let laneCoverSpeedMult = 1.0;
     // Auto Play UI
     const autoPlayCheckbox = document.getElementById('auto-play-checkbox');
     let isAutoPlay = false;
@@ -59,6 +68,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     const scoreDisplay = document.getElementById('score-display');
     let rawScore = 0;
     let lostScore = 0;
+    let currentHealth = 100;
     let totalMaxScore = 1;
     // Offset Controls
     const offsetInput = document.getElementById('offset-input');
@@ -182,6 +192,31 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                             offsetDisplay.textContent = off.toString();
                     }
                 }
+                // Lane Width
+                if (settings.laneWidth !== undefined) {
+                    currentLaneWidth = parseInt(settings.laneWidth) || 100;
+                    if (laneWidthInput)
+                        laneWidthInput.value = currentLaneWidth.toString();
+                    if (laneWidthDisplay)
+                        laneWidthDisplay.textContent = currentLaneWidth.toString();
+                }
+                // Lane Cover
+                if (settings.laneCover !== undefined) {
+                    isLaneCoverEnabled = !!settings.laneCover.enabled;
+                    if (laneCoverCheckbox)
+                        laneCoverCheckbox.checked = isLaneCoverEnabled;
+                    laneCoverHeight = parseInt(settings.laneCover.height) || 300;
+                    if (laneCoverHeightInput)
+                        laneCoverHeightInput.value = laneCoverHeight.toString();
+                    if (laneCoverHeightDisplay)
+                        laneCoverHeightDisplay.textContent = laneCoverHeight.toString();
+                    laneCoverSpeedMult = parseFloat(settings.laneCover.speed) || 1.0;
+                    if (laneCoverSpeedInput)
+                        laneCoverSpeedInput.value = laneCoverSpeedMult.toString();
+                    if (laneCoverSpeedDisplay)
+                        laneCoverSpeedDisplay.textContent = laneCoverSpeedMult.toFixed(1);
+                }
+                resize(); // Apply loaded lane width
             }
             else {
                 // Default fallback if no settings for this user
@@ -209,7 +244,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         const off = offsetInput ? parseInt(offsetInput.value) : 0;
         const settings = {
             speed: multiplier,
-            offset: off
+            offset: off,
+            laneWidth: currentLaneWidth,
+            laneCover: {
+                enabled: isLaneCoverEnabled,
+                height: laneCoverHeight,
+                speed: laneCoverSpeedMult
+            }
         };
         localStorage.setItem(key, JSON.stringify(settings));
     }
@@ -233,6 +274,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 div.style.fontWeight = 'bold';
             }
             div.onclick = () => {
+                playClickSound();
                 currentPlayer = name;
                 localStorage.setItem('magsic_player', currentPlayer);
                 if (playerDisplay)
@@ -292,8 +334,26 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 startScreen.style.display = 'flex';
         });
     }
-    // ... Skipping lines, moving to btnRandom ...
-    // Deleted duplicate handler block
+    if (laneCoverCheckbox) {
+        laneCoverCheckbox.addEventListener('change', () => {
+            isLaneCoverEnabled = laneCoverCheckbox.checked;
+            savePlayerSettings();
+        });
+    }
+    if (laneCoverHeightInput && laneCoverHeightDisplay) {
+        laneCoverHeightInput.addEventListener('input', () => {
+            laneCoverHeight = parseInt(laneCoverHeightInput.value);
+            laneCoverHeightDisplay.textContent = laneCoverHeight.toString();
+            savePlayerSettings();
+        });
+    }
+    if (laneCoverSpeedInput && laneCoverSpeedDisplay) {
+        laneCoverSpeedInput.addEventListener('input', () => {
+            laneCoverSpeedMult = parseFloat(laneCoverSpeedInput.value);
+            laneCoverSpeedDisplay.textContent = laneCoverSpeedMult.toFixed(1);
+            savePlayerSettings();
+        });
+    }
     // Input handling logic removed from here (it exists at the bottom)
     if (btnCalibrate) {
         btnCalibrate.addEventListener('click', startCalibration);
@@ -307,6 +367,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             globalOffset = val;
             offsetDisplay.textContent = val.toString();
             savePlayerSettings(); // <--- Save on change
+        });
+    }
+    if (laneWidthInput && laneWidthDisplay) {
+        laneWidthInput.addEventListener('input', () => {
+            currentLaneWidth = parseInt(laneWidthInput.value);
+            laneWidthDisplay.textContent = currentLaneWidth.toString();
+            resize(); // Trigger recalculated layout
+            savePlayerSettings();
         });
     }
     // Option Drawer Toggle
@@ -329,7 +397,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     // Game Config
     let currentLaneWidth = 100;
     const KEYS = ['e', 'd', 'r', 'f', ' ', 'u', 'j', 'i', 'k'];
-    const NOTE_HEIGHT = 10;
+    const NOTE_HEIGHT = 15;
     // Speed Configuration
     const BASE_NOTE_SPEED = 0.5; // Base speed (x1.0)
     let currentNoteSpeed = BASE_NOTE_SPEED * 2.5; // Default x2.5
@@ -627,7 +695,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         const currentTimeMs = getAudioTime() * 1000;
         // Y = HIT_Y - (time_until_hit * speed)
         // If currentTimeMs < 0, time_until_hit is larger, so Y is smaller (higher up)
-        return HIT_Y - (scheduledTime - currentTimeMs) * currentNoteSpeed;
+        // Visual speed multiplier applied here
+        return HIT_Y - (scheduledTime - currentTimeMs) * currentNoteSpeed * laneCoverSpeedMult;
     }
     function spawnNote(laneIndex, scheduledTime, isLong = false, duration = 0) {
         notes.push({
@@ -944,27 +1013,25 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             }
         });
         // Draw Combo & Score
-        if (stats.combo > 0) {
-            ctx.fillStyle = '#fff';
-            ctx.font = 'bold 60px Arial';
-            ctx.textAlign = 'center';
-            ctx.globalAlpha = 0.3;
-            ctx.fillText(stats.combo.toString(), canvas.width / 2, canvas.height / 2);
-            // Subtraction Score Display (Under Combo)
-            // If AutoPlay, show label instead of score
-            ctx.font = 'bold 30px Arial';
-            if (isAutoPlay) {
-                ctx.fillText('AUTO PLAY', canvas.width / 2, (canvas.height / 2) + 50);
-            }
-            else {
-                let pct = ((totalMaxScore - lostScore) / totalMaxScore) * 100;
-                if (pct < 0)
-                    pct = 0;
-                const scoreText = pct.toFixed(4) + '%';
-                ctx.fillText(scoreText, canvas.width / 2, (canvas.height / 2) + 50);
-            }
-            ctx.globalAlpha = 1.0;
+        // Draw Combo & Score (Always Visible)
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 60px Arial';
+        ctx.textAlign = 'center';
+        ctx.globalAlpha = 0.3;
+        ctx.fillText(stats.combo.toString(), canvas.width / 2, canvas.height / 2);
+        // Subtraction Score Display (Under Combo)
+        ctx.font = 'bold 30px Arial';
+        if (isAutoPlay) {
+            ctx.fillText('AUTO PLAY', canvas.width / 2, (canvas.height / 2) + 50);
         }
+        else {
+            let pct = ((totalMaxScore - lostScore) / totalMaxScore) * 100;
+            if (pct < 0)
+                pct = 0;
+            const scoreText = pct.toFixed(4) + '%';
+            ctx.fillText(scoreText, canvas.width / 2, (canvas.height / 2) + 50);
+        }
+        ctx.globalAlpha = 1.0;
         // Draw Judgement Stats (Left of Lanes)
         if (laneStartX > 150) { // Only if there's space
             const statsX = laneStartX - 140;
@@ -1040,7 +1107,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 // Determine Note Height (Blue is same size, Space is thinner)
                 let drawHeight = NOTE_HEIGHT;
                 if (note.laneIndex === 4) {
-                    drawHeight = 3;
+                    drawHeight = 4.5;
                 }
                 // Determine Skin Image
                 let skinImg = null;
@@ -1089,6 +1156,26 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         [1, 3, 6, 8].forEach(idx => drawNotesForLane(idx));
         // Pass 3: Blue Notes (0, 2, 5, 7) - On Top
         [0, 2, 5, 7].forEach(idx => drawNotesForLane(idx));
+        // Draw Lane Cover (Hidden Bar)
+        if (isLaneCoverEnabled && VISUAL_LANES.length > 0) {
+            const minX = VISUAL_LANES[0].x;
+            const maxX = VISUAL_LANES[VISUAL_LANES.length - 1].x + VISUAL_LANES[VISUAL_LANES.length - 1].width;
+            const coverW = maxX - minX;
+            // Gradient for better look
+            const gradient = ctx.createLinearGradient(minX, 0, minX, laneCoverHeight);
+            gradient.addColorStop(0, '#000');
+            gradient.addColorStop(0.8, '#222');
+            gradient.addColorStop(1, '#444');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(minX, 0, coverW, laneCoverHeight);
+            // Bottom line
+            ctx.strokeStyle = '#00ffff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(minX, laneCoverHeight);
+            ctx.lineTo(maxX, laneCoverHeight);
+            ctx.stroke();
+        }
         // Draw Judgement
         if (judgementTimer > 0) {
             ctx.fillStyle = judgementColor;
@@ -1477,6 +1564,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                                 btn.appendChild(img);
                                 btn.onclick = (e) => {
                                     e.stopPropagation();
+                                    playClickSound();
                                     loadSong(song, filename);
                                 };
                                 btnWrapper.appendChild(btn);
@@ -1951,15 +2039,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
     // Start Loop
     requestAnimationFrame(loop);
-    // Sound Effect Helper
+    // --- Sound Effects ---
     const sfxDecision = new Audio('assets/decision.mp3');
-    // Preload
     sfxDecision.load();
     function playClickSound() {
-        // Reset and play
         sfxDecision.currentTime = 0;
         sfxDecision.play().catch(e => {
-            // Ignore auto-play blocking errors until interaction
             // console.log('SFX Play blocked', e);
         });
     }
@@ -1968,7 +2053,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         btnSelectSong, btnCloseSelect, btnStartSelect,
         btnResume, btnRetry, btnQuit, btnCloseResults,
         btnPauseUI, btnCalibrate, btnCancelCalibration,
-        btnOptionsToggle
+        btnOptionsToggle, btnRandom, btnChart,
+        btnAddPlayer, btnClosePlayer, playerDisplay, playerDisplayInSelect
     ];
     uiButtons.forEach(btn => {
         if (btn) {

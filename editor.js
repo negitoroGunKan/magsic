@@ -1,4 +1,3 @@
-"use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -28,8 +27,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     let scrollTime = 0; // Current rendered time (LERP)
     let targetScrollTime = 0; // Target time (set by Audio or Scroll)
     let zoomLevel = 1.0; // Pixels per ms (base factor)
-    const BASE_PX_PER_MS = 0.5; // Matches game base speed roughly
-    const PLAYHEAD_Y = 500; // Y position of the "current time" line from top of canvas
+    const BASE_PX_PER_MS = 0.2; // Adjusted for better visibility range
+    const PLAYHEAD_Y = 850; // Y position of the "current time" line from top of canvas
     let snapDenominator = 16; // 1/16th beat default
     // UI Elements
     const audioInput = document.getElementById('audio-input');
@@ -123,7 +122,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     }
     loadEditorSongList();
     if (btnLoadSong && songSelect) {
-        btnLoadSong.addEventListener('click', () => __awaiter(void 0, void 0, void 0, function* () {
+        btnLoadSong.addEventListener('click', () => __awaiter(this, void 0, void 0, function* () {
             const index = parseInt(songSelect.value);
             if (isNaN(index) || !flattenedSongOptions[index]) {
                 alert('Please select a song from the list first.');
@@ -407,7 +406,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         });
     }
     // Note Type Logic
-    // const holdLengthInput = document.getElementById('hold-length') as HTMLInputElement; // Removed
     const noteTypeRadios = document.getElementsByName('note-type');
     let customNoteType = 'tap';
     let pendingHold = null;
@@ -416,8 +414,51 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             radio.addEventListener('change', () => {
                 if (radio.checked) {
                     customNoteType = radio.value;
-                    // Cancel pending hold if switching modes
                     pendingHold = null;
+                }
+            });
+        });
+    }
+    // Edit Layer Logic
+    const editLayerRadios = document.getElementsByName('edit-layer');
+    const layerSelectorContainer = document.getElementById('layer-selector-container');
+    let currentEditLayer = 'white';
+    if (editLayerRadios) {
+        editLayerRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                if (radio.checked) {
+                    currentEditLayer = radio.value;
+                    pendingHold = null;
+                }
+            });
+        });
+    }
+    // Editor Mode Logic
+    const editorModeRadios = document.getElementsByName('editor-mode');
+    let editorMode = '4-lane';
+    const visualEditorContainer = document.getElementById('visual-editor-container');
+    if (editorModeRadios) {
+        editorModeRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                if (radio.checked) {
+                    editorMode = radio.value;
+                    pendingHold = null;
+                    // Update UI for mode
+                    if (editorMode === '9-lane') {
+                        if (layerSelectorContainer)
+                            layerSelectorContainer.style.display = 'none';
+                        if (visualEditorContainer)
+                            visualEditorContainer.style.width = '800px';
+                        editorCanvas.width = 800;
+                    }
+                    else {
+                        if (layerSelectorContainer)
+                            layerSelectorContainer.style.display = 'block';
+                        if (visualEditorContainer)
+                            visualEditorContainer.style.width = '220px';
+                        editorCanvas.width = 220;
+                    }
+                    calculateLaneLayout(editorCanvas.width);
                 }
             });
         });
@@ -456,48 +497,43 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     let LANE_DEFS = [];
     function calculateLaneLayout(canvasW) {
         LANE_DEFS = [];
-        // Fixed layout for 800px width as per calculation
-        // w=80, space=120, gap=10.
-        // Group 1: 0, 1
-        // Gap
-        // Group 2: 2, 3
-        // Gap
-        // Group 3: 4 (Space)
-        // Gap
-        // Group 4: 5, 6
-        // Gap
-        // Group 5: 7, 8
-        const w = 80;
-        const gap = 10;
-        const spaceW = 120;
-        let cx = 0;
-        // 0, 1
-        LANE_DEFS[0] = { x: cx, width: w };
-        cx += w;
-        LANE_DEFS[1] = { x: cx, width: w };
-        cx += w;
-        cx += gap;
-        // 2, 3
-        LANE_DEFS[2] = { x: cx, width: w };
-        cx += w;
-        LANE_DEFS[3] = { x: cx, width: w };
-        cx += w;
-        cx += gap;
-        // 4
-        LANE_DEFS[4] = { x: cx, width: spaceW };
-        cx += spaceW;
-        cx += gap;
-        // 5, 6
-        LANE_DEFS[5] = { x: cx, width: w };
-        cx += w;
-        LANE_DEFS[6] = { x: cx, width: w };
-        cx += w;
-        cx += gap;
-        // 7, 8
-        LANE_DEFS[7] = { x: cx, width: w };
-        cx += w;
-        LANE_DEFS[8] = { x: cx, width: w };
-        cx += w;
+        if (editorMode === '9-lane') {
+            // Original 9-lane logic
+            const w = 80;
+            const gap = 10;
+            const spaceW = 120;
+            let cx = 0;
+            LANE_DEFS[0] = { x: cx, width: w };
+            cx += w;
+            LANE_DEFS[1] = { x: cx, width: w };
+            cx += w;
+            cx += gap;
+            LANE_DEFS[2] = { x: cx, width: w };
+            cx += w;
+            LANE_DEFS[3] = { x: cx, width: w };
+            cx += w;
+            cx += gap;
+            LANE_DEFS[4] = { x: cx, width: spaceW };
+            cx += spaceW;
+            cx += gap;
+            LANE_DEFS[5] = { x: cx, width: w };
+            cx += w;
+            LANE_DEFS[6] = { x: cx, width: w };
+            cx += w;
+            cx += gap;
+            LANE_DEFS[7] = { x: cx, width: w };
+            cx += w;
+            LANE_DEFS[8] = { x: cx, width: w };
+            cx += w;
+        }
+        else {
+            // Refactor to 4 equal lanes
+            const totalLanes = 4;
+            const w = Math.floor(canvasW / totalLanes);
+            for (let i = 0; i < totalLanes; i++) {
+                LANE_DEFS[i] = { x: i * w, width: w };
+            }
+        }
     }
     // Interaction: Click to Add/Remove
     editorCanvas.addEventListener('mousedown', (e) => {
@@ -517,6 +553,26 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         }
         if (clickedLane === -1)
             return; // Clicked in gap
+        // Map Clicked Lane to Game Key Index
+        let targetKeyIndex = -1;
+        if (editorMode === '9-lane') {
+            targetKeyIndex = clickedLane;
+        }
+        else {
+            if (currentEditLayer === 'white') {
+                const mapping = [1, 3, 6, 8];
+                targetKeyIndex = mapping[clickedLane];
+            }
+            else if (currentEditLayer === 'blue') {
+                const mapping = [0, 2, 5, 7];
+                targetKeyIndex = mapping[clickedLane];
+            }
+            else if (currentEditLayer === 'space') {
+                targetKeyIndex = 4; // Space
+            }
+        }
+        if (targetKeyIndex === -1)
+            return;
         // Calculate clicked Time
         const pxPerMs = BASE_PX_PER_MS * zoomLevel;
         const currentTime = scrollTime; // Use visual time
@@ -530,7 +586,32 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         const quantizedTime = offset + (n * snapMs);
         // Check if note exists nearby (tolerance of snap/2)
         const hitWindow = snapMs / 2;
-        const existingNoteIndex = recordedNotes.findIndex(note => note.lane === clickedLane && Math.abs(note.time - quantizedTime) < hitWindow);
+        let existingNoteIndex = -1;
+        if (editorMode === '4-lane') {
+            // In 4-lane mode, allow deleting any note that appears in that visual lane
+            existingNoteIndex = recordedNotes.findIndex(note => {
+                const sameTime = Math.abs(note.time - quantizedTime) < hitWindow;
+                if (!sameTime)
+                    return false;
+                const whiteIndices = [1, 3, 6, 8];
+                const blueIndices = [0, 2, 5, 7];
+                if (currentEditLayer === 'space') {
+                    return note.lane === 4;
+                }
+                else {
+                    // Check if the note's lane maps to the clicked visual lane
+                    let nVisualLane = -1;
+                    if (whiteIndices.includes(note.lane))
+                        nVisualLane = whiteIndices.indexOf(note.lane);
+                    else if (blueIndices.includes(note.lane))
+                        nVisualLane = blueIndices.indexOf(note.lane);
+                    return nVisualLane === clickedLane;
+                }
+            });
+        }
+        else {
+            existingNoteIndex = recordedNotes.findIndex(note => note.lane === targetKeyIndex && Math.abs(note.time - quantizedTime) < hitWindow);
+        }
         if (existingNoteIndex !== -1) {
             // Remove
             recordedNotes.splice(existingNoteIndex, 1);
@@ -540,24 +621,24 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             if (customNoteType === 'hold') {
                 if (!pendingHold) {
                     // Click 1: Start
-                    pendingHold = { lane: clickedLane, time: quantizedTime };
+                    pendingHold = { lane: targetKeyIndex, time: quantizedTime };
                 }
                 else {
                     // Click 2: End
-                    if (pendingHold.lane === clickedLane) {
+                    if (pendingHold.lane === targetKeyIndex) {
                         const start = Math.min(pendingHold.time, quantizedTime);
                         const end = Math.max(pendingHold.time, quantizedTime);
                         const duration = end - start;
                         recordedNotes.push({
                             time: start,
-                            lane: clickedLane,
+                            lane: targetKeyIndex,
                             duration: duration
                         });
                         pendingHold = null;
                     }
                     else {
                         // Clicked different lane -> Move start point
-                        pendingHold = { lane: clickedLane, time: quantizedTime };
+                        pendingHold = { lane: targetKeyIndex, time: quantizedTime };
                     }
                 }
             }
@@ -579,7 +660,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 // Click (Tap)
                 recordedNotes.push({
                     time: quantizedTime,
-                    lane: clickedLane,
+                    lane: targetKeyIndex,
                     duration: 0
                 });
                 pendingHold = null;
@@ -631,7 +712,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             }
         }
         const currentTime = scrollTime;
-        const laneWidth = editorCanvas.width / LANE_COUNT;
+        // Lane width is calculated in calculateLaneLayout and stored in LANE_DEFS
         // Draw Beat Grid
         const msPerBeat = 60000 / bpm;
         // Optimization: view range
@@ -712,58 +793,108 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 ctx.fillRect(ld.x + 2, yTailPos, ld.width - 4, yHeadPos - yTailPos);
             }
         }
-        // Draw Pending Hold (Click-Click Mode)
-        if (pendingHold) {
-            const lane = pendingHold.lane;
-            const time = pendingHold.time;
-            const ld = LANE_DEFS[lane];
-            const y = PLAYHEAD_Y - (time - currentTime) * pxPerMs;
-            // Draw ghost head
-            ctx.fillStyle = 'rgba(255, 255, 0, 0.5)'; // Yellow tint
-            ctx.fillRect(ld.x + 2, y - 5, ld.width - 4, 10);
-            // Draw cross or circle to mark exact spot
-            ctx.strokeStyle = '#ffff00';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(ld.x + 2, y - 5, ld.width - 4, 10);
-        }
-        // Draw Recorded Notes
-        recordedNotes.forEach(note => {
-            // Note visible?
-            const noteStart = note.time;
-            const noteEnd = note.time + note.duration;
+        // Helper to draw a single note
+        function drawNote(lane, time, duration, isGhost = false) {
+            if (!ctx)
+                return;
+            const noteStart = time;
+            const noteEnd = time + duration;
             if (noteEnd < startTime - 1000 || noteStart > endTime + 1000)
                 return;
-            const ld = LANE_DEFS[note.lane];
-            const x = ld.x;
-            const w = ld.width;
-            // Colors
-            // E D R F Sp U J I K
-            // 0 1 2 3 4  5 6 7 8
-            let color = '#7CA4FF'; // default blue
-            if ([1, 3, 6, 8].includes(note.lane))
-                color = '#ffffff'; // white
-            if (note.lane === 4)
-                color = '#e040fb'; // Purple
-            ctx.fillStyle = color;
-            // Head Position
-            const y = PLAYHEAD_Y - (note.time - currentTime) * pxPerMs;
-            let drawX = x + 2;
-            let drawW = w - 4;
-            // Blue Note Resize (Make smaller/narrower)
-            if ([0, 2, 5, 7].includes(note.lane)) {
-                drawX = x + 10; // More separation
-                drawW = w - 20;
+            let visualLane = -1;
+            let color = '#ffffff';
+            let isSpace = false;
+            const whiteIndices = [1, 3, 6, 8];
+            const blueIndices = [0, 2, 5, 7];
+            if (editorMode === '9-lane') {
+                visualLane = lane;
+                if (whiteIndices.includes(lane))
+                    color = '#ffffff';
+                else if (blueIndices.includes(lane))
+                    color = '#7CA4FF';
+                else if (lane === 4) {
+                    color = '#e040fb';
+                    isSpace = true;
+                }
             }
-            // Draw Long Note Tail
-            if (note.duration > 0) {
-                const tailHeight = note.duration * pxPerMs;
+            else {
+                if (whiteIndices.includes(lane)) {
+                    visualLane = whiteIndices.indexOf(lane);
+                    color = '#ffffff';
+                }
+                else if (blueIndices.includes(lane)) {
+                    visualLane = blueIndices.indexOf(lane);
+                    color = '#7CA4FF';
+                }
+                else if (lane === 4) {
+                    isSpace = true;
+                    color = '#e040fb';
+                }
+            }
+            if (visualLane === -1 && !isSpace)
+                return;
+            const y = PLAYHEAD_Y - (time - currentTime) * pxPerMs;
+            if (isGhost) {
                 ctx.globalAlpha = 0.5;
-                ctx.fillRect(drawX + 2, y - tailHeight, drawW - 4, tailHeight);
+                if (isSpace && editorMode === '4-lane') {
+                    ctx.fillStyle = 'rgba(224, 64, 251, 0.5)';
+                    ctx.fillRect(0, y - 5, editorCanvas.width, 10);
+                }
+                else {
+                    const ld = LANE_DEFS[visualLane];
+                    if (ld) {
+                        ctx.fillStyle = 'rgba(255, 255, 0, 0.5)';
+                        ctx.fillRect(ld.x + 2, y - 5, ld.width - 4, 10);
+                        ctx.strokeStyle = '#ffff00';
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(ld.x + 2, y - 5, ld.width - 4, 10);
+                    }
+                }
+                ctx.globalAlpha = 1.0;
+                return;
+            }
+            ctx.fillStyle = color;
+            if (isSpace && editorMode === '4-lane') {
+                const drawH = 15;
+                ctx.globalAlpha = 0.5; // Transparency for Space bars
+                if (duration > 0) {
+                    const tailHeight = duration * pxPerMs;
+                    ctx.fillRect(0, y - tailHeight, editorCanvas.width, tailHeight);
+                }
+                ctx.fillRect(0, y - drawH / 2, editorCanvas.width, drawH);
                 ctx.globalAlpha = 1.0;
             }
-            // Head
-            const noteH = 10;
-            ctx.fillRect(drawX, y - noteH / 2, drawW, noteH);
+            else {
+                const ld = LANE_DEFS[visualLane];
+                if (!ld)
+                    return;
+                const drawX = ld.x + 5;
+                const drawW = ld.width - 10;
+                if (duration > 0) {
+                    const tailHeight = duration * pxPerMs;
+                    ctx.globalAlpha = 0.5;
+                    ctx.fillRect(drawX + 2, y - tailHeight, drawW - 4, tailHeight);
+                    ctx.globalAlpha = 1.0;
+                }
+                const noteH = 15;
+                ctx.fillRect(drawX, y - noteH / 2, drawW, noteH);
+            }
+        }
+        // Pass 1: Draw Space Notes and Space Ghost (Background Layer)
+        if (pendingHold && pendingHold.lane === 4) {
+            drawNote(pendingHold.lane, pendingHold.time, 0, true);
+        }
+        recordedNotes.forEach(note => {
+            if (note.lane === 4)
+                drawNote(note.lane, note.time, note.duration);
+        });
+        // Pass 2: Draw White/Blue Notes and their Ghost (Foreground Layer)
+        if (pendingHold && pendingHold.lane !== 4) {
+            drawNote(pendingHold.lane, pendingHold.time, 0, true);
+        }
+        recordedNotes.forEach(note => {
+            if (note.lane !== 4)
+                drawNote(note.lane, note.time, note.duration);
         });
         // Draw Playhead
         ctx.strokeStyle = '#ff0000';
@@ -843,7 +974,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     // Save to Disk (Server) Logic
     const btnSaveDisk = document.getElementById('btn-save-disk');
     if (btnSaveDisk) {
-        btnSaveDisk.addEventListener('click', () => __awaiter(void 0, void 0, void 0, function* () {
+        btnSaveDisk.addEventListener('click', () => __awaiter(this, void 0, void 0, function* () {
             // Auto-export
             const content = getChartJSONString();
             txtOutput.value = content;
