@@ -101,7 +101,26 @@
             <br>
 
             <label>Offset (ms):</label>
-            <input type="number" id="offset" value="0"><br>
+            <input type="number" id="offset" value="0">
+            <label style="display: inline; width: auto; margin-left:10px; font-size: 14px; color: #ffeb3b;">
+                <input type="checkbox" id="chk-metronome"> Metronome
+            </label>
+            <br>
+            <div style="margin-top: 10px; padding: 5px; border: 1px dashed #555; background: rgba(0,255,150,0.05);">
+                <span style="font-size: 0.9em; color: #00ff96;">Offset Sync Tool:</span>
+                <span id="sync-tap-count" style="color: white; font-size: 0.9em; margin-left:10px;">0 taps</span>
+                <button id="btn-apply-sync"
+                    style="background: #00ff96; color: #000; font-size: 0.8em; padding: 2px 5px; margin-left:5px;">Apply
+                    Sync</button>
+                <button id="btn-reset-sync" style="font-size: 0.8em; padding: 2px 5px;">Reset</button>
+                <br>
+                <label style="display: inline; width: auto; font-size: 0.75em; color: #fff;">
+                    <input type="checkbox" id="chk-sync-shift-notes" checked> Shift existing notes
+                </label>
+                <div style="font-size: 0.8em; color: #aaa; margin-top: 3px;">
+                    Tap any key while playing. Press <b>Shift + Enter</b> to sync instantly.
+                </div>
+            </div>
         </div>
 
         <div class="control-group">

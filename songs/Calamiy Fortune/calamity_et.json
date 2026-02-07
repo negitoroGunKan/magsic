@@ -629,7 +629,7 @@
     },
     {
       "beat": 36.75,
-      "lane": 3,
+      "lane": 7,
       "duration": 0
     },
     {
@@ -639,16 +639,11 @@
     },
     {
       "beat": 37,
-      "lane": 7,
+      "lane": 3,
       "duration": 0
     },
     {
       "beat": 37.25,
-      "lane": 6,
-      "duration": 0
-    },
-    {
-      "beat": 37.5,
       "lane": 7,
       "duration": 0
     },

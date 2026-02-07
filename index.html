@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Circular Motion Sprite</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
             margin: 0;
@@ -67,6 +68,15 @@
         #btn-options-toggle:active {
             transform: scale(0.9);
         }
+
+        .record-row {
+            transition: background 0.1s ease;
+        }
+
+        .record-row:hover {
+            background: rgba(0, 188, 212, 0.2);
+            /* Cyan subtle glow */
+        }
     </style>
 </head>
 
@@ -107,7 +117,49 @@
             style="padding: 20px 40px; font-size: 2em; background: #e040fb; color: white; border: none; border-radius: 50px; cursor: pointer; box-shadow: 0 0 20px rgba(224, 64, 251, 0.5); transition: transform 0.2s;">
             SELECT SONG
         </button>
+        <button id="btn-view-records"
+            style="margin-top: 15px; padding: 10px 20px; font-size: 1.2em; background: rgba(0,0,0,0.5); color: #00ffff; border: 1px solid #00ffff; border-radius: 25px; cursor: pointer; transition: all 0.2s;">
+            VIEW RECORDS
+        </button>
         <p style="margin-top:20px; color:#aaa; font-size: 0.9em;">MagsicBeat initial 1.2.1</p>
+    </div>
+
+    <!-- Records Overlay -->
+    <div id="records-overlay"
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:300; flex-direction:column; justify-content:flex-start; align-items:center; padding-top:40px; overflow-y:auto;">
+        <h2 style="color:#00ffff; margin-bottom:20px;">Score Analytics & Records</h2>
+
+        <!-- Charts Row -->
+        <div style="display:flex; flex-direction:column; gap:20px; width:90%; max-width:1100px; margin-bottom:30px;">
+            <div style="background:rgba(255,255,255,0.05); padding:15px; border-radius:10px; border:1px solid #555;">
+                <h3 style="color:#00ffff; margin-top:0; font-size:1.1em; text-align:center;">TOP PERFORMANCE (Best
+                    Scores)</h3>
+                <div style="height:350px;"><canvas id="chart-best"></canvas></div>
+            </div>
+        </div>
+
+        <div id="records-container"
+            style="width:90%; max-width:1100px; background:rgba(255,255,255,0.05); border:1px solid #555; padding:20px; border-radius:10px; margin-bottom:30px;">
+            <table style="width:100%; border-collapse:collapse; color:white; text-align:left;">
+                <thead>
+                    <tr style="border-bottom:2px solid #00bcd4;">
+                        <th style="padding:10px;">Song</th>
+                        <th style="padding:10px;">Result</th>
+                        <th style="padding:10px;">Rank</th>
+                        <th style="padding:10px;">Score</th>
+                        <th style="padding:10px;">Acc</th>
+                        <th style="padding:10px;">Gauge / Modifiers</th>
+                    </tr>
+                </thead>
+                <tbody id="records-body">
+                    <!-- Records injected here -->
+                </tbody>
+            </table>
+        </div>
+        <button id="btn-close-records"
+            style="margin-bottom:40px; padding:12px 30px; background:transparent; border:1px solid #00ffff; color:#00ffff; border-radius:25px; cursor:pointer; font-size:1.1em; transition:all 0.2s;">
+            Close
+        </button>
     </div>
 
     <!-- Player Selection Overlay -->
@@ -209,13 +261,22 @@
                 <option value="space_boost">Space Boost</option>
             </select>
         </div>
-        <div style="margin-bottom:20px;">
+        <div style="margin-bottom:10px;">
             <label>RANDOM:</label><br>
             <select id="random-select"
                 style="width:200px; padding:5px; background:#222; color:white; border:1px solid #555;">
                 <option value="none">None</option>
                 <option value="shuffle_color">Shuffle (Color)</option>
                 <option value="shuffle_chaos">Shuffle (Chaos)</option>
+            </select>
+        </div>
+        <div style="margin-bottom:20px;">
+            <label>GAUGE TYPE:</label><br>
+            <select id="gauge-select"
+                style="width:200px; padding:5px; background:#222; color:white; border:1px solid #555;">
+                <option value="norma" selected>NORMA (70% Clear)</option>
+                <option value="life">LIFE NORMAL (Bad-4%/Miss-5%)</option>
+                <option value="life_hard">LIFE HARD (Bad-5%/Miss-10%)</option>
             </select>
         </div>
 

@@ -61,6 +61,36 @@
     const ctx = editorCanvas.getContext('2d');
     const snapSelect = document.getElementById('snap-select') as HTMLSelectElement;
     const zoomRange = document.getElementById('zoom-range') as HTMLInputElement;
+    const chkMetronome = document.getElementById('chk-metronome') as HTMLInputElement;
+
+    const syncTapCountDisp = document.getElementById('sync-tap-count') as HTMLSpanElement;
+    const btnApplySync = document.getElementById('btn-apply-sync') as HTMLButtonElement;
+    const btnResetSync = document.getElementById('btn-reset-sync') as HTMLButtonElement;
+    const chkSyncShiftNotes = document.getElementById('chk-sync-shift-notes') as HTMLInputElement;
+
+    // Metronome State
+    let lastMetronomeBeat = -1;
+    let audioCtx: AudioContext | null = null;
+    let syncTapTimes: number[] = [];
+    function getAudioCtx() {
+        if (!audioCtx) audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        return audioCtx;
+    }
+
+    function beep(freq = 880, duration = 0.07) {
+        const ctx = getAudioCtx();
+        if (ctx.state === 'suspended') ctx.resume();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = freq;
+        osc.type = 'square'; // Square is the most piercing/audible
+        gain.gain.setValueAtTime(0.8, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+        osc.start();
+        osc.stop(ctx.currentTime + duration);
+    }
 
     if (!ctx) throw new Error('Canvas context not supported');
 
@@ -336,11 +366,25 @@
             // If NOT recording, Space toggles play/pause
             if (!isRecording) {
                 if (!e.repeat) togglePlay();
-                return;
+                // We still want to record a tap even if it toggles play? 
+                // Maybe better to only record if isPlaying is already true.
             }
             // If Recording, fall through to note logic below...
         }
 
+        // --- Offset Sync Tap Recording ---
+        // Record ANY key press as a tap if we are currently playing.
+        // This is more flexible than just the game keys.
+        if (isPlaying && !e.repeat) {
+            // Ignore pure modifier keys
+            const modifiers = ['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Tab', 'Escape'];
+            if (!modifiers.includes(e.key)) {
+                syncTapTimes.push(audio.currentTime * 1000);
+                if (syncTapCountDisp) syncTapCountDisp.textContent = `${syncTapTimes.length} taps`;
+            }
+        }
+
+        const currentKeyIndex = KEYS.indexOf(e.key.toLowerCase());
         if (!isPlaying || !isRecording) return;
         if (e.repeat) return; // Ignore hold-repeat events
 
@@ -352,6 +396,31 @@
                 activeHolds[keyIndex] = audio.currentTime * 1000;
                 statusDiv.textContent = `Status: Recording... (Hold started)`;
             }
+        }
+        // Offset Shortcuts
+        if (e.key === '[' || e.key === ']') {
+            const currentOffset = parseInt(offsetInput.value) || 0;
+            const step = e.shiftKey ? 1 : 5;
+            const diff = e.key === '[' ? -step : step;
+            const newVal = currentOffset + diff;
+            offsetInput.value = newVal.toString();
+
+            // SHIFT NOTES if enabled
+            if (chkSyncShiftNotes && chkSyncShiftNotes.checked) {
+                recordedNotes.forEach(note => note.time += diff);
+                layoutChanges.forEach(lc => lc.time += diff);
+                statusDiv.textContent = `Offset tuned: ${newVal}ms (Notes Shifted)`;
+            } else {
+                statusDiv.textContent = `Offset tuned: ${newVal}ms`;
+            }
+
+            // Trigger metronome seek reset if nudging back
+            lastMetronomeBeat = -1;
+        }
+
+        if (e.key === 'Enter' && e.shiftKey) {
+            e.preventDefault();
+            applyOffsetSync();
         }
     });
 
@@ -437,6 +506,66 @@
         btnBpmPlus.addEventListener('click', () => {
             const val = parseFloat(bpmInput.value) || 0;
             bpmInput.value = (val + 1).toFixed(2);
+        });
+    }
+
+    function applyOffsetSync() {
+        if (syncTapTimes.length < 2) {
+            alert('Please record at least 2 taps (by pressing keys while playing) before applying sync.');
+            return;
+        }
+
+        const bpm = parseFloat(bpmInput.value) || 120;
+        const currentOffset = parseInt(offsetInput.value) || 0;
+        const msPerBeat = 60000 / bpm;
+
+        let totalDeviation = 0;
+        syncTapTimes.forEach(tap => {
+            const n = Math.round((tap - currentOffset) / msPerBeat);
+            const beatTime = currentOffset + (n * msPerBeat);
+            const dev = tap - beatTime;
+            totalDeviation += dev;
+        });
+
+        const avgDev = totalDeviation / syncTapTimes.length;
+        const roundedDev = Math.round(avgDev);
+        const newOffset = currentOffset + roundedDev;
+
+        offsetInput.value = newOffset.toString();
+        lastMetronomeBeat = -1; // Reset metronome
+
+        // SHIFT NOTES if enabled
+        if (chkSyncShiftNotes && chkSyncShiftNotes.checked) {
+            recordedNotes.forEach(note => {
+                note.time += roundedDev;
+            });
+            layoutChanges.forEach(lc => {
+                lc.time += roundedDev;
+            });
+            statusDiv.textContent = `Offset synced: Adjusted by ${roundedDev}ms. Notes SHIFTED.`;
+        } else {
+            statusDiv.textContent = `Offset synced: Adjusted by ${roundedDev}ms. (Grid only)`;
+        }
+
+        // Clear taps
+        syncTapTimes = [];
+        if (syncTapCountDisp) syncTapCountDisp.textContent = '0 taps (Applied)';
+
+        // Visual feedback
+        statusDiv.style.backgroundColor = 'rgba(0, 255, 150, 0.3)';
+        setTimeout(() => statusDiv.style.backgroundColor = '', 1000);
+    }
+
+    // Offset Sync Tool
+    if (btnApplySync) {
+        btnApplySync.addEventListener('click', applyOffsetSync);
+    }
+
+    if (btnResetSync) {
+        btnResetSync.addEventListener('click', () => {
+            syncTapTimes = [];
+            if (syncTapCountDisp) syncTapCountDisp.textContent = '0 taps';
+            statusDiv.textContent = 'Sync taps reset.';
         });
     }
 
@@ -732,6 +861,25 @@
             }
             // Clamp
             targetScrollTime = Math.max(0, Math.min((audio.duration || 600) * 1000, targetScrollTime));
+        } else {
+            // Metronome logic
+            if (chkMetronome && chkMetronome.checked) {
+                const bpm = parseFloat(bpmInput.value) || 110;
+                const offset = parseFloat(offsetInput.value) || 0;
+                const msPerBeat = 60000 / bpm;
+                const currentTime = audio.currentTime * 1000;
+                const currentBeat = Math.floor((currentTime - offset) / msPerBeat);
+
+                if (currentBeat > lastMetronomeBeat) {
+                    // Tick! (Higher pitch for measure start)
+                    const isMeasure = currentBeat % 4 === 0;
+                    beep(isMeasure ? 880 : 440, 0.05);
+                    lastMetronomeBeat = currentBeat;
+                } else if (currentBeat < lastMetronomeBeat) {
+                    // Reset if seek back
+                    lastMetronomeBeat = currentBeat;
+                }
+            }
         }
 
         requestAnimationFrame(loop);

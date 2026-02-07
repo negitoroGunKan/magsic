@@ -96,27 +96,56 @@ const server = http.createServer((req, res) => {
 
                 // Add playerName support (default to 'Guest' if missing)
                 if (!newScore.playerName) newScore.playerName = 'Guest';
+                newScore.timestamp = new Date().toISOString();
 
-                scores[songId].push(newScore);
-
-                // Sort by score desc
-                scores[songId].sort((a, b) => b.score - a.score);
-
-                fs.writeFile(scoresPath, JSON.stringify(scores, null, 2), err => {
-                    if (err) {
-                        res.writeHead(500);
-                        res.end('Error saving score');
-                    } else {
-                        res.writeHead(200);
-                        res.end('Score saved');
+                // Check for Personal Best: only save if it's better than current records for this song
+                // Since we only want BEST values to save capacity
+                let isBetter = true;
+                if (scores[songId].length > 0) {
+                    const currentBest = scores[songId][0].score || 0;
+                    if (newScore.score <= currentBest) {
+                        isBetter = false;
                     }
-                });
+                }
+
+                if (isBetter) {
+                    // Replace or push? The user wants "Best values". 
+                    // Let's keep only the ONE BEST to maximize capacity efficiency.
+                    scores[songId] = [newScore];
+
+                    fs.writeFile(scoresPath, JSON.stringify(scores, null, 2), err => {
+                        if (err) {
+                            res.writeHead(500);
+                            res.end('Error saving score');
+                        } else {
+                            res.writeHead(200);
+                            res.end('New Personal Best saved');
+                        }
+                    });
+                } else {
+                    res.writeHead(200);
+                    res.end('Score not a new best, not saved');
+                }
             } catch (e) {
                 console.error(e);
                 res.writeHead(400);
                 res.end('Bad Request');
             }
         });
+        return;
+    }
+
+    // API: Get Scores
+    if (req.method === 'GET' && pathname === '/api/scores') {
+        const scoresPath = path.join(ROOT, 'scores.json');
+        if (fs.existsSync(scoresPath)) {
+            const data = fs.readFileSync(scoresPath, 'utf8');
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(data);
+        } else {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({}));
+        }
         return;
     }
 

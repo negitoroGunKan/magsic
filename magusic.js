@@ -1,3 +1,4 @@
+"use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -46,6 +47,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     let isLaneCoverEnabled = false;
     let laneCoverHeight = 300;
     let laneCoverSpeedMult = 1.0;
+    // In-game control state (N + Arrows)
+    let lastNPressTime = 0;
+    let isNHolding = false;
+    let isNDoubleTapHolding = false;
+    let hasAdjustedDuringNHold = false;
+    let originalLaneCoverHeight = 0;
+    let originalIsLaneCoverEnabled = false;
+    const DOUBLE_TAP_WINDOW = 400; // Increased for easier use
     // Auto Play UI
     const autoPlayCheckbox = document.getElementById('auto-play-checkbox');
     let isAutoPlay = false;
@@ -68,8 +77,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     const scoreDisplay = document.getElementById('score-display');
     let rawScore = 0;
     let lostScore = 0;
-    let currentHealth = 100;
+    let currentHealth = 0; // Starts at 0 for Norma
     let totalMaxScore = 1;
+    let gaugeType = 'norma';
+    // Game Over Shutter State
+    let isTrackFailed = false;
+    let shutterHeight = 0;
     // Offset Controls
     const offsetInput = document.getElementById('offset-input');
     const offsetDisplay = document.getElementById('offset-display');
@@ -125,8 +138,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     if (btnCloseResults) {
         btnCloseResults.addEventListener('click', () => {
             resultsOverlay.style.display = 'none';
+            // Reset fail state so it doesn't re-trigger
+            isTrackFailed = false;
+            shutterHeight = 0;
+            // Refresh record history if visible
+            if (recordsOverlay && recordsOverlay.style.display !== 'none') {
+                fetchScoreHistory();
+            }
             // Return to start screen or controls? 
-            // Usually Result -> Select Screen or Start Screen.
             if (startScreen)
                 startScreen.style.display = 'flex';
             controlsDiv.style.display = 'block'; // Make drawer available
@@ -144,6 +163,141 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     }
     if (btnStartSelect) {
         btnStartSelect.addEventListener('click', openSongSelect);
+    }
+    // Records Overlay Logic
+    const recordsOverlay = document.getElementById('records-overlay');
+    const recordsBody = document.getElementById('records-body');
+    const btnViewRecords = document.getElementById('btn-view-records');
+    const btnCloseRecords = document.getElementById('btn-close-records');
+    function openRecords() {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (startScreen)
+                startScreen.style.display = 'none';
+            if (recordsOverlay)
+                recordsOverlay.style.display = 'flex';
+            yield fetchScoreHistory();
+        });
+    }
+    let bestChart = null;
+    function fetchScoreHistory() {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!recordsBody)
+                return;
+            recordsBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">Loading...</td></tr>';
+            try {
+                const response = yield fetch('/api/scores');
+                if (!response.ok)
+                    throw new Error('Failed to fetch');
+                const data = yield response.json(); // Map of { songId: Score[] }
+                recordsBody.innerHTML = '';
+                // 1. Group records by song and find the BEST record for each
+                const bestRecords = [];
+                Object.keys(data).forEach(songId => {
+                    const songScores = data[songId];
+                    if (Array.isArray(songScores) && songScores.length > 0) {
+                        // Find the best score entry
+                        let best = songScores[0];
+                        songScores.forEach((s) => {
+                            if ((s.score || 0) > (best.score || 0)) {
+                                best = s;
+                            }
+                        });
+                        best._songId = songId;
+                        bestRecords.push(best);
+                    }
+                });
+                // 2. Render Bar Chart for Bests
+                renderBestChart(bestRecords);
+                // 3. Sort Table by Best Score (Descending)
+                bestRecords.sort((a, b) => (b.score || 0) - (a.score || 0));
+                if (bestRecords.length === 0) {
+                    recordsBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">No records yet.</td></tr>';
+                    return;
+                }
+                bestRecords.forEach(s => {
+                    const tr = document.createElement('tr');
+                    tr.style.borderBottom = '1px solid #333';
+                    tr.className = 'record-row';
+                    const songLabel = s._songId.split('/').pop() || s._songId;
+                    const acc = s.percentage ? s.percentage + '%' : '-';
+                    const isFailed = s.isClear === false || s.rank === 'F';
+                    const resultText = isFailed ? "FAILED" : "CLEAR";
+                    const resultColor = isFailed ? "#f44" : "#0f0";
+                    tr.innerHTML = `
+                    <td style="padding:12px 10px;">${songLabel}</td>
+                    <td style="padding:12px 10px; color:${resultColor}; font-weight:bold;">${resultText}</td>
+                    <td style="padding:12px 10px; font-weight:bold; color:${s.rank === 'F' ? '#f44' : '#00ffff'};">${s.rank}</td>
+                    <td style="padding:12px 10px;">${(s.score || 0).toLocaleString()}</td>
+                    <td style="padding:12px 10px; font-size:0.9em;">${acc}</td>
+                    <td style="padding:12px 10px; font-size:0.9em; color:#aaa;">${s.modifiers || 'None'}</td>
+                `;
+                    recordsBody.appendChild(tr);
+                });
+            }
+            catch (e) {
+                console.error(e);
+                recordsBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#f44;">Error loading records.</td></tr>';
+            }
+        });
+    }
+    function renderBestChart(bestRecords) {
+        const ChartLib = window.Chart;
+        if (!ChartLib)
+            return;
+        // Best Records Chart (Top 15 songs)
+        const sortedBests = [...bestRecords].sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 15);
+        const labels = sortedBests.map(s => s._songId.split('/').pop() || s._songId);
+        const values = sortedBests.map(s => s.score);
+        if (bestChart)
+            bestChart.destroy();
+        bestChart = new ChartLib(document.getElementById('chart-best'), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                        label: 'Personal Best',
+                        data: values,
+                        backgroundColor: '#00ffff',
+                        borderRadius: 5
+                    }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        grid: { color: '#333' },
+                        ticks: { color: '#aaa' },
+                        max: 1000000
+                    },
+                    y: {
+                        grid: { display: false },
+                        ticks: { color: '#aaa', font: { size: 12 } }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => `Score: ${context.raw.toLocaleString()}`
+                        }
+                    }
+                }
+            }
+        });
+    }
+    if (btnViewRecords) {
+        btnViewRecords.addEventListener('click', openRecords);
+    }
+    if (btnCloseRecords) {
+        btnCloseRecords.addEventListener('click', () => {
+            if (recordsOverlay)
+                recordsOverlay.style.display = 'none';
+            if (startScreen)
+                startScreen.style.display = 'flex';
+        });
     }
     // Song Select Event Listeners
     if (btnSelectSong) {
@@ -354,6 +508,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             savePlayerSettings();
         });
     }
+    // Gauge Selector Listener
+    const gaugeSelect = document.getElementById('gauge-select');
+    if (gaugeSelect) {
+        gaugeSelect.addEventListener('change', () => {
+            gaugeType = gaugeSelect.value;
+            console.log('Gauge Type changed to:', gaugeType);
+            resetStats();
+        });
+    }
     // Input handling logic removed from here (it exists at the bottom)
     if (btnCalibrate) {
         btnCalibrate.addEventListener('click', startCalibration);
@@ -467,6 +630,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         };
         rawScore = 0;
         lostScore = 0;
+        currentHealth = (gaugeType === 'life' || gaugeType === 'life_hard') ? 100 : 0;
+        isTrackFailed = false;
+        shutterHeight = 0;
+        if (resultsOverlay)
+            resultsOverlay.style.display = 'none';
         // Calculate Max Score based on current chart (Long Note = Head(9) + Tail(9) = 18)
         totalMaxScore = (chartData && chartData.length > 0)
             ? chartData.reduce((acc, n) => acc + (n.duration > 0 ? 18 : 9), 0)
@@ -487,12 +655,56 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 stats.maxCombo = stats.combo;
             }
         }
-        // Scoring Logic (Subtraction)
         if (!isAutoPlay) {
             const weight = SCORE_WEIGHTS[type];
             const loss = 9 - weight;
             lostScore += loss;
             rawScore += weight;
+            // Health Logic
+            let recovery = 0;
+            if (gaugeType === 'norma') {
+                if (type === 'perfect')
+                    recovery = 2.0;
+                else if (type === 'great')
+                    recovery = 1.0;
+                else if (type === 'nice')
+                    recovery = 0.2;
+                else if (type === 'bad')
+                    recovery = -2.0;
+                else if (type === 'miss')
+                    recovery = -5.0;
+            }
+            else if (gaugeType === 'life') { // NORMAL
+                if (type === 'perfect')
+                    recovery = 0.2;
+                else if (type === 'great')
+                    recovery = 0.1;
+                else if (type === 'nice')
+                    recovery = 0.0;
+                else if (type === 'bad')
+                    recovery = -4.0;
+                else if (type === 'miss')
+                    recovery = -5.0;
+            }
+            else { // 'life_hard'
+                if (type === 'perfect')
+                    recovery = 0.2;
+                else if (type === 'great')
+                    recovery = 0.1;
+                else if (type === 'nice')
+                    recovery = 0.0;
+                else if (type === 'bad')
+                    recovery = -5.0;
+                else if (type === 'miss')
+                    recovery = -10.0;
+            }
+            currentHealth += recovery;
+            currentHealth = Math.max(0, Math.min(100, currentHealth));
+            // LIFE Gauge Death Check
+            if ((gaugeType === 'life' || gaugeType === 'life_hard') && currentHealth <= 0) {
+                console.log('LIFE DEPLETED - GAME OVER');
+                failGame();
+            }
         }
     }
     // Calibration State
@@ -676,6 +888,16 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             audioSource = null;
         }
     }
+    function failGame() {
+        if (isTrackFailed)
+            return;
+        isTrackFailed = true;
+        stopAudio();
+        if (bgVideo)
+            bgVideo.pause();
+        // Keep isPlaying = true to allow animation loop to continue for Shutter
+        console.log("GAME FAILED - Closing Shutter");
+    }
     function getAudioTime() {
         if (isStarting) {
             const now = performance.now();
@@ -693,10 +915,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     }
     function getNoteY(scheduledTime) {
         const currentTimeMs = getAudioTime() * 1000;
-        // Y = HIT_Y - (time_until_hit * speed)
-        // If currentTimeMs < 0, time_until_hit is larger, so Y is smaller (higher up)
-        // Visual speed multiplier applied here
-        return HIT_Y - (scheduledTime - currentTimeMs) * currentNoteSpeed * laneCoverSpeedMult;
+        const speed = currentNoteSpeed * (isLaneCoverEnabled ? laneCoverSpeedMult : 1.0);
+        return HIT_Y - (scheduledTime - currentTimeMs) * speed;
+    }
+    function getSpawnAheadTime() {
+        const speed = currentNoteSpeed * (isLaneCoverEnabled ? laneCoverSpeedMult : 1.0);
+        // Spawn notes at least 2000 pixels before they hit. 
+        // This ensures they start way off-screen at any speed.
+        return 2000 / speed;
     }
     function spawnNote(laneIndex, scheduledTime, isLong = false, duration = 0) {
         notes.push({
@@ -710,6 +936,23 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         });
     }
     function update(deltaTime) {
+        // Shutter Logic
+        if (isTrackFailed) {
+            // Speed: Close in 500ms -> canvas.height / 500
+            const speed = canvas.height / 500;
+            shutterHeight += speed * deltaTime;
+            if (shutterHeight >= canvas.height) {
+                shutterHeight = canvas.height;
+                // Show results if not already
+                if (resultsOverlay && resultsOverlay.style.display !== 'block') {
+                    showResults();
+                    isPlaying = false; // Stop loop once results shown
+                    if (controlsDiv)
+                        controlsDiv.style.display = 'block';
+                }
+            }
+            return; // Skip normal update
+        }
         if (!isPlaying || isPaused || isCountdown)
             return;
         const currentTime = getAudioTime(); // In seconds
@@ -737,17 +980,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             // Random Spawn Logic
             if (Math.random() < 0.02) {
                 const lane = Math.floor(Math.random() * KEYS.length);
-                const spawnAheadTime = HIT_Y / currentNoteSpeed;
+                const spawnAheadTime = getSpawnAheadTime();
                 spawnNote(lane, currentTimeMs + spawnAheadTime, Math.random() < 0.2, Math.random() * 500);
             }
         }
         else {
             // Chart Spawn Logic
-            // Spawn ahead: look for notes that will arrive at HIT_Y within window.
-            // But we can look arbitrarily far ahead? No, usually screen height.
-            // If we use screen height, we only spawn what is on screen.
-            // notes outside logic will be handled next frame.
-            const spawnAheadTime = HIT_Y / currentNoteSpeed;
+            const spawnAheadTime = getSpawnAheadTime();
             while (nextNoteIndex < chartData.length) {
                 const noteData = chartData[nextNoteIndex];
                 // Check if note is roughly within screen or just passed top
@@ -997,6 +1236,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         ctx.fillText(`NICE:    ${stats.nice}`, 20, statsStartY + statsLineH * 2);
         ctx.fillText(`BAD:     ${stats.bad}`, 20, statsStartY + statsLineH * 3);
         ctx.fillText(`MISS:    ${stats.miss}`, 20, statsStartY + statsLineH * 4);
+        const avgVal = stats.hitCount > 0 ? (stats.totalErrorMs / stats.hitCount).toFixed(1) : '0';
+        ctx.fillText(`AVG:     ${avgVal}ms`, 20, statsStartY + statsLineH * 5);
         // Draw Labels
         ctx.fillStyle = '#fff';
         ctx.textAlign = 'center';
@@ -1053,9 +1294,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             ctx.fillText(`BAD: ${stats.bad}`, statsX, statsStartTime + lineHeight * 3);
             // Miss
             ctx.fillStyle = '#ff0000';
-            // Miss
-            ctx.fillStyle = '#ff0000';
             ctx.fillText(`MISS: ${stats.miss}`, statsX, statsStartTime + lineHeight * 4);
+            // Avg Latency (Real-time)
+            ctx.fillStyle = '#ffffff';
+            const sideAvg = stats.hitCount > 0 ? (stats.totalErrorMs / stats.hitCount).toFixed(1) : '0';
+            ctx.fillText(`AVG: ${sideAvg}ms`, statsX, statsStartTime + lineHeight * 5);
         }
         // Draw Health Gauge (Vertical, Left of Stats or Lanes)
         // Let's put it to the far left of lanes, or between stats and lanes?
@@ -1074,13 +1317,25 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             // Fill
             const fillH = (currentHealth / 100) * barH;
             const fillY = barY + (barH - fillH);
-            // Color based on health
-            if (currentHealth > 50)
-                ctx.fillStyle = '#00ff00'; // Green
-            else if (currentHealth > 20)
-                ctx.fillStyle = '#ffff00'; // Yellow
-            else
-                ctx.fillStyle = '#ff0000'; // Red
+            // Color based on Gauge Type
+            if (gaugeType === 'norma') {
+                // NORMA: Cyan/Yellow -> RED if >= 70%
+                if (currentHealth >= 70)
+                    ctx.fillStyle = '#ff0055'; // Pinkish Red for Clear
+                else if (currentHealth >= 40)
+                    ctx.fillStyle = '#00ffff'; // Cyan
+                else
+                    ctx.fillStyle = '#ffff00'; // Yellowish for low? Or keep Cyan.
+            }
+            else {
+                // LIFE (NORMAL & HARD): Green -> Yellow -> Red
+                if (currentHealth > 50)
+                    ctx.fillStyle = '#00ff00'; // Green
+                else if (currentHealth > 20)
+                    ctx.fillStyle = '#ffff00'; // Yellow
+                else
+                    ctx.fillStyle = '#ff0000'; // Red
+            }
             ctx.fillRect(barX, fillY, barW, fillH);
             // Text Label
             ctx.fillStyle = '#fff';
@@ -1185,6 +1440,50 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             lines.forEach((line, i) => {
                 ctx.fillText(line, canvas.width / 2, HIT_Y - 50 + (i * 40));
             });
+        }
+        // Draw Shutter (Fail Effect)
+        if (isTrackFailed || shutterHeight > 0) {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, shutterHeight);
+            // Bottom line for shutter
+            ctx.strokeStyle = '#555';
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.moveTo(0, shutterHeight);
+            ctx.lineTo(canvas.width, shutterHeight);
+            ctx.stroke();
+            if (shutterHeight > canvas.height / 2) {
+                ctx.fillStyle = '#ff0000';
+                ctx.font = 'bold 80px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText("TRACK FAILED", canvas.width / 2, canvas.height / 2);
+            }
+        }
+        // Draw Speed/Height adjustment UI (At the bottom edge of lane cover)
+        if (isNHolding && hasAdjustedDuringNHold) {
+            const minX = (VISUAL_LANES.length > 0) ? VISUAL_LANES[0].x : canvas.width / 2 - 200;
+            const maxX = (VISUAL_LANES.length > 0) ? (VISUAL_LANES[VISUAL_LANES.length - 1].x + VISUAL_LANES[VISUAL_LANES.length - 1].width) : canvas.width / 2 + 200;
+            const coverW = maxX - minX;
+            const uiW = 200;
+            const uiH = 40;
+            const uiX = minX + (coverW - uiW) / 2;
+            // Place UI just below the cover line, but keep it on screen
+            const uiY = Math.min(canvas.height - uiH, laneCoverHeight);
+            ctx.fillStyle = 'rgba(0,0,0,0.85)';
+            ctx.fillRect(uiX, uiY, uiW, uiH);
+            ctx.strokeStyle = '#00ffff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(uiX, uiY, uiW, uiH);
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 20px Arial';
+            ctx.textAlign = 'center';
+            if (isNDoubleTapHolding) {
+                const spd = speedInput ? speedInput.value : '?.?';
+                ctx.fillText(`SPEED: x${spd}`, uiX + uiW / 2, uiY + 27);
+            }
+            else {
+                ctx.fillText(`HEIGHT: ${laneCoverHeight}px`, uiX + uiW / 2, uiY + 27);
+            }
         }
     }
     function loop(timestamp) {
@@ -1355,6 +1654,44 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             else if (finalRatio >= 0.7)
                 rank = 'C';
             resultsOverlay.style.display = 'block';
+            // Update Title based on Gauge Result
+            const resTitle = resultsOverlay.querySelector('h2');
+            let isClear = true;
+            if (resTitle) {
+                if (isTrackFailed)
+                    isClear = false;
+                else if (gaugeType === 'norma' && currentHealth < 70)
+                    isClear = false;
+                if (isClear) {
+                    resTitle.textContent = "TRACK CLEAR";
+                    resTitle.style.color = "#00ffff"; // Cyan
+                }
+                else {
+                    resTitle.textContent = "TRACK FAILED";
+                    resTitle.style.color = "#ff0000"; // Red
+                    rank = 'F'; // Force Rank F?
+                }
+            }
+            // Format Descriptive Modifiers (e.g. NORMAL-white-RANDOM)
+            // Format Descriptive Modifiers (e.g. NORMAL-white-RANDOM)
+            let descriptiveModifiers = "";
+            // 1. Gauge
+            if (gaugeType === 'norma')
+                descriptiveModifiers = "NORMA";
+            else if (gaugeType === 'life')
+                descriptiveModifiers = "NORMAL";
+            else if (gaugeType === 'life_hard')
+                descriptiveModifiers = "HARD";
+            // 2. Assist
+            if ((assistSelect === null || assistSelect === void 0 ? void 0 : assistSelect.value) === 'blue_to_white')
+                descriptiveModifiers += "-white";
+            else if ((assistSelect === null || assistSelect === void 0 ? void 0 : assistSelect.value) === 'space_boost')
+                descriptiveModifiers += "-boost";
+            // 3. Random
+            if ((randomSelect === null || randomSelect === void 0 ? void 0 : randomSelect.value) === 'shuffle_color')
+                descriptiveModifiers += "-RANDOM";
+            else if ((randomSelect === null || randomSelect === void 0 ? void 0 : randomSelect.value) === 'shuffle_chaos')
+                descriptiveModifiers += "-CHAOS";
             // Send to Server (Skip if AutoPlay)
             if (currentSongData && !isAutoPlay) {
                 try {
@@ -1366,10 +1703,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                             difficulty: currentChartFilename, // Use filename as diff identifier
                             score: scaledScore,
                             rank: rank,
+                            isClear: isClear,
                             layout: currentLayoutType,
-                            modifiers: ((assistSelect === null || assistSelect === void 0 ? void 0 : assistSelect.value) !== 'none' || (randomSelect === null || randomSelect === void 0 ? void 0 : randomSelect.value) !== 'none')
-                                ? `A:${assistSelect === null || assistSelect === void 0 ? void 0 : assistSelect.value} R:${randomSelect === null || randomSelect === void 0 ? void 0 : randomSelect.value}`
-                                : 'none',
+                            modifiers: descriptiveModifiers,
                             combo: stats.maxCombo,
                             perfect: stats.perfect,
                             great: stats.great,
@@ -1419,7 +1755,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         });
     }
     if (btnChart) {
-        btnChart.addEventListener('click', () => __awaiter(this, void 0, void 0, function* () {
+        btnChart.addEventListener('click', () => __awaiter(void 0, void 0, void 0, function* () {
             if (startScreen)
                 startScreen.style.display = 'none'; // Hide Start Screen
             // 0. Initialize Audio Context (User Gesture)
@@ -1868,6 +2204,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             if (type === 'type-a') {
                 const totalPlayWidth = tempWidth * 4;
                 const sx = (canvas.width - totalPlayWidth) / 2;
+                laneStartX = sx;
                 for (let i = 0; i < 4; i++) {
                     vLanes.push({ x: sx + (i * tempWidth), width: tempWidth });
                 }
@@ -1892,6 +2229,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 const totalScale = (4 * bScale) + (4 * wScale);
                 const totalPlayWidth = (tempWidth * totalScale) + (4 * pairGap) + (3 * groupGap);
                 const sx = (canvas.width - totalPlayWidth) / 2;
+                laneStartX = sx;
                 const ord = [
                     { idx: 0, label: 'E', color: '#7CA4FF', scale: bScale, gapAfter: pairGap },
                     { idx: 1, label: 'D', color: '#ffffff', scale: wScale, gapAfter: groupGap },
@@ -1963,6 +2301,55 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         }
         if (e.code === 'Space')
             e.preventDefault();
+        const now = performance.now();
+        const keyLower = e.key.toLowerCase();
+        // 1. "N" Combos (Cover & Speed)
+        if (keyLower === 'n' && !e.repeat) {
+            isNHolding = true;
+            hasAdjustedDuringNHold = false; // Reset on new press
+            if (now - lastNPressTime < DOUBLE_TAP_WINDOW) {
+                // Second tap: Start holding mode for Speed
+                isNDoubleTapHolding = true;
+                // Capture original state
+                originalLaneCoverHeight = laneCoverHeight;
+                originalIsLaneCoverEnabled = isLaneCoverEnabled;
+                // Hide cover during adjustment (temporarily)
+                laneCoverHeight = 0;
+                isLaneCoverEnabled = false;
+            }
+            lastNPressTime = now;
+        }
+        // 3. Arrow Keys (Combo interactions)
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            if (isNDoubleTapHolding) {
+                e.preventDefault();
+                hasAdjustedDuringNHold = true;
+                if (speedInput) {
+                    const currentVal = parseFloat(speedInput.value);
+                    const step = 0.1;
+                    const newVal = e.key === 'ArrowUp' ? currentVal + step : Math.max(0.1, currentVal - step);
+                    speedInput.value = newVal.toFixed(1);
+                    // Update currentNoteSpeed immediately
+                    currentNoteSpeed = BASE_NOTE_SPEED * newVal;
+                    if (speedDisplay)
+                        speedDisplay.textContent = newVal.toFixed(1);
+                    savePlayerSettings();
+                }
+                return;
+            }
+            else if (isNHolding) {
+                e.preventDefault();
+                hasAdjustedDuringNHold = true;
+                const step = 10; // 10px adjustment
+                laneCoverHeight = e.key === 'ArrowUp' ? Math.max(0, laneCoverHeight - step) : Math.min(canvas.height, laneCoverHeight + step);
+                if (laneCoverHeightInput)
+                    laneCoverHeightInput.value = laneCoverHeight.toString();
+                if (laneCoverHeightDisplay)
+                    laneCoverHeightDisplay.textContent = laneCoverHeight.toString();
+                savePlayerSettings();
+                return;
+            }
+        }
         const keyIndex = KEYS.indexOf(e.key.toLowerCase());
         if (keyIndex !== -1 && !pressedKeys[keyIndex]) {
             pressedKeys[keyIndex] = true;
@@ -2016,7 +2403,29 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         }
     });
     window.addEventListener('keyup', (e) => {
-        const keyIndex = KEYS.indexOf(e.key.toLowerCase());
+        const keyLower = e.key.toLowerCase();
+        if (keyLower === 'n') {
+            const now = performance.now();
+            if (isNDoubleTapHolding) {
+                if (hasAdjustedDuringNHold) {
+                    // Restore cover and Force ON (Reverted scaling logic here)
+                    laneCoverHeight = originalLaneCoverHeight;
+                    isLaneCoverEnabled = true;
+                }
+                else {
+                    // Quick double tap (no adjustment) -> Toggle!
+                    isLaneCoverEnabled = !originalIsLaneCoverEnabled;
+                    laneCoverHeight = originalLaneCoverHeight;
+                }
+                if (laneCoverCheckbox)
+                    laneCoverCheckbox.checked = isLaneCoverEnabled;
+                savePlayerSettings();
+            }
+            isNHolding = false;
+            isNDoubleTapHolding = false;
+            hasAdjustedDuringNHold = false;
+        }
+        const keyIndex = KEYS.indexOf(keyLower);
         if (keyIndex !== -1) {
             pressedKeys[keyIndex] = false;
             // Release Long Note

@@ -231,7 +231,97 @@
       "beat": 18,
       "lane": 6,
       "duration": 1
+    },
+    {
+      "beat": 18,
+      "lane": 4,
+      "duration": 1
+    },
+    {
+      "beat": 19,
+      "lane": 0,
+      "duration": 0
+    },
+    {
+      "beat": 19.5,
+      "lane": 7,
+      "duration": 0
+    },
+    {
+      "beat": 20,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 20,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 20.5,
+      "lane": 7,
+      "duration": 0
+    },
+    {
+      "beat": 21,
+      "lane": 0,
+      "duration": 0
+    },
+    {
+      "beat": 21,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 21,
+      "lane": 4,
+      "duration": 0
+    },
+    {
+      "beat": 21.5,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 22,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 22,
+      "lane": 7,
+      "duration": 0
+    },
+    {
+      "beat": 22.5,
+      "lane": 0,
+      "duration": 0
+    },
+    {
+      "beat": 23,
+      "lane": 7,
+      "duration": 0
+    },
+    {
+      "beat": 23,
+      "lane": 2,
+      "duration": 0
+    },
+    {
+      "beat": 23,
+      "lane": 4,
+      "duration": 0
+    },
+    {
+      "beat": 23.5,
+      "lane": 5,
+      "duration": 0
     }
   ],
-  "layoutChanges": []
+  "layoutChanges": [
+    {
+      "beat": 0,
+      "type": "type-a"
+    }
+  ]
 }
