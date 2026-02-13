@@ -10,43 +10,243 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 (() => {
     console.log('Magusic script executing...');
-    // alert('Script Loaded 2.0'); // Un-comment to verify reload
-    // Check for button immediately
-    const checkBtn = document.getElementById('btn-calibrate');
-    if (!checkBtn) {
-        console.error('Critical: btn-calibrate NOT FOUND in DOM on load');
-    }
-    else {
-        console.log('btn-calibrate found!');
-        checkBtn.addEventListener('click', () => console.log('Direct Click Handler!'));
-    }
-    // Canvas Setup
-    const canvas = document.getElementById('game-canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx)
-        throw new Error('Canvas context not supported');
-    // UI Elements
-    const btnRandom = document.getElementById('btn-random');
-    const btnChart = document.getElementById('btn-chart');
-    const audioInput = document.getElementById('audio-input');
-    const chartInput = document.getElementById('chart-input');
+    // --- Constants and Types ---
+    const BASE_NOTE_SPEED = 0.5;
+    let currentNoteSpeed = BASE_NOTE_SPEED * 2.5;
+    const KEYS = ['e', 'd', 'r', 'f', ' ', 'u', 'j', 'i', 'k', 's', 'l', 'w', 'o'];
+    const GAME_MODES = {
+        '4key': { indices: [1, 3, 6, 8, 4], label: '4 KEY' },
+        '6key': { indices: [9, 1, 3, 6, 8, 10, 4], label: '6 KEY' },
+        '8key': { indices: [0, 1, 2, 3, 4, 5, 6, 7, 8], label: '8 KEY' },
+        '12key': { indices: [0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 4], label: '12 KEY' }
+    };
+    const SKIN = {
+        white: null, blue: null, space: null, titleBg: null, gameBg: null
+    };
+    // --- State Variables (Hoisted for Initialization) ---
+    let currentPlayer = localStorage.getItem('magsic_player') || 'Guest';
+    let globalOffset = 0;
+    let currentLaneWidth = 100;
+    let isLaneCoverEnabled = false;
+    let laneCoverHeight = 300;
+    let laneCoverSpeedMult = 1.0;
+    let gaugeType = 'norma';
+    let isAutoPlay = false;
+    // Layout and Interpolation State
+    let currentLayoutType = 'default';
+    let targetLayoutType = 'type-a';
+    let LERP_SPEED = 0.15;
+    let currentLaneWidthState = 100;
+    // --- UI Elements ---
+    const startScreen = document.getElementById('start-screen');
     const controlsDiv = document.getElementById('controls');
+    const songSelectOverlay = document.getElementById('song-select-overlay');
+    const resultsOverlay = document.getElementById('results-overlay');
+    const calibrationOverlay = document.getElementById('calibration-overlay');
+    const playerSelectOverlay = document.getElementById('player-select-overlay');
+    const recordsOverlay = document.getElementById('records-overlay');
+    const pauseOverlay = document.getElementById('pause-overlay');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas ? canvas.getContext('2d') : null;
+    const titleCanvas = document.getElementById('title-rain-canvas');
+    const logo = document.getElementById('title-logo');
+    let HIT_Y = 0;
+    const NOTE_HEIGHT = 15;
+    let currentKeyMode = '8key';
     const speedInput = document.getElementById('speed-input');
     const speedDisplay = document.getElementById('speed-display');
+    const offsetInput = document.getElementById('offset-input');
+    const offsetDisplay = document.getElementById('offset-display');
     const laneWidthInput = document.getElementById('lane-width-input');
     const laneWidthDisplay = document.getElementById('lane-width-display');
-    // Modifiers UI
-    const assistSelect = document.getElementById('assist-select');
-    const randomSelect = document.getElementById('random-select');
-    // Lane Cover UI
     const laneCoverCheckbox = document.getElementById('lane-cover-checkbox');
     const laneCoverHeightInput = document.getElementById('lane-cover-height-input');
     const laneCoverHeightDisplay = document.getElementById('lane-cover-height-display');
     const laneCoverSpeedInput = document.getElementById('lane-cover-speed-input');
     const laneCoverSpeedDisplay = document.getElementById('lane-cover-speed-display');
-    let isLaneCoverEnabled = false;
-    let laneCoverHeight = 300;
-    let laneCoverSpeedMult = 1.0;
+    const autoPlayCheckbox = document.getElementById('auto-play-checkbox');
+    const assistSelect = document.getElementById('assist-select');
+    const randomSelect = document.getElementById('random-select');
+    const audioInput = document.getElementById('audio-input');
+    const chartInput = document.getElementById('chart-input');
+    const btnCalibrate = document.getElementById('btn-calibrate');
+    const btnCancelCalibration = document.getElementById('btn-cancel-calibration');
+    const btnSelectSong = document.getElementById('btn-select-song');
+    const btnStartSelect = document.getElementById('btn-start-select');
+    const btnViewRecords = document.getElementById('btn-view-records');
+    const btnCloseSelect = document.getElementById('btn-close-select');
+    const btnCloseResults = document.getElementById('btn-close-results');
+    const btnResume = document.getElementById('btn-resume');
+    const btnRetry = document.getElementById('btn-retry');
+    const btnQuit = document.getElementById('btn-quit');
+    const btnOptionsToggle = document.getElementById('btn-options-toggle');
+    const btnAddPlayer = document.getElementById('btn-add-player');
+    const btnClosePlayer = document.getElementById('btn-close-player');
+    const playerDisplay = document.getElementById('player-display');
+    const playerDisplayInSelect = document.getElementById('player-display-in-select');
+    const btnRandom = document.getElementById('btn-random');
+    const btnChart = document.getElementById('btn-chart');
+    const btnPauseUI = document.getElementById('btn-pause-ui');
+    const playerListDiv = document.getElementById('player-list');
+    const newPlayerNameInput = document.getElementById('new-player-name');
+    const loadingText = document.getElementById('loading-text');
+    const pauseStatusText = document.getElementById('pause-status');
+    const calibrationVisual = document.getElementById('calibration-visual');
+    const calibrationStatus = document.getElementById('calibration-status');
+    const songListDiv = document.getElementById('song-list');
+    // Check for button immediately
+    const checkBtn = btnCalibrate;
+    if (!checkBtn) {
+        console.error('Critical: btn-calibrate NOT FOUND in DOM on load');
+    }
+    else {
+        console.log('btn-calibrate found!');
+    }
+    // --- Title Animation Logic ---
+    function initTitleAnimation() {
+        if (!titleCanvas || !logo || !startScreen) {
+            console.error('Title Animation Init Failed: Missing Elements', { titleCanvas, logo, startScreen });
+            return;
+        }
+        const titleCtx = titleCanvas.getContext('2d');
+        if (!titleCtx) {
+            console.error('Title Animation Init Failed: No Context');
+            return;
+        }
+        console.log('Title Animation Initialized Successfully', {
+            canvasW: titleCanvas.width,
+            canvasH: titleCanvas.height,
+            screenWidth: startScreen.offsetWidth,
+            screenHeight: startScreen.offsetHeight
+        });
+        // Resize Canvas
+        const resizeAnim = () => {
+            if (startScreen.style.display !== 'none') {
+                titleCanvas.width = startScreen.offsetWidth;
+                titleCanvas.height = startScreen.offsetHeight;
+            }
+        };
+        window.addEventListener('resize', resizeAnim);
+        resizeAnim();
+        // Load Sprites
+        const sprites = [];
+        const loadSprite = (src, prob) => {
+            const img = new Image();
+            img.src = src;
+            sprites.push({ img, prob });
+        };
+        // sprite1 (94%), sprite3 (3%), sprite5 (3%)
+        loadSprite('assets/sprite1.svg', 0.94);
+        loadSprite('assets/sprite3.svg', 0.03);
+        loadSprite('assets/sprite5.svg', 0.03);
+        const particles = [];
+        const SPAWN_RATE = 2; // Particles per frame
+        // Animation Loop
+        let startTime = performance.now();
+        let frameCount = 0;
+        function animLoop(time) {
+            var _a, _b, _c, _d;
+            frameCount++;
+            if (frameCount % 60 === 0) {
+                console.log('AnimLoop Running...', {
+                    display: startScreen.style.display,
+                    particles: particles.length,
+                    canvas: `${titleCanvas.width}x${titleCanvas.height}`
+                });
+            }
+            if (startScreen.style.display === 'none') {
+                requestAnimationFrame(animLoop);
+                return;
+            }
+            // 1. Logo Pulsation
+            // 100 + (2 * sin(t) * 5) -> 100 + 10 * sin(t)
+            const elapsed = (time - startTime) / 1000;
+            const scale = 100 + (10 * Math.sin(elapsed * 2)); // Speed 2
+            logo.style.width = `${scale}%`;
+            // Note: modifying width % might be jerky if container fluxuates. 
+            // Better to use transform scale?
+            // User asked for: "magnitude 100 + (2 * sin * 5)"
+            // Let's stick to user formula relative to base size.
+            // But logo.style.width = 80% originally. 
+            // Let's apply transform scale instead for smoothness.
+            const scaleFactor = 1 + (0.1 * Math.sin(elapsed * 2)); // 1.0 +/- 0.1
+            logo.style.transform = `scale(${scaleFactor})`;
+            // 2. Rain Animation
+            titleCtx.clearRect(0, 0, titleCanvas.width, titleCanvas.height);
+            // Spawn
+            for (let i = 0; i < SPAWN_RATE; i++) {
+                const r = Math.random();
+                let selectedImg = (_a = sprites[0]) === null || _a === void 0 ? void 0 : _a.img; // Default
+                // Prob logic
+                // 0...0.94 -> s1
+                // 0.94...0.97 -> s3
+                // 0.97...1.0 -> s5
+                if (r > 0.97)
+                    selectedImg = (_b = sprites[2]) === null || _b === void 0 ? void 0 : _b.img; // s5
+                else if (r > 0.94)
+                    selectedImg = (_c = sprites[1]) === null || _c === void 0 ? void 0 : _c.img; // s3
+                else
+                    selectedImg = (_d = sprites[0]) === null || _d === void 0 ? void 0 : _d.img; // s1
+                if (selectedImg && selectedImg.complete && selectedImg.naturalWidth > 0) {
+                    // Start from top or right side
+                    // Angle 135 deg: Top-Left to Bottom-Right? No.
+                    // "Left-Bottom 135 degrees" -> 
+                    // Standard trig: 0 is Right, 90 is Down (canvas), 135 is Bottom-Left.
+                    // Vector: x < 0, y > 0.
+                    // So particles move LEFT and DOWN.
+                    // Thus spawn area: Top edge AND Right edge.
+                    const size = 20 + Math.random() * 30;
+                    const speed = 2 + Math.random() * 3;
+                    let startX, startY;
+                    if (Math.random() < 0.5) {
+                        // Top edge
+                        startX = Math.random() * titleCanvas.width * 1.5; // Extension for angle
+                        startY = -50;
+                    }
+                    else {
+                        // Right edge
+                        startX = titleCanvas.width + 50;
+                        startY = Math.random() * titleCanvas.height;
+                    }
+                    particles.push({
+                        x: startX,
+                        y: startY,
+                        speed: speed,
+                        img: selectedImg,
+                        size: size
+                    });
+                }
+            }
+            // Update & Draw
+            // 135 degrees vector (approx -0.707, 0.707)
+            const vx = -0.707;
+            const vy = 0.707;
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.speed * vx * 3; // Speed multiplier
+                p.y += p.speed * vy * 3;
+                // Safety: check naturalWidth to avoid drawing broken image
+                if (p.img.complete && p.img.naturalWidth > 0) {
+                    titleCtx.drawImage(p.img, p.x, p.y, p.size, p.size);
+                }
+                // Cull
+                if (p.y > titleCanvas.height + 50 || p.x < -50) {
+                    particles.splice(i, 1);
+                }
+            }
+            requestAnimationFrame(animLoop);
+        }
+        requestAnimationFrame(animLoop);
+    }
+    // Call init
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        initTitleAnimation();
+    }
+    else {
+        window.addEventListener('load', initTitleAnimation);
+    }
+    // (Canvas and Settings UI handled at top)
     // In-game control state (N + Arrows)
     let lastNPressTime = 0;
     let isNHolding = false;
@@ -56,15 +256,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     let originalIsLaneCoverEnabled = false;
     const DOUBLE_TAP_WINDOW = 400; // Increased for easier use
     // Auto Play UI
-    const autoPlayCheckbox = document.getElementById('auto-play-checkbox');
-    let isAutoPlay = false;
+    // (autoPlayCheckbox and isAutoPlay handled at top)
     if (autoPlayCheckbox) {
         autoPlayCheckbox.addEventListener('change', () => {
             isAutoPlay = autoPlayCheckbox.checked;
         });
     }
     // Results UI
-    const resultsOverlay = document.getElementById('results-overlay');
     const resPerfect = document.getElementById('res-perfect');
     const resGreat = document.getElementById('res-great');
     const resNice = document.getElementById('res-nice');
@@ -72,27 +270,21 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     const resMiss = document.getElementById('res-miss');
     const resCombo = document.getElementById('res-combo');
     const resAvg = document.getElementById('res-avg');
-    const btnCloseResults = document.getElementById('btn-close-results');
+    // (resultsOverlay and btnCloseResults handled at top)
     // Score Display (In-game)
     const scoreDisplay = document.getElementById('score-display');
     let rawScore = 0;
     let lostScore = 0;
     let currentHealth = 0; // Starts at 0 for Norma
     let totalMaxScore = 1;
-    let gaugeType = 'norma';
+    // (gaugeType handled at top)
     // Game Over Shutter State
     let isTrackFailed = false;
     let shutterHeight = 0;
     // Offset Controls
-    const offsetInput = document.getElementById('offset-input');
-    const offsetDisplay = document.getElementById('offset-display');
-    let globalOffset = 0;
+    // (offsetInput, offsetDisplay, globalOffset handled at top)
     // Layout Selector
-    let currentLayoutType = 'default';
-    let targetLayoutType = 'type-a'; // The layout we should be in
-    // Lane State for Interpolation
-    let LERP_SPEED = 0.15; // Smoothness factor
-    let currentLaneWidthState = 100; // Track width for resize logic
+    // (currentLayoutType and targetLayoutType handled at top or below)
     const layoutRadios = document.getElementsByName('layout-type');
     layoutRadios.forEach(radio => {
         radio.addEventListener('change', (e) => {
@@ -105,30 +297,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             resize();
         });
     });
-    // Calibration UI
-    const calibrationOverlay = document.getElementById('calibration-overlay');
-    const btnCalibrate = document.getElementById('btn-calibrate');
-    const btnCancelCalibration = document.getElementById('btn-cancel-calibration');
-    const calibrationVisual = document.getElementById('calibration-visual');
-    const calibrationStatus = document.getElementById('calibration-status');
-    // Song Select UI
-    const btnSelectSong = document.getElementById('btn-select-song');
-    const songSelectOverlay = document.getElementById('song-select-overlay');
-    const songListDiv = document.getElementById('song-list');
-    const btnCloseSelect = document.getElementById('btn-close-select');
-    // Start Screen UI
-    const startScreen = document.getElementById('start-screen');
-    const btnStartSelect = document.getElementById('btn-start-select');
-    const loadingOverlay = document.getElementById('loading-overlay');
-    const loadingText = document.getElementById('loading-text');
-    // Pause UI
-    const pauseOverlay = document.getElementById('pause-overlay');
-    const pauseStatusText = document.getElementById('pause-status');
-    const btnResume = document.getElementById('btn-resume');
-    const btnRetry = document.getElementById('btn-retry');
-    const btnQuit = document.getElementById('btn-quit');
+    // (Calibration, Song Select, Start Screen, Pause handled at top)
+    // Event listeners preserved below:
     // Pause UI Button
-    const btnPauseUI = document.getElementById('btn-pause-ui');
+    // (startScreen, btnStartSelect, pauseOverlay, btnResume, btnRetry, btnQuit, btnPauseUI handled at top)
     if (btnPauseUI) {
         btnPauseUI.addEventListener('click', () => {
             console.log('Pause button clicked');
@@ -232,10 +404,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         });
     }
     // Records Overlay Logic
-    const recordsOverlay = document.getElementById('records-overlay');
     const recordsBody = document.getElementById('records-body');
-    const btnViewRecords = document.getElementById('btn-view-records');
     const btnCloseRecords = document.getElementById('btn-close-records');
+    // (recordsOverlay and btnViewRecords handled at top)
     function openRecords() {
         return __awaiter(this, void 0, void 0, function* () {
             if (startScreen)
@@ -371,14 +542,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         btnSelectSong.addEventListener('click', openSongSelect);
     }
     // Player Management Logic
-    let currentPlayer = localStorage.getItem('magsic_player') || 'Guest';
-    const playerDisplay = document.getElementById('player-display');
-    const playerDisplayInSelect = document.getElementById('player-display-in-select'); // New button
-    const playerSelectOverlay = document.getElementById('player-select-overlay');
-    const playerListDiv = document.getElementById('player-list');
-    const btnAddPlayer = document.getElementById('btn-add-player');
-    const newPlayerNameInput = document.getElementById('new-player-name');
-    const btnClosePlayer = document.getElementById('btn-close-player');
+    currentPlayer = localStorage.getItem('magsic_player') || 'Guest';
+    // (playerDisplay, playerDisplayInSelect, playerSelectOverlay, playerListDiv, newPlayerNameInput, btnClosePlayer handled at top)
     // Init Player UI
     if (playerDisplay)
         playerDisplay.textContent = `Player: ${currentPlayer} ▼`;
@@ -613,7 +778,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         });
     }
     // Option Drawer Toggle
-    const btnOptionsToggle = document.getElementById('btn-options-toggle');
+    // (btnOptionsToggle and controlsDiv handled at top)
     if (btnOptionsToggle && controlsDiv) {
         btnOptionsToggle.addEventListener('click', (e) => {
             e.stopPropagation(); // Stop bubbling
@@ -630,63 +795,24 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             }
         });
     }
-    // Game Config
-    let currentLaneWidth = 100;
-    // Indices: 0-8 (Classic), 9-12 (New: s,l,w,o)
-    const KEYS = ['e', 'd', 'r', 'f', ' ', 'u', 'j', 'i', 'k', 's', 'l', 'w', 'o'];
-    console.log('Current Key Mapping:', KEYS);
-    const NOTE_HEIGHT = 15;
-    let currentKeyMode = '8key'; // Default
-    const GAME_MODES = {
-        '4key': {
-            indices: [1, 3, 6, 8], // d, f, j, k
-            label: '4 KEY'
-        },
-        '6key': {
-            indices: [9, 1, 3, 6, 8, 10], // s, d, f, j, k, l
-            label: '6 KEY'
-        },
-        '8key': {
-            indices: [0, 1, 2, 3, 4, 5, 6, 7, 8], // e, d, r, f, Space, u, j, i, k
-            label: '8 KEY'
-        },
-        '12key': {
-            indices: [0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12], // All 12
-            label: '12 KEY'
-        }
-    };
-    // Speed Configuration
-    const BASE_NOTE_SPEED = 0.5; // Base speed (x1.0)
-    let currentNoteSpeed = BASE_NOTE_SPEED * 2.5; // Default x2.5
-    let HIT_Y = 0; // Calculated on resize
-    // Skin Assets
-    const SKIN = {
-        white: null,
-        blue: null,
-        space: null,
-        titleBg: null,
-        gameBg: null
-    };
+    // Game Config (Values assigned at top)
+    // NOTE_HEIGHT, currentKeyMode, HIT_Y handled at top
     function loadSkin() {
         const assets = [
             { key: 'white', src: 'assets/note_white.png' },
             { key: 'blue', src: 'assets/note_blue.png' },
             { key: 'space', src: 'assets/note_space.png' },
-            { key: 'titleBg', src: 'assets/title_bg.png' },
-            { key: 'selectBg', src: 'assets/select_bg.png' },
-            { key: 'gameBg', src: 'assets/game_bg.png' }
+            { key: 'titleBg', src: 'assets/backdrop1.png' }, // Use backdrop1 for title as requested
+            { key: 'gameBg', src: 'assets/initial2.png' } // Fallback
         ];
         assets.forEach(a => {
             const img = new Image();
             img.src = a.src;
             img.onload = () => {
                 SKIN[a.key] = img;
-                // Specific Logic for HTML elements
-                if (a.key === 'selectBg') {
-                    // Override default rgba background
-                    if (songSelectOverlay) {
-                        songSelectOverlay.style.background = `url(${a.src}) no-repeat center center / cover`;
-                    }
+                // Ensure background is semi-transparent black
+                if (songSelectOverlay) {
+                    songSelectOverlay.style.background = 'rgba(0,0,0,0.95)';
                 }
             };
             // onerror: silently fail -> fallback to null, keep default style
@@ -2536,6 +2662,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     vLanes.push({ x, width: tempWidth });
                     lConfigs[kIdx] = { x, width: tempWidth, color: colors[i], label: labels[i] };
                 });
+                lConfigs[4] = { x: sx, width: totalPlayWidth, color: '#e040fb', label: 'SPACE' };
             }
             // --- 6 KEY (s, d, f, j, k, l) ---
             else if (currentKeyMode === '6key') {
@@ -2552,6 +2679,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     vLanes.push({ x, width: tempWidth });
                     lConfigs[kIdx] = { x, width: tempWidth, color: colors[i], label: labels[i] };
                 });
+                lConfigs[4] = { x: sx, width: totalPlayWidth, color: '#e040fb', label: 'SPACE' };
             }
             // --- 8 KEY (e, d, r, f, u, j, i, k) ---
             // --- 12 KEY (s, l, w, o + others) ---
@@ -2826,4 +2954,4 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             btn.addEventListener('click', playClickSound);
         }
     });
-})();
+})(); // Correct end of IIFE

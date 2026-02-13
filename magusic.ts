@@ -1,45 +1,280 @@
 (() => {
     console.log('Magusic script executing...');
-    // alert('Script Loaded 2.0'); // Un-comment to verify reload
 
-    // Check for button immediately
-    const checkBtn = document.getElementById('btn-calibrate');
-    if (!checkBtn) {
-        console.error('Critical: btn-calibrate NOT FOUND in DOM on load');
-    } else {
-        console.log('btn-calibrate found!');
-        checkBtn.addEventListener('click', () => console.log('Direct Click Handler!'));
-    }
-    // Canvas Setup
-    const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Canvas context not supported');
+    // --- Constants and Types ---
+    const BASE_NOTE_SPEED = 0.5;
+    let currentNoteSpeed = BASE_NOTE_SPEED * 2.5;
+    const KEYS = ['e', 'd', 'r', 'f', ' ', 'u', 'j', 'i', 'k', 's', 'l', 'w', 'o'];
+    type KeyMode = '4key' | '6key' | '8key' | '12key';
+    const GAME_MODES: { [key in KeyMode]: { indices: number[], label: string } } = {
+        '4key': { indices: [1, 3, 6, 8, 4], label: '4 KEY' },
+        '6key': { indices: [9, 1, 3, 6, 8, 10, 4], label: '6 KEY' },
+        '8key': { indices: [0, 1, 2, 3, 4, 5, 6, 7, 8], label: '8 KEY' },
+        '12key': { indices: [0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 4], label: '12 KEY' }
+    };
+    const SKIN: { [key: string]: HTMLImageElement | null } = {
+        white: null, blue: null, space: null, titleBg: null, gameBg: null
+    };
 
-    // UI Elements
-    const btnRandom = document.getElementById('btn-random') as HTMLButtonElement;
-    const btnChart = document.getElementById('btn-chart') as HTMLButtonElement;
-    const audioInput = document.getElementById('audio-input') as HTMLInputElement;
-    const chartInput = document.getElementById('chart-input') as HTMLInputElement;
+    // --- State Variables (Hoisted for Initialization) ---
+    let currentPlayer = localStorage.getItem('magsic_player') || 'Guest';
+    let globalOffset = 0;
+    let currentLaneWidth = 100;
+    let isLaneCoverEnabled = false;
+    let laneCoverHeight = 300;
+    let laneCoverSpeedMult = 1.0;
+    let gaugeType: 'norma' | 'life' | 'life_hard' = 'norma';
+    let isAutoPlay = false;
+
+    // Layout and Interpolation State
+    let currentLayoutType: 'type-a' | 'type-b' | 'default' = 'default';
+    let targetLayoutType: 'type-a' | 'type-b' = 'type-a';
+    let LERP_SPEED = 0.15;
+    let currentLaneWidthState = 100;
+
+    // --- UI Elements ---
+    const startScreen = document.getElementById('start-screen') as HTMLDivElement;
     const controlsDiv = document.getElementById('controls') as HTMLDivElement;
+    const songSelectOverlay = document.getElementById('song-select-overlay') as HTMLDivElement;
+    const resultsOverlay = document.getElementById('results-overlay') as HTMLDivElement;
+    const calibrationOverlay = document.getElementById('calibration-overlay') as HTMLDivElement;
+    const playerSelectOverlay = document.getElementById('player-select-overlay') as HTMLDivElement;
+    const recordsOverlay = document.getElementById('records-overlay') as HTMLDivElement;
+    const pauseOverlay = document.getElementById('pause-overlay') as HTMLDivElement;
+    const loadingOverlay = document.getElementById('loading-overlay') as HTMLDivElement;
+
+    const canvas = document.getElementById('canvas') as HTMLCanvasElement;
+    const ctx = canvas ? canvas.getContext('2d') : null;
+
+    const titleCanvas = document.getElementById('title-rain-canvas') as HTMLCanvasElement;
+    const logo = document.getElementById('title-logo') as HTMLImageElement;
+
+    let HIT_Y = 0;
+    const NOTE_HEIGHT = 15;
+    let currentKeyMode: KeyMode = '8key';
+
     const speedInput = document.getElementById('speed-input') as HTMLInputElement;
     const speedDisplay = document.getElementById('speed-display') as HTMLSpanElement;
+    const offsetInput = document.getElementById('offset-input') as HTMLInputElement;
+    const offsetDisplay = document.getElementById('offset-display') as HTMLSpanElement;
     const laneWidthInput = document.getElementById('lane-width-input') as HTMLInputElement;
     const laneWidthDisplay = document.getElementById('lane-width-display') as HTMLSpanElement;
-
-    // Modifiers UI
-    const assistSelect = document.getElementById('assist-select') as HTMLSelectElement;
-    const randomSelect = document.getElementById('random-select') as HTMLSelectElement;
-
-    // Lane Cover UI
     const laneCoverCheckbox = document.getElementById('lane-cover-checkbox') as HTMLInputElement;
     const laneCoverHeightInput = document.getElementById('lane-cover-height-input') as HTMLInputElement;
     const laneCoverHeightDisplay = document.getElementById('lane-cover-height-display') as HTMLSpanElement;
     const laneCoverSpeedInput = document.getElementById('lane-cover-speed-input') as HTMLInputElement;
     const laneCoverSpeedDisplay = document.getElementById('lane-cover-speed-display') as HTMLSpanElement;
+    const autoPlayCheckbox = document.getElementById('auto-play-checkbox') as HTMLInputElement;
+    const assistSelect = document.getElementById('assist-select') as HTMLSelectElement;
+    const randomSelect = document.getElementById('random-select') as HTMLSelectElement;
+    const audioInput = document.getElementById('audio-input') as HTMLInputElement;
+    const chartInput = document.getElementById('chart-input') as HTMLInputElement;
 
-    let isLaneCoverEnabled = false;
-    let laneCoverHeight = 300;
-    let laneCoverSpeedMult = 1.0;
+    const btnCalibrate = document.getElementById('btn-calibrate') as HTMLButtonElement;
+    const btnCancelCalibration = document.getElementById('btn-cancel-calibration') as HTMLButtonElement;
+    const btnSelectSong = document.getElementById('btn-select-song') as HTMLButtonElement;
+    const btnStartSelect = document.getElementById('btn-start-select') as HTMLButtonElement;
+    const btnViewRecords = document.getElementById('btn-view-records') as HTMLButtonElement;
+    const btnCloseSelect = document.getElementById('btn-close-select') as HTMLButtonElement;
+    const btnCloseResults = document.getElementById('btn-close-results') as HTMLButtonElement;
+    const btnResume = document.getElementById('btn-resume') as HTMLButtonElement;
+    const btnRetry = document.getElementById('btn-retry') as HTMLButtonElement;
+    const btnQuit = document.getElementById('btn-quit') as HTMLButtonElement;
+    const btnOptionsToggle = document.getElementById('btn-options-toggle') as HTMLButtonElement;
+    const btnAddPlayer = document.getElementById('btn-add-player') as HTMLButtonElement;
+    const btnClosePlayer = document.getElementById('btn-close-player') as HTMLButtonElement;
+    const playerDisplay = document.getElementById('player-display') as HTMLDivElement;
+    const playerDisplayInSelect = document.getElementById('player-display-in-select') as HTMLDivElement;
+    const btnRandom = document.getElementById('btn-random') as HTMLButtonElement;
+    const btnChart = document.getElementById('btn-chart') as HTMLButtonElement;
+    const btnPauseUI = document.getElementById('btn-pause-ui') as HTMLButtonElement;
+
+    const playerListDiv = document.getElementById('player-list') as HTMLDivElement;
+    const newPlayerNameInput = document.getElementById('new-player-name') as HTMLInputElement;
+    const loadingText = document.getElementById('loading-text') as HTMLParagraphElement;
+    const pauseStatusText = document.getElementById('pause-status') as HTMLHeadingElement;
+    const calibrationVisual = document.getElementById('calibration-visual') as HTMLDivElement;
+    const calibrationStatus = document.getElementById('calibration-status') as HTMLParagraphElement;
+    const songListDiv = document.getElementById('song-list') as HTMLDivElement;
+
+    // Check for button immediately
+    const checkBtn = btnCalibrate;
+    if (!checkBtn) {
+        console.error('Critical: btn-calibrate NOT FOUND in DOM on load');
+    } else {
+        console.log('btn-calibrate found!');
+    }
+
+    // --- Title Animation Logic ---
+    function initTitleAnimation() {
+        if (!titleCanvas || !logo || !startScreen) {
+            console.error('Title Animation Init Failed: Missing Elements', { titleCanvas, logo, startScreen });
+            return;
+        }
+
+        const titleCtx = titleCanvas.getContext('2d');
+        if (!titleCtx) {
+            console.error('Title Animation Init Failed: No Context');
+            return;
+        }
+        console.log('Title Animation Initialized Successfully', {
+            canvasW: titleCanvas.width,
+            canvasH: titleCanvas.height,
+            screenWidth: startScreen.offsetWidth,
+            screenHeight: startScreen.offsetHeight
+        });
+
+        // Resize Canvas
+        const resizeAnim = () => {
+            if (startScreen.style.display !== 'none') {
+                titleCanvas.width = startScreen.offsetWidth;
+                titleCanvas.height = startScreen.offsetHeight;
+            }
+        };
+        window.addEventListener('resize', resizeAnim);
+        resizeAnim();
+
+        // Load Sprites
+        const sprites: { img: HTMLImageElement, prob: number }[] = [];
+        const loadSprite = (src: string, prob: number) => {
+            const img = new Image();
+            img.src = src;
+            sprites.push({ img, prob });
+        };
+
+        // sprite1 (94%), sprite3 (3%), sprite5 (3%)
+        loadSprite('assets/sprite1.svg', 0.94);
+        loadSprite('assets/sprite3.svg', 0.03);
+        loadSprite('assets/sprite5.svg', 0.03);
+
+        interface Particle {
+            x: number;
+            y: number;
+            speed: number;
+            img: HTMLImageElement;
+            size: number;
+        }
+
+        const particles: Particle[] = [];
+        const SPAWN_RATE = 2; // Particles per frame
+
+        // Animation Loop
+        let startTime = performance.now();
+        let frameCount = 0;
+
+        function animLoop(time: number) {
+            frameCount++;
+            if (frameCount % 60 === 0) {
+                console.log('AnimLoop Running...', {
+                    display: startScreen.style.display,
+                    particles: particles.length,
+                    canvas: `${titleCanvas.width}x${titleCanvas.height}`
+                });
+            }
+
+            if (startScreen.style.display === 'none') {
+                requestAnimationFrame(animLoop);
+                return;
+            }
+
+            // 1. Logo Pulsation
+            // 100 + (2 * sin(t) * 5) -> 100 + 10 * sin(t)
+            const elapsed = (time - startTime) / 1000;
+            const scale = 100 + (10 * Math.sin(elapsed * 2)); // Speed 2
+            logo.style.width = `${scale}%`;
+            // Note: modifying width % might be jerky if container fluxuates. 
+            // Better to use transform scale?
+            // User asked for: "magnitude 100 + (2 * sin * 5)"
+            // Let's stick to user formula relative to base size.
+            // But logo.style.width = 80% originally. 
+            // Let's apply transform scale instead for smoothness.
+            const scaleFactor = 1 + (0.1 * Math.sin(elapsed * 2)); // 1.0 +/- 0.1
+            logo.style.transform = `scale(${scaleFactor})`;
+
+
+            // 2. Rain Animation
+            titleCtx!.clearRect(0, 0, titleCanvas.width, titleCanvas.height);
+
+            // Spawn
+            for (let i = 0; i < SPAWN_RATE; i++) {
+                const r = Math.random();
+                let selectedImg = sprites[0]?.img; // Default
+
+                // Prob logic
+                // 0...0.94 -> s1
+                // 0.94...0.97 -> s3
+                // 0.97...1.0 -> s5
+                if (r > 0.97) selectedImg = sprites[2]?.img; // s5
+                else if (r > 0.94) selectedImg = sprites[1]?.img; // s3
+                else selectedImg = sprites[0]?.img; // s1
+
+                if (selectedImg && selectedImg.complete && selectedImg.naturalWidth > 0) {
+                    // Start from top or right side
+                    // Angle 135 deg: Top-Left to Bottom-Right? No.
+                    // "Left-Bottom 135 degrees" -> 
+                    // Standard trig: 0 is Right, 90 is Down (canvas), 135 is Bottom-Left.
+                    // Vector: x < 0, y > 0.
+                    // So particles move LEFT and DOWN.
+                    // Thus spawn area: Top edge AND Right edge.
+
+                    const size = 20 + Math.random() * 30;
+                    const speed = 2 + Math.random() * 3;
+
+                    let startX, startY;
+                    if (Math.random() < 0.5) {
+                        // Top edge
+                        startX = Math.random() * titleCanvas.width * 1.5; // Extension for angle
+                        startY = -50;
+                    } else {
+                        // Right edge
+                        startX = titleCanvas.width + 50;
+                        startY = Math.random() * titleCanvas.height;
+                    }
+
+                    particles.push({
+                        x: startX,
+                        y: startY,
+                        speed: speed,
+                        img: selectedImg,
+                        size: size
+                    });
+                }
+            }
+
+            // Update & Draw
+            // 135 degrees vector (approx -0.707, 0.707)
+            const vx = -0.707;
+            const vy = 0.707;
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.speed * vx * 3; // Speed multiplier
+                p.y += p.speed * vy * 3;
+
+                // Safety: check naturalWidth to avoid drawing broken image
+                if (p.img.complete && p.img.naturalWidth > 0) {
+                    titleCtx!.drawImage(p.img, p.x, p.y, p.size, p.size);
+                }
+
+                // Cull
+                if (p.y > titleCanvas.height + 50 || p.x < -50) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            requestAnimationFrame(animLoop);
+        }
+        requestAnimationFrame(animLoop);
+    }
+
+    // Call init
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        initTitleAnimation();
+    } else {
+        window.addEventListener('load', initTitleAnimation);
+    }
+
+    // (Canvas and Settings UI handled at top)
 
     // In-game control state (N + Arrows)
     let lastNPressTime = 0;
@@ -51,9 +286,7 @@
     const DOUBLE_TAP_WINDOW = 400; // Increased for easier use
 
     // Auto Play UI
-    const autoPlayCheckbox = document.getElementById('auto-play-checkbox') as HTMLInputElement;
-    let isAutoPlay = false;
-
+    // (autoPlayCheckbox and isAutoPlay handled at top)
     if (autoPlayCheckbox) {
         autoPlayCheckbox.addEventListener('change', () => {
             isAutoPlay = autoPlayCheckbox.checked;
@@ -61,7 +294,6 @@
     }
 
     // Results UI
-    const resultsOverlay = document.getElementById('results-overlay') as HTMLDivElement;
     const resPerfect = document.getElementById('res-perfect') as HTMLSpanElement;
     const resGreat = document.getElementById('res-great') as HTMLSpanElement;
     const resNice = document.getElementById('res-nice') as HTMLSpanElement;
@@ -69,7 +301,7 @@
     const resMiss = document.getElementById('res-miss') as HTMLSpanElement;
     const resCombo = document.getElementById('res-combo') as HTMLSpanElement;
     const resAvg = document.getElementById('res-avg') as HTMLSpanElement;
-    const btnCloseResults = document.getElementById('btn-close-results') as HTMLButtonElement;
+    // (resultsOverlay and btnCloseResults handled at top)
 
     // Score Display (In-game)
     const scoreDisplay = document.getElementById('score-display') as HTMLSpanElement;
@@ -77,25 +309,17 @@
     let lostScore = 0;
     let currentHealth = 0; // Starts at 0 for Norma
     let totalMaxScore = 1;
-    let gaugeType: 'norma' | 'life' | 'life_hard' = 'norma';
+    // (gaugeType handled at top)
 
     // Game Over Shutter State
     let isTrackFailed = false;
     let shutterHeight = 0;
 
     // Offset Controls
-    const offsetInput = document.getElementById('offset-input') as HTMLInputElement;
-    const offsetDisplay = document.getElementById('offset-display') as HTMLSpanElement;
-    let globalOffset = 0;
+    // (offsetInput, offsetDisplay, globalOffset handled at top)
 
     // Layout Selector
-    let currentLayoutType: 'type-a' | 'type-b' | 'default' = 'default';
-    let targetLayoutType: 'type-a' | 'type-b' = 'type-a'; // The layout we should be in
-
-    // Lane State for Interpolation
-    let LERP_SPEED = 0.15; // Smoothness factor
-    let currentLaneWidthState = 100; // Track width for resize logic
-
+    // (currentLayoutType and targetLayoutType handled at top or below)
     const layoutRadios = document.getElementsByName('layout-type');
     layoutRadios.forEach(radio => {
         radio.addEventListener('change', (e) => {
@@ -109,34 +333,10 @@
         });
     });
 
-    // Calibration UI
-    const calibrationOverlay = document.getElementById('calibration-overlay') as HTMLDivElement;
-    const btnCalibrate = document.getElementById('btn-calibrate') as HTMLButtonElement;
-    const btnCancelCalibration = document.getElementById('btn-cancel-calibration') as HTMLButtonElement;
-    const calibrationVisual = document.getElementById('calibration-visual') as HTMLDivElement;
-    const calibrationStatus = document.getElementById('calibration-status') as HTMLParagraphElement;
-
-    // Song Select UI
-    const btnSelectSong = document.getElementById('btn-select-song') as HTMLButtonElement;
-    const songSelectOverlay = document.getElementById('song-select-overlay') as HTMLDivElement;
-    const songListDiv = document.getElementById('song-list') as HTMLDivElement;
-    const btnCloseSelect = document.getElementById('btn-close-select') as HTMLButtonElement;
-
-    // Start Screen UI
-    const startScreen = document.getElementById('start-screen') as HTMLDivElement;
-    const btnStartSelect = document.getElementById('btn-start-select') as HTMLButtonElement;
-    const loadingOverlay = document.getElementById('loading-overlay') as HTMLDivElement;
-    const loadingText = document.getElementById('loading-text') as HTMLParagraphElement;
-
-    // Pause UI
-    const pauseOverlay = document.getElementById('pause-overlay') as HTMLDivElement;
-    const pauseStatusText = document.getElementById('pause-status') as HTMLHeadingElement;
-    const btnResume = document.getElementById('btn-resume') as HTMLButtonElement;
-    const btnRetry = document.getElementById('btn-retry') as HTMLButtonElement;
-    const btnQuit = document.getElementById('btn-quit') as HTMLButtonElement;
-
+    // (Calibration, Song Select, Start Screen, Pause handled at top)
+    // Event listeners preserved below:
     // Pause UI Button
-    const btnPauseUI = document.getElementById('btn-pause-ui') as HTMLButtonElement;
+    // (startScreen, btnStartSelect, pauseOverlay, btnResume, btnRetry, btnQuit, btnPauseUI handled at top)
     if (btnPauseUI) {
         btnPauseUI.addEventListener('click', () => {
             console.log('Pause button clicked');
@@ -255,10 +455,9 @@
     }
 
     // Records Overlay Logic
-    const recordsOverlay = document.getElementById('records-overlay') as HTMLDivElement;
     const recordsBody = document.getElementById('records-body') as HTMLTableSectionElement;
-    const btnViewRecords = document.getElementById('btn-view-records');
     const btnCloseRecords = document.getElementById('btn-close-records');
+    // (recordsOverlay and btnViewRecords handled at top)
 
     async function openRecords() {
         if (startScreen) startScreen.style.display = 'none';
@@ -402,14 +601,8 @@
     }
 
     // Player Management Logic
-    let currentPlayer = localStorage.getItem('magsic_player') || 'Guest';
-    const playerDisplay = document.getElementById('player-display');
-    const playerDisplayInSelect = document.getElementById('player-display-in-select'); // New button
-    const playerSelectOverlay = document.getElementById('player-select-overlay');
-    const playerListDiv = document.getElementById('player-list');
-    const btnAddPlayer = document.getElementById('btn-add-player');
-    const newPlayerNameInput = document.getElementById('new-player-name') as HTMLInputElement;
-    const btnClosePlayer = document.getElementById('btn-close-player');
+    currentPlayer = localStorage.getItem('magsic_player') || 'Guest';
+    // (playerDisplay, playerDisplayInSelect, playerSelectOverlay, playerListDiv, newPlayerNameInput, btnClosePlayer handled at top)
 
     // Init Player UI
     if (playerDisplay) playerDisplay.textContent = `Player: ${currentPlayer} ▼`;
@@ -660,7 +853,7 @@
     }
 
     // Option Drawer Toggle
-    const btnOptionsToggle = document.getElementById('btn-options-toggle');
+    // (btnOptionsToggle and controlsDiv handled at top)
     if (btnOptionsToggle && controlsDiv) {
         btnOptionsToggle.addEventListener('click', (e) => {
             e.stopPropagation(); // Stop bubbling
@@ -679,59 +872,16 @@
         });
     }
 
-    // Game Config
-    let currentLaneWidth = 100;
-    // Indices: 0-8 (Classic), 9-12 (New: s,l,w,o)
-    const KEYS = ['e', 'd', 'r', 'f', ' ', 'u', 'j', 'i', 'k', 's', 'l', 'w', 'o'];
-    console.log('Current Key Mapping:', KEYS);
-    const NOTE_HEIGHT = 15;
-
-    // Key Mode Definitions
-    type KeyMode = '4key' | '6key' | '8key' | '12key';
-    let currentKeyMode: KeyMode = '8key'; // Default
-
-    const GAME_MODES: { [key in KeyMode]: { indices: number[], label: string } } = {
-        '4key': {
-            indices: [1, 3, 6, 8], // d, f, j, k
-            label: '4 KEY'
-        },
-        '6key': {
-            indices: [9, 1, 3, 6, 8, 10], // s, d, f, j, k, l
-            label: '6 KEY'
-        },
-        '8key': {
-            indices: [0, 1, 2, 3, 4, 5, 6, 7, 8], // e, d, r, f, Space, u, j, i, k
-            label: '8 KEY'
-        },
-
-        '12key': {
-            indices: [0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12], // All 12
-            label: '12 KEY'
-        }
-    };
-
-    // Speed Configuration
-    const BASE_NOTE_SPEED = 0.5; // Base speed (x1.0)
-    let currentNoteSpeed = BASE_NOTE_SPEED * 2.5; // Default x2.5
-    let HIT_Y = 0; // Calculated on resize
-
-    // Skin Assets
-    const SKIN: { [key: string]: HTMLImageElement | null } = {
-        white: null,
-        blue: null,
-        space: null,
-        titleBg: null,
-        gameBg: null
-    };
+    // Game Config (Values assigned at top)
+    // NOTE_HEIGHT, currentKeyMode, HIT_Y handled at top
 
     function loadSkin() {
         const assets = [
             { key: 'white', src: 'assets/note_white.png' },
             { key: 'blue', src: 'assets/note_blue.png' },
             { key: 'space', src: 'assets/note_space.png' },
-            { key: 'titleBg', src: 'assets/title_bg.png' },
-            { key: 'selectBg', src: 'assets/select_bg.png' },
-            { key: 'gameBg', src: 'assets/game_bg.png' }
+            { key: 'titleBg', src: 'assets/backdrop1.png' }, // Use backdrop1 for title as requested
+            { key: 'gameBg', src: 'assets/initial2.png' }  // Fallback
         ];
 
         assets.forEach(a => {
@@ -740,12 +890,9 @@
             img.onload = () => {
                 SKIN[a.key] = img;
 
-                // Specific Logic for HTML elements
-                if (a.key === 'selectBg') {
-                    // Override default rgba background
-                    if (songSelectOverlay) {
-                        songSelectOverlay.style.background = `url(${a.src}) no-repeat center center / cover`;
-                    }
+                // Ensure background is semi-transparent black
+                if (songSelectOverlay) {
+                    songSelectOverlay.style.background = 'rgba(0,0,0,0.95)';
                 }
             };
             // onerror: silently fail -> fallback to null, keep default style
@@ -2772,6 +2919,7 @@
                     vLanes.push({ x, width: tempWidth });
                     lConfigs[kIdx] = { x, width: tempWidth, color: colors[i], label: labels[i] };
                 });
+                lConfigs[4] = { x: sx, width: totalPlayWidth, color: '#e040fb', label: 'SPACE' };
             }
             // --- 6 KEY (s, d, f, j, k, l) ---
             else if (currentKeyMode === '6key') {
@@ -2790,6 +2938,7 @@
                     vLanes.push({ x, width: tempWidth });
                     lConfigs[kIdx] = { x, width: tempWidth, color: colors[i], label: labels[i] };
                 });
+                lConfigs[4] = { x: sx, width: totalPlayWidth, color: '#e040fb', label: 'SPACE' };
             }
             // --- 8 KEY (e, d, r, f, u, j, i, k) ---
 
@@ -3090,6 +3239,7 @@
         }
     });
 
-})();
+})(); // Correct end of IIFE
+
 
 

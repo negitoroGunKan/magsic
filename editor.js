@@ -641,8 +641,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             editorCanvas.width = newWidth;
             calculateLaneLayout(editorCanvas.width);
             // Hide Layer Selector completely?
+            // User requested it be visible in all modes
             if (layerSelectorContainer)
-                layerSelectorContainer.style.display = 'none';
+                layerSelectorContainer.style.display = 'block';
         });
         // Init logic
         editorModeSelect.dispatchEvent(new Event('change'));
@@ -680,6 +681,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     }, { passive: false });
     let LANE_DEFS = [];
     function calculateLaneLayout(canvasW) {
+        if (!canvasW)
+            canvasW = 800; // Safety fallback
         LANE_DEFS = [];
         if (editorMode === '9key') {
             // Original 9-lane logic
@@ -713,12 +716,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         else {
             // Generic linear layout
             let totalLanes = 4;
+            if (editorMode === '4key')
+                totalLanes = 5; // 4 + Space
             if (editorMode === '6key')
-                totalLanes = 6;
+                totalLanes = 7; // 6 + Space
             if (editorMode === '8key')
-                totalLanes = 8;
+                totalLanes = 9; // 8key + Space = 9 inputs
             if (editorMode === '12key')
-                totalLanes = 12;
+                totalLanes = 13; // 12 + Space
             const w = Math.floor(canvasW / totalLanes);
             for (let i = 0; i < totalLanes; i++) {
                 LANE_DEFS[i] = { x: i * w, width: w };
@@ -748,30 +753,33 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         let targetKeyIndex = -1;
         if (editorMode === '9key') {
             targetKeyIndex = clickedLane;
-        }
-        else if (editorMode === '4key') {
-            // d, f, j, k -> 1, 3, 6, 8
-            const mapping = [1, 3, 6, 8];
+            // d, f, j, k -> 1, 3, 6, 8. Space is 4.
+            // Visual: d, f, Space, j, k -> 1, 3, 4, 6, 8
+            const mapping = [1, 3, 4, 6, 8];
             targetKeyIndex = mapping[clickedLane];
         }
         else if (editorMode === '6key') {
-            // s, d, f, j, k, l -> 9, 1, 3, 6, 8, 10
-            const mapping = [9, 1, 3, 6, 8, 10];
+            // s, d, f, j, k, l -> 9, 1, 3, 6, 8, 10. Space is 4.
+            // Visual: s, d, f, Space, j, k, l -> 9, 1, 3, 4, 6, 8, 10
+            const mapping = [9, 1, 3, 4, 6, 8, 10];
             targetKeyIndex = mapping[clickedLane];
         }
         else if (editorMode === '8key') {
-            // e, d, r, f, u, j, i, k -> 0, 1, 2, 3, 5, 6, 7, 8
-            const mapping = [0, 1, 2, 3, 5, 6, 7, 8];
+            // e, d, r, f, Space, u, j, i, k -> 0, 1, 2, 3, 4, 5, 6, 7, 8
+            // Visual Order: Linear 0-8
+            const mapping = [0, 1, 2, 3, 4, 5, 6, 7, 8];
             targetKeyIndex = mapping[clickedLane];
         }
         else if (editorMode === '12key') {
             // s, l, w, o + others...
-            // Visual Order from getLayoutData: 9, 11, 1, 0, 3, 2, 5, 6, 7, 8, 12, 10
-            const mapping = [9, 11, 1, 0, 3, 2, 5, 6, 7, 8, 12, 10];
+            // Space (4) in middle
+            // [9, 11, 1, 0, 3, 2,  4,  5, 6, 7, 8, 12, 10]
+            const mapping = [9, 11, 1, 0, 3, 2, 4, 5, 6, 7, 8, 12, 10];
             targetKeyIndex = mapping[clickedLane];
         }
         if (targetKeyIndex === -1)
             return;
+        console.log(`MouseDown: ClickedLane=${clickedLane}, TargetKey=${targetKeyIndex}, Mode=${editorMode}`);
         // Calculate clicked Time
         const pxPerMs = BASE_PX_PER_MS * zoomLevel;
         const currentTime = scrollTime; // Use visual time
@@ -988,10 +996,31 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             for (const laneStr in activeHolds) {
                 const lane = parseInt(laneStr);
                 const startTime = activeHolds[lane];
-                const ld = LANE_DEFS[lane];
+                // Determine Visual Lane
+                let visualLane = -1;
+                if (editorMode === '9key') {
+                    visualLane = lane;
+                }
+                else {
+                    let mapping = [];
+                    if (editorMode === '4key')
+                        mapping = [1, 3, 4, 6, 8];
+                    else if (editorMode === '6key')
+                        mapping = [9, 1, 3, 4, 6, 8, 10];
+                    else if (editorMode === '8key')
+                        mapping = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+                    else if (editorMode === '12key')
+                        mapping = [9, 11, 1, 0, 3, 2, 4, 5, 6, 7, 8, 12, 10];
+                    const idx = mapping.indexOf(lane);
+                    if (idx !== -1)
+                        visualLane = idx;
+                }
+                if (visualLane === -1 || !LANE_DEFS[visualLane])
+                    continue;
+                const ld = LANE_DEFS[visualLane];
                 const yHeadPos = PLAYHEAD_Y - (startTime - currentTime) * pxPerMs;
                 const yTailPos = PLAYHEAD_Y; // Current time
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.fillStyle = (lane === 4) ? 'rgba(224, 64, 251, 0.3)' : 'rgba(255, 255, 255, 0.3)';
                 ctx.fillRect(ld.x + 2, yTailPos, ld.width - 4, yHeadPos - yTailPos);
             }
         }
@@ -1023,37 +1052,48 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 // Determine Visual Lane for current mode
                 let mapping = [];
                 if (editorMode === '4key')
-                    mapping = [1, 3, 6, 8];
+                    mapping = [1, 3, 4, 6, 8];
                 else if (editorMode === '6key')
-                    mapping = [9, 1, 3, 6, 8, 10];
+                    mapping = [9, 1, 3, 4, 6, 8, 10];
                 else if (editorMode === '8key')
-                    mapping = [0, 1, 2, 3, 5, 6, 7, 8];
+                    mapping = [0, 1, 2, 3, 4, 5, 6, 7, 8];
                 else if (editorMode === '12key')
-                    mapping = [9, 11, 1, 0, 3, 2, 5, 6, 7, 8, 12, 10];
+                    mapping = [9, 11, 1, 0, 3, 2, 4, 5, 6, 7, 8, 12, 10];
                 const idx = mapping.indexOf(lane);
                 if (idx !== -1) {
                     visualLane = idx;
-                    // Auto Color logic based on generic lane patterns
-                    if (editorMode === '4key') {
-                        color = (idx === 1 || idx === 2) ? '#7CA4FF' : '#ffffff';
+                    // User-specified Color Logic
+                    if (lane === 4) {
+                        color = '#e040fb'; // Space is Purple
+                        isSpace = true;
+                    }
+                    else if (editorMode === '4key') {
+                        // All White (d,f,j,k)
+                        color = '#ffffff';
                     }
                     else if (editorMode === '6key') {
-                        // S, D, F, J, K, L -> B, W, B, B, W, B
-                        color = (idx === 1 || idx === 4) ? '#ffffff' : '#7CA4FF';
+                        // All White (s,d,f,j,k,l)
+                        color = '#ffffff';
                     }
                     else if (editorMode === '8key') {
-                        // E, D, R, F, U, J, I, K -> B, W, B, W...
                         color = (idx % 2 === 0) ? '#7CA4FF' : '#ffffff';
                     }
                     else if (editorMode === '12key') {
-                        // S, W, D, E, F, R ...
-                        // Let's use alternating for simplicity or a pattern
-                        color = (idx % 2 === 0) ? '#7CA4FF' : '#ffffff';
+                        // White: s(9), d(1), f(3), j(6), k(8), l(10)
+                        // Blue: w(11), e(0), r(2), u(5), i(7), o(12)
+                        const whiteKeys = [9, 1, 3, 6, 8, 10];
+                        if (whiteKeys.includes(lane))
+                            color = '#ffffff';
+                        else
+                            color = '#7CA4FF';
                     }
                 }
             }
-            if (visualLane === -1 && !isSpace)
+            if (visualLane === -1 && !isSpace) {
+                console.log(`DrawNote Skip: lane=${lane}`);
                 return;
+            }
+            // console.log(`DrawNote: lane=${lane}, mode=${editorMode}, visualLane=${visualLane}, isSpace=${isSpace}, color=${color}`);
             const y = PLAYHEAD_Y - (time - currentTime) * pxPerMs;
             if (isGhost) {
                 ctx.globalAlpha = 0.5;
