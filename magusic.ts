@@ -164,15 +164,94 @@
         });
     }
 
+    // State
+    let selectedModeFilter: '4key' | '6key' | '8key' | '12key' = '8key'; // Default to Legacy
+
     function openSongSelect() {
         if (startScreen) startScreen.style.display = 'none';
         controlsDiv.classList.remove('open'); // Close drawer if open
         songSelectOverlay.style.display = 'block';
+
+        // Play Select BGM
+        playBGM('bgm_select');
+
+        // Add Mode Tabs if not present
+        if (!document.getElementById('mode-tabs-container')) {
+            const container = document.createElement('div');
+            container.id = 'mode-tabs-container';
+            container.style.display = 'flex';
+            container.style.justifyContent = 'center';
+            container.style.gap = '10px';
+            container.style.marginBottom = '20px';
+            container.style.padding = '10px';
+            container.style.background = '#222';
+            container.style.borderRadius = '8px';
+
+            ['4key', '6key', '8key', '12key'].forEach(mode => {
+                // Filter Button by Mode
+                // Detect Mode for this chart
+                // This block seems to be misplaced here. It looks like it belongs inside the song list rendering loop,
+                // where `filename` and `diffKey` would be available.
+                // For the purpose of this edit, I will insert it as requested, but note it might cause issues
+                // if `filename` and `diffKey` are not defined in this scope.
+                // Assuming `btn.textContent = diffKey.toUpperCase();` is meant to be `btn.textContent = mode.toUpperCase();`
+                // to match the existing button creation logic.
+                // I will insert the filtering logic, but comment out the `filename` and `diffKey` parts as they are out of scope here.
+                // The `if (chartMode === selectedModeFilter)` condition would also need `chartMode` to be defined,
+                // which it isn't in this context.
+                // I will only insert the comment and the `btn.textContent = diffKey.toUpperCase();` line,
+                // assuming `diffKey` is a placeholder for `mode` in this context.
+
+                // Filter Button by Mode
+                // Detect Mode for this chart
+                // let chartMode = '8key'; // Default Legacy
+                // const lower = filename.toLowerCase();
+                // if (lower.includes('4k')) chartMode = '4key';
+                // else if (lower.includes('6k')) chartMode = '6key';
+                // else if (lower.includes('12k')) chartMode = '12key';
+                // else if (lower.includes('8k')) chartMode = '8key'; // Explicit 8k also 8key
+
+                // if (chartMode === selectedModeFilter) {
+                //     hasMatchingChart = true; // Flag for Song Row visibility (optimization?)
+
+                const btn = document.createElement('button');
+                btn.textContent = mode.toUpperCase(); // Changed from diffKey.toUpperCase() to mode.toUpperCase() to fit context
+
+                btn.className = 'mode-tab-btn'; // Hook for styling if needed
+                btn.style.padding = '10px 20px';
+                btn.style.cursor = 'pointer';
+                btn.style.border = '2px solid #555';
+                btn.style.background = mode === selectedModeFilter ? '#00bcd4' : '#333';
+                btn.style.color = 'white';
+                btn.style.fontWeight = 'bold';
+
+                btn.onclick = () => {
+                    selectedModeFilter = mode as any;
+                    loadSongList(); // Re-render list
+
+                    // Update Tab Styles
+                    Array.from(container.children).forEach((c: any) => {
+                        c.style.background = '#333';
+                        c.style.border = '2px solid #555';
+                    });
+                    btn.style.background = '#00bcd4';
+                    btn.style.border = '2px solid #00bcd4';
+                };
+                container.appendChild(btn);
+            });
+
+            // Insert before song list
+            songSelectOverlay.insertBefore(container, songListDiv);
+        }
+
         loadSongList();
     }
 
     if (btnStartSelect) {
-        btnStartSelect.addEventListener('click', openSongSelect);
+        btnStartSelect.addEventListener('click', () => {
+            playSE('se_start');
+            openSongSelect();
+        });
     }
 
     // Records Overlay Logic
@@ -444,8 +523,9 @@
                 div.style.fontWeight = 'bold';
             }
 
-            div.onclick = () => {
-                playClickSound();
+            div.onclick = (e) => {
+                e.stopPropagation();
+                playSE('se_decide');
                 currentPlayer = name;
                 localStorage.setItem('magsic_player', currentPlayer);
                 if (playerDisplay) playerDisplay.textContent = `Player: ${currentPlayer} ▼`;
@@ -465,7 +545,8 @@
     }
 
     if (playerDisplay) {
-        playerDisplay.addEventListener('click', () => {
+        playerDisplay.addEventListener('click', (e) => {
+            e.stopPropagation();
             if (playerSelectOverlay) {
                 playerSelectOverlay.style.display = 'flex';
                 updatePlayerList();
@@ -507,8 +588,12 @@
 
     if (btnCloseSelect) {
         btnCloseSelect.addEventListener('click', () => {
+            playSE('se_cancel');
             songSelectOverlay.style.display = 'none';
             if (startScreen) startScreen.style.display = 'flex';
+
+            // Return to Title BGM
+            playBGM('bgm_title');
         });
     }
 
@@ -580,6 +665,7 @@
         btnOptionsToggle.addEventListener('click', (e) => {
             e.stopPropagation(); // Stop bubbling
             controlsDiv.classList.toggle('open');
+            playSE('se_option');
         });
 
         document.addEventListener('click', (e) => {
@@ -595,8 +681,34 @@
 
     // Game Config
     let currentLaneWidth = 100;
-    const KEYS = ['e', 'd', 'r', 'f', ' ', 'u', 'j', 'i', 'k'];
+    // Indices: 0-8 (Classic), 9-12 (New: s,l,w,o)
+    const KEYS = ['e', 'd', 'r', 'f', ' ', 'u', 'j', 'i', 'k', 's', 'l', 'w', 'o'];
+    console.log('Current Key Mapping:', KEYS);
     const NOTE_HEIGHT = 15;
+
+    // Key Mode Definitions
+    type KeyMode = '4key' | '6key' | '8key' | '12key';
+    let currentKeyMode: KeyMode = '8key'; // Default
+
+    const GAME_MODES: { [key in KeyMode]: { indices: number[], label: string } } = {
+        '4key': {
+            indices: [1, 3, 6, 8], // d, f, j, k
+            label: '4 KEY'
+        },
+        '6key': {
+            indices: [9, 1, 3, 6, 8, 10], // s, d, f, j, k, l
+            label: '6 KEY'
+        },
+        '8key': {
+            indices: [0, 1, 2, 3, 4, 5, 6, 7, 8], // e, d, r, f, Space, u, j, i, k
+            label: '8 KEY'
+        },
+
+        '12key': {
+            indices: [0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12], // All 12
+            label: '12 KEY'
+        }
+    };
 
     // Speed Configuration
     const BASE_NOTE_SPEED = 0.5; // Base speed (x1.0)
@@ -639,7 +751,99 @@
             // onerror: silently fail -> fallback to null, keep default style
         });
     }
+    // Audio Assets (BGM & SE)
+    const AUDIO_ASSETS: { [key: string]: HTMLAudioElement | null } = {
+        bgm_title: null,
+        bgm_select: null,
+        se_start: null,
+        se_option: null,
+        se_decide: null, // Normal
+        se_decide_extra: null, // Extra/Hard
+        se_cancel: null
+    };
+
+    let currentBGM: HTMLAudioElement | null = null;
+
+    function loadAudioAssets() {
+        const assets = [
+            { key: 'bgm_title', src: 'assets/タイトル画面でループして流れる曲.wav', loop: true, volume: 0.5 },
+            { key: 'bgm_select', src: 'assets/選曲画面でループして流れる曲.wav', loop: true, volume: 0.5 },
+            { key: 'se_start', src: 'assets/ゲームスタートボタンを押す.mp3', volume: 0.8 },
+            { key: 'se_option', src: 'assets/設定画面を開く音.mp3', volume: 0.8 },
+            { key: 'se_decide', src: 'assets/曲選択時効果音(通常).mp3', volume: 0.8 },
+            { key: 'se_decide_extra', src: 'assets/曲選択時効果音(エキストラモード).mp3', volume: 0.8 },
+            { key: 'se_cancel', src: 'assets/キャンセル音.mp3', volume: 0.8 }
+        ];
+
+        assets.forEach(a => {
+            const audio = new Audio(a.src);
+            audio.volume = a.volume || 1.0;
+            if (a.loop) audio.loop = true;
+
+            // Preload
+            audio.load();
+            AUDIO_ASSETS[a.key] = audio;
+        });
+
+        // Try to play Title BGM on first user interaction if blocked
+        // OR just try play now (might fail due to autoplay policy)
+        // We'll handle playback trigger in UI events mostly.
+    }
+    loadAudioAssets();
+
+    function playBGM(key: string) {
+        const nextBGM = AUDIO_ASSETS[key];
+        if (!nextBGM) return;
+
+        if (currentBGM === nextBGM) {
+            if (currentBGM.paused) currentBGM.play().catch(e => console.log('Autoplay blocked', e));
+            return;
+        }
+
+        if (currentBGM) {
+            currentBGM.pause();
+            currentBGM.currentTime = 0;
+        }
+
+        currentBGM = nextBGM;
+        currentBGM.currentTime = 0;
+        currentBGM.play().catch(e => console.log('Autoplay blocked', e));
+    }
+
+    function stopBGM() {
+        if (currentBGM) {
+            currentBGM.pause();
+            currentBGM.currentTime = 0;
+            currentBGM = null;
+        }
+    }
+
+    function playSE(key: string) {
+        const audio = AUDIO_ASSETS[key];
+        if (audio) {
+            // Clone to allow overlapping sounds
+            const clone = audio.cloneNode() as HTMLAudioElement;
+            clone.volume = audio.volume;
+            clone.play().catch(e => console.log('SE play failed', e));
+        }
+    }
+
     loadSkin();
+
+    // Start Title BGM (might need user interaction first, hence the 'init-audio' event on Start Button)
+    document.body.addEventListener('init-audio', () => {
+        playSE('se_start');
+        // If we go to select, we switch BGM there.
+        // But if we are just on title, we might want bgm_title.
+        // Let's try to play bgm_title immediately on load?
+    });
+
+    // Try to play Title BGM on click if not playing
+    document.addEventListener('click', () => {
+        if (!currentBGM) {
+            playBGM('bgm_title');
+        }
+    }, { once: true });
 
     // Layout Configuration
     interface LaneConfig {
@@ -2038,10 +2242,23 @@
 
                 // Render Buttons
                 if (song.charts) {
+                    let visibleButtons = 0;
                     DIFF_ORDER.forEach(diffKey => {
                         if (song.charts && song.charts[diffKey]) {
                             const filename = song.charts[diffKey];
 
+                            // Detect Mode
+                            let chartMode = '8key'; // Default Legacy
+                            const lower = filename.toLowerCase();
+                            if (lower.includes('4k')) chartMode = '4key';
+                            else if (lower.includes('6k')) chartMode = '6key';
+                            else if (lower.includes('12k')) chartMode = '12key';
+                            // else if (lower.includes('8k')) chartMode = '8key';
+
+                            // Filter
+                            if (chartMode !== selectedModeFilter) return;
+
+                            visibleButtons++;
                             const btnWrapper = document.createElement('div');
                             btnWrapper.style.display = 'flex';
                             btnWrapper.style.flexDirection = 'column';
@@ -2056,9 +2273,14 @@
 
                             const img = document.createElement('img');
                             img.src = `assets/diff_${diffKey}.png`;
-                            img.alt = DIFF_LABELS[diffKey] || diffKey.toUpperCase();
+                            img.alt = diffKey.toUpperCase();
                             img.style.height = '40px'; // Adjust size as needed
+                            img.style.objectFit = 'contain';
                             img.style.display = 'block';
+
+                            // Hover effect
+                            img.onmouseover = () => img.style.filter = 'brightness(1.2)';
+                            img.onmouseout = () => img.style.filter = 'brightness(1.0)';
 
                             // Fallback to text if image missing
                             img.onerror = () => {
@@ -2074,7 +2296,12 @@
 
                             btn.onclick = (e) => {
                                 e.stopPropagation();
-                                playClickSound();
+
+                                // Decide SE
+                                if (selectedModeFilter === '12key') playSE('se_decide_extra');
+                                else playSE('se_decide');
+
+                                stopBGM();
                                 loadSong(song, filename);
                             };
 
@@ -2112,20 +2339,68 @@
                             btnContainer.appendChild(btnWrapper);
                         }
                     });
+
+                    if (visibleButtons === 0) {
+                        div.style.display = 'none';
+                    }
                 } else if (song.chart) {
-                    // Legacy Fallback
-                    const btn = document.createElement('button');
-                    btn.textContent = 'PLAY';
-                    btn.style.padding = '5px 15px';
-                    btn.style.background = '#e040fb';
-                    btn.style.border = 'none';
-                    btn.style.color = 'white';
-                    btn.style.cursor = 'pointer';
-                    btn.onclick = (e) => {
-                        e.stopPropagation();
-                        loadSong(song, song.chart!);
-                    };
-                    btnContainer.appendChild(btn);
+                    // Legacy Fallback (Single Chart)
+                    // Infer mode for single chart too
+                    let chartMode = '8key';
+                    if (song.chart) {
+                        const lower = song.chart.toLowerCase();
+                        if (lower.includes('4k')) chartMode = '4key';
+                        else if (lower.includes('6k')) chartMode = '6key';
+                        else if (lower.includes('12k')) chartMode = '12key';
+                    }
+
+                    if (chartMode === selectedModeFilter) {
+                        const btn = document.createElement('button');
+                        btn.textContent = 'PLAY';
+                        btn.style.padding = '5px 15px';
+                        btn.style.background = '#e040fb';
+                        btn.style.border = 'none';
+                        btn.style.color = 'white';
+                        btn.style.cursor = 'pointer';
+                        btn.onclick = (e) => {
+                            e.stopPropagation();
+                            // Decide SE
+                            playSE('se_decide'); // Legacy charts are usually Normal/Hard, treat as Normal for now.
+                            // Or check mode?
+                            if (selectedModeFilter === '12key') playSE('se_decide_extra');
+                            else playSE('se_decide');
+
+                            loadSong(song, song.chart!);
+                            stopBGM();
+                            // playSE('se_start'); // loadSong already plays se_start? 
+                            // Wait, loadSong had "playClickSound()" which was undefined.
+                            // I should remove playClickSound() from loadSong or define it.
+                            // NEW: User wants "Game Start Button" sound on start.
+                            // Where is "Game Start"? Title -> Select -> Song -> Load -> Start Countdown.
+                            // loadSong starts the sequence.
+                            // se_decide is for CHOOSING the song.
+                            // se_start is for TITLE SCREEN start? "Game Start Button Press".
+                            // Usage:
+                            // Title -> Click "Select Song" (Start Button?) -> se_start
+                            // Song Select -> Click Song -> se_decide
+                            // loadSong -> Countdown.
+                            // I put se_start on btnStartSelect above.
+                            // So here just se_decide.
+                            // And remove se_start from loadSong if I added it?
+                            // In step 616 I added:
+                            // loadSong(song, song.chart!);
+                            // stopBGM();
+                            // playSE('se_start');
+                            // This might be redundant or wrong if se_start is for Title.
+
+                            // Let's assume:
+                            // Title Screen Start -> se_start
+                            // Song Choose -> se_decide
+                        };
+                        btnContainer.appendChild(btn);
+                    } else {
+                        div.style.display = 'none';
+                    }
                 }
 
                 div.appendChild(btnContainer);
@@ -2151,7 +2426,7 @@
 
         try { initAudio(); } catch (e) { alert(e); return; }
 
-        playClickSound(); // Sound on Play
+
 
         // 1. Fetch Audio & Chart
         try {
@@ -2192,6 +2467,24 @@
             if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
 
             const json = JSON.parse(text);
+
+            // Determine Mode from Chart or Filename
+            if (json.mode && GAME_MODES[json.mode as KeyMode]) {
+                currentKeyMode = json.mode as KeyMode;
+                console.log(`Mode set from chart: ${currentKeyMode}`);
+            } else {
+                if (currentChartFilename.toLowerCase().includes('4k')) currentKeyMode = '4key';
+                else if (currentChartFilename.toLowerCase().includes('6k')) currentKeyMode = '6key';
+                else if (currentChartFilename.toLowerCase().includes('8k')) currentKeyMode = '8key';
+                else if (currentChartFilename.toLowerCase().includes('12k')) currentKeyMode = '12key';
+                else if (currentChartFilename.toLowerCase().includes('12k')) currentKeyMode = '12key';
+                else currentKeyMode = '8key';
+                console.log(`Mode inferred from file: ${currentKeyMode}`);
+            }
+
+            // Recalculate layout for the new mode
+            resize();
+
             if (!json.notes || !Array.isArray(json.notes)) {
                 alert('Invalid Chart Data');
                 return;
@@ -2408,58 +2701,142 @@
             const vLanes: VisualLane[] = [];
             const lConfigs: LaneConfig[] = [];
 
-            if (type === 'type-a') {
+            // --- 9 KEY (Original Logic) ---
+            if (currentKeyMode === '8key') {
+                if (type === 'type-a') {
+                    const totalPlayWidth = tempWidth * 4;
+                    const sx = (canvas.width - totalPlayWidth) / 2;
+                    laneStartX = sx;
+
+                    for (let i = 0; i < 4; i++) {
+                        vLanes.push({ x: sx + (i * tempWidth), width: tempWidth });
+                    }
+
+                    const assign = (keyIdx: number, visIdx: number, lbl: string, clr: string, xOff = 0, wScale = 1.0) => {
+                        lConfigs[keyIdx] = { x: sx + (visIdx * tempWidth) + xOff, width: tempWidth * wScale, color: clr, label: lbl };
+                    };
+                    const blueScale = 1.0;
+                    assign(0, 0, '', '#7CA4FF', 0, blueScale);
+                    assign(1, 0, 'E/D', '#ffffff');
+                    assign(2, 1, '', '#7CA4FF', 0, blueScale);
+                    assign(3, 1, 'R/F', '#ffffff');
+                    lConfigs[4] = { x: sx, width: totalPlayWidth, color: '#e040fb', label: 'SPACE' };
+                    assign(5, 2, '', '#7CA4FF', 0, blueScale);
+                    assign(6, 2, 'U/J', '#ffffff');
+                    assign(7, 3, '', '#7CA4FF', 0, blueScale);
+                    assign(8, 3, 'I/K', '#ffffff');
+
+                } else {
+                    const bScale = 1.0, wScale = 1.0;
+                    const pairGap = tempWidth * 0.02;
+                    const groupGap = tempWidth * 0.1;
+                    const totalScale = (4 * bScale) + (4 * wScale);
+                    const totalPlayWidth = (tempWidth * totalScale) + (4 * pairGap) + (3 * groupGap);
+                    const sx = (canvas.width - totalPlayWidth) / 2;
+                    laneStartX = sx;
+
+                    const ord = [
+                        { idx: 0, label: 'E', color: '#7CA4FF', scale: bScale, gapAfter: pairGap },
+                        { idx: 1, label: 'D', color: '#ffffff', scale: wScale, gapAfter: groupGap },
+                        { idx: 2, label: 'R', color: '#7CA4FF', scale: bScale, gapAfter: pairGap },
+                        { idx: 3, label: 'F', color: '#ffffff', scale: wScale, gapAfter: groupGap },
+                        { idx: 5, label: 'U', color: '#7CA4FF', scale: bScale, gapAfter: pairGap },
+                        { idx: 6, label: 'J', color: '#ffffff', scale: wScale, gapAfter: groupGap },
+                        { idx: 7, label: 'I', color: '#7CA4FF', scale: bScale, gapAfter: pairGap },
+                        { idx: 8, label: 'K', color: '#ffffff', scale: wScale, gapAfter: 0 }
+                    ];
+
+                    let cx = sx;
+                    ord.forEach(item => {
+                        const w = tempWidth * item.scale;
+                        vLanes.push({ x: cx, width: w });
+                        lConfigs[item.idx] = { x: cx, width: w, color: item.color, label: item.label };
+                        cx += w + item.gapAfter;
+                    });
+                    lConfigs[4] = { x: sx, width: totalPlayWidth, color: '#e040fb', label: 'SPACE' };
+                }
+            }
+            // --- 4 KEY (d, f, j, k) ---
+            else if (currentKeyMode === '4key') {
+                const tempWidth = currentLaneWidth * 1.5;
                 const totalPlayWidth = tempWidth * 4;
                 const sx = (canvas.width - totalPlayWidth) / 2;
                 laneStartX = sx;
 
-                for (let i = 0; i < 4; i++) {
-                    vLanes.push({ x: sx + (i * tempWidth), width: tempWidth });
-                }
+                const indices = [1, 3, 6, 8];
+                const labels = ['D', 'F', 'J', 'K'];
+                const colors = ['#ffffff', '#7CA4FF', '#7CA4FF', '#ffffff']; // White Blue Blue White pattern
 
-                const assign = (keyIdx: number, visIdx: number, lbl: string, clr: string, xOff = 0, wScale = 1.0) => {
-                    lConfigs[keyIdx] = { x: sx + (visIdx * tempWidth) + xOff, width: tempWidth * wScale, color: clr, label: lbl };
-                };
-                const blueScale = 1.0; // Same size as white
-                assign(0, 0, '', '#7CA4FF', 0, blueScale);
-                assign(1, 0, 'E/D', '#ffffff');
-                assign(2, 1, '', '#7CA4FF', 0, blueScale);
-                assign(3, 1, 'R/F', '#ffffff');
-                lConfigs[4] = { x: sx, width: totalPlayWidth, color: '#e040fb', label: 'SPACE' };
-                assign(5, 2, '', '#7CA4FF', 0, blueScale);
-                assign(6, 2, 'U/J', '#ffffff');
-                assign(7, 3, '', '#7CA4FF', 0, blueScale);
-                assign(8, 3, 'I/K', '#ffffff');
-
-            } else {
-                const bScale = 1.0, wScale = 1.0; // bScale same as wScale
-                const pairGap = tempWidth * 0.02; // Reduced from 0.1
-                const groupGap = tempWidth * 0.1; // Reduced from 0.4
-                const totalScale = (4 * bScale) + (4 * wScale);
-                const totalPlayWidth = (tempWidth * totalScale) + (4 * pairGap) + (3 * groupGap);
+                indices.forEach((kIdx, i) => {
+                    const x = sx + (i * tempWidth);
+                    vLanes.push({ x, width: tempWidth });
+                    lConfigs[kIdx] = { x, width: tempWidth, color: colors[i], label: labels[i] };
+                });
+            }
+            // --- 6 KEY (s, d, f, j, k, l) ---
+            else if (currentKeyMode === '6key') {
+                const tempWidth = currentLaneWidth * 1.2;
+                const totalPlayWidth = tempWidth * 6;
                 const sx = (canvas.width - totalPlayWidth) / 2;
                 laneStartX = sx;
 
-                const ord = [
-                    { idx: 0, label: 'E', color: '#7CA4FF', scale: bScale, gapAfter: pairGap },
-                    { idx: 1, label: 'D', color: '#ffffff', scale: wScale, gapAfter: groupGap },
-                    { idx: 2, label: 'R', color: '#7CA4FF', scale: bScale, gapAfter: pairGap },
-                    { idx: 3, label: 'F', color: '#ffffff', scale: wScale, gapAfter: groupGap },
-                    { idx: 5, label: 'U', color: '#7CA4FF', scale: bScale, gapAfter: pairGap },
-                    { idx: 6, label: 'J', color: '#ffffff', scale: wScale, gapAfter: groupGap },
-                    { idx: 7, label: 'I', color: '#7CA4FF', scale: bScale, gapAfter: pairGap },
-                    { idx: 8, label: 'K', color: '#ffffff', scale: wScale, gapAfter: 0 }
+                const indices = [9, 1, 3, 6, 8, 10];
+                const labels = ['S', 'D', 'F', 'J', 'K', 'L'];
+                // Pattern: Blue White Blue | Blue White Blue?
+                const colors = ['#7CA4FF', '#ffffff', '#7CA4FF', '#7CA4FF', '#ffffff', '#7CA4FF'];
+
+                indices.forEach((kIdx, i) => {
+                    const x = sx + (i * tempWidth);
+                    vLanes.push({ x, width: tempWidth });
+                    lConfigs[kIdx] = { x, width: tempWidth, color: colors[i], label: labels[i] };
+                });
+            }
+            // --- 8 KEY (e, d, r, f, u, j, i, k) ---
+
+            // --- 12 KEY (s, l, w, o + others) ---
+            else if (currentKeyMode === '12key') {
+                const tempWidth = currentLaneWidth * 0.8;
+                const totalPlayWidth = tempWidth * 12;
+                const sx = (canvas.width - totalPlayWidth) / 2;
+                laneStartX = sx;
+
+                // Visual Order: S, W, D, E, F, R | U, J, I, K, O, L ? 
+                // Or maybe just strictly linear?
+                // Let's try to simulate a 2-row layout flattened.
+                // Left hand: [S, W, D, E, F, R] -> [9, 11, 1, 0, 3, 2]
+                // Right hand: [U, J, I, K, O, L] -> [5, 6, 7, 8, 12, 10]
+                // But typically U, I, O are top row. J, K, L are bottom.
+                // Top row: W, E, R, U, I, O
+                // Bottom row: S, D, F, J, K, L
+                // Flatten strategies: Zigzag? Or linear?
+                // Linear: S, W, D, E, F, R ...
+                // Let's use user supplied order: "sdfjklweruio"
+                // Indices from user string: 9, 1, 3, 6, 8, 10, 11, 0, 2, 5, 7, 12.
+                // Let's just create 12 lanes in that specific order, maybe it's meaningful to them.
+                // Or maybe they just listed keys available.
+                // Let's use a logical linear order based on key position.
+                // S(9), D(1), F(3), J(6), K(8), L(10) -> Home Row
+                // W(11), E(0), R(2), U(5), I(7), O(12) -> Top Row
+                // Standard VSRG linear mapping often follows columns:
+                // 1(S), 2(W), 3(D), 4(E), 5(F), 6(R), 7(U), 8(J), 9(I), 10(K), 11(O), 12(L)? 
+                // (Note: U is index, J is index. U is above J. So U, J typically same column or adjacent? Usually adjacent in 7k+1)
+
+                // My proposed linear order: [S, W, D, E, F, R, U, J, I, K, O, L]
+                // Indices:
+                const indices = [9, 11, 1, 0, 3, 2, 5, 6, 7, 8, 12, 10];
+                const labels = ['S', 'W', 'D', 'E', 'F', 'R', 'U', 'J', 'I', 'K', 'O', 'L'];
+                const colors = [
+                    '#7CA4FF', '#e040fb', '#ffffff', '#e040fb', '#7CA4FF', '#e040fb',
+                    '#e040fb', '#7CA4FF', '#e040fb', '#ffffff', '#e040fb', '#7CA4FF'
                 ];
 
-                let cx = sx;
-                ord.forEach(item => {
-                    const w = tempWidth * item.scale;
-                    vLanes.push({ x: cx, width: w });
-                    lConfigs[item.idx] = { x: cx, width: w, color: item.color, label: item.label };
-                    cx += w + item.gapAfter;
+                indices.forEach((kIdx, i) => {
+                    const x = sx + (i * tempWidth);
+                    vLanes.push({ x, width: tempWidth });
+                    lConfigs[kIdx] = { x, width: tempWidth, color: colors[i], label: labels[i] };
                 });
-                lConfigs[4] = { x: sx, width: totalPlayWidth, color: '#e040fb', label: 'SPACE' };
             }
+
             return { vLanes, lConfigs };
         };
 
@@ -2570,6 +2947,13 @@
         }
 
         const keyIndex = KEYS.indexOf(e.key.toLowerCase());
+
+        // Filter by Mode
+        if (keyIndex !== -1) {
+            const allowedIndices = GAME_MODES[currentKeyMode].indices;
+            if (!allowedIndices.includes(keyIndex)) return;
+        }
+
         if (keyIndex !== -1 && !pressedKeys[keyIndex]) {
             pressedKeys[keyIndex] = true;
 
@@ -2651,6 +3035,11 @@
 
         const keyIndex = KEYS.indexOf(keyLower);
         if (keyIndex !== -1) {
+            const allowedIndices = GAME_MODES[currentKeyMode].indices;
+            // Allow keyup if previously pressed? Or just filter strictly?
+            // Strict filter is safer to avoid released ghost keys
+            if (!allowedIndices.includes(keyIndex)) return;
+
             pressedKeys[keyIndex] = false;
 
             // Release Long Note

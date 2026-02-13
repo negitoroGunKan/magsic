@@ -1,6 +1,6 @@
-(() => {
-    // Keys Mapping
-    const KEYS = ['e', 'd', 'r', 'f', ' ', 'u', 'j', 'i', 'k'];
+(function () {
+    // Keys Mapping (0-12)
+    const KEYS = ['e', 'd', 'r', 'f', ' ', 'u', 'j', 'i', 'k', 's', 'l', 'w', 'o'];
     const LANE_COUNT = KEYS.length;
 
     // DEBUG: Confirm script execution
@@ -78,18 +78,18 @@
     }
 
     function beep(freq = 880, duration = 0.07) {
-        const ctx = getAudioCtx();
-        if (ctx.state === 'suspended') ctx.resume();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
+        const actx = getAudioCtx();
+        if (actx.state === 'suspended') actx.resume();
+        const osc = actx.createOscillator();
+        const gain = actx.createGain();
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(actx.destination);
         osc.frequency.value = freq;
         osc.type = 'square'; // Square is the most piercing/audible
-        gain.gain.setValueAtTime(0.8, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+        gain.gain.setValueAtTime(0.8, actx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + duration);
         osc.start();
-        osc.stop(ctx.currentTime + duration);
+        osc.stop(actx.currentTime + duration);
     }
 
     if (!ctx) throw new Error('Canvas context not supported');
@@ -118,8 +118,9 @@
     });
 
     // Song Selection Logic
-    const songSelect = document.getElementById('song-select') as HTMLSelectElement;
-    const btnLoadSong = document.getElementById('btn-load-song') as HTMLButtonElement;
+    // DOM Elements (Updated)
+    // const songSelect = document.getElementById('song-select') as HTMLSelectElement; // Removed
+    // const btnLoadSong = document.getElementById('btn-load-song') as HTMLButtonElement; // Removed
     let songList: any[] = [];
 
     // Load Song List
@@ -128,6 +129,8 @@
         song: any;
         label: string;
         filename: string;
+        mode?: string;
+        diff?: string;
     }
     let flattenedSongOptions: SongOption[] = [];
 
@@ -138,36 +141,90 @@
             songList = await res.json();
             flattenedSongOptions = [];
 
+            const tableDiv = document.getElementById('song-table-body');
+            if (tableDiv) tableDiv.innerHTML = '<tr><td colspan="3">Loading...</td></tr>';
+
+            /*
             if (songSelect) {
-                songSelect.innerHTML = '<option value="">-- Select Song --</option>';
+                songSelect.innerHTML = '<option value="">-- Select Song --</option>'; 
+            */
 
-                songList.forEach((song) => {
-                    // Check for multiple charts (Difficulty System)
-                    if (song.charts) {
-                        const diffs = Object.keys(song.charts); // e.g. ['no', 'st', 'et']
-                        // Optional: Sort difficulty? 
-                        const ORDER = ['no', 'st', 'ad', 'pr', 'et'];
-                        diffs.sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
+            const MODES = ['4key', '6key', '8key', '12key'];
+            // Diff Keys: no=Normal, st=Standard, ad=Advanced, pr=Professional, et=Extreme
+            const DIFFS = ['no', 'st', 'ad', 'pr', 'et'];
 
-                        diffs.forEach(diffKey => {
-                            const filename = song.charts[diffKey];
-                            const label = `${song.title} [${diffKey.toUpperCase()}]`;
-                            flattenedSongOptions.push({ song, label, filename });
+            const tableBody = document.getElementById('song-table-body');
+            if (tableBody) tableBody.innerHTML = '';
+
+            songList.forEach(song => {
+                MODES.forEach(mode => {
+                    DIFFS.forEach(diff => {
+                        let filename = '';
+                        let isLegacy = false;
+
+                        // 1. Check for Legacy (8key / 9key) existing file
+                        // The user considers existing list.json charts as "8KEY"
+                        if (mode === '8key' && song.charts && song.charts[diff]) {
+                            filename = song.charts[diff];
+                            isLegacy = true;
+                        } else {
+                            // 2. Generate New Filename for missing/new modes
+                            // Format: {id}_{diff}_{mode}.json  (e.g. netsu_ijo_no_4k.json)
+                            // Mode Abbr: 4key->4k, 6key->6k, 12key->12k, 8key->8k
+                            const modeAbbr = mode.replace('key', 'k');
+                            filename = `${song.folder}_${diff}_${modeAbbr}.json`;
+                            // Note: song.folder might be "netsu_ijo" or "Calamity Fortune" (with spaces).
+                            // Existing files seem to use song.folder name? 
+                            // Actually list.json: "no": "netsu_ijo_no.json". Folder: "netsu_ijo".
+                            // "knights_no.json". Folder: "knight_of_nights". 
+                            // This implies filename is arbitrary in list.json.
+                            // For NEW files, we should use a consistent pattern.
+                            // Let's use song.id or song.folder (sanitized)? 
+                            // song.id is safer "netsu_ijo". "knight_of_nights".
+                            // Let's use song.id: `${song.id}_${diff}_${modeAbbr}.json`
+                            // Wait, list.json has "knights_no.json" but id is "knight_of_nights".
+                            // The user might prefer "knights" but I can't guess that.
+                            // I will use song.id.
+                            filename = `${song.id}_${diff}_${modeAbbr}.json`;
+                        }
+
+                        const label = `${song.title} (${diff.toUpperCase()}-${mode.toUpperCase()})`;
+
+                        flattenedSongOptions.push({
+                            label: label,
+                            song: song,
+                            filename: filename,
+                            mode: mode,
+                            diff: diff.toUpperCase()
                         });
-                    } else if (song.chart) {
-                        // Legacy single chart
-                        flattenedSongOptions.push({ song, label: song.title, filename: song.chart });
-                    }
-                });
 
-                // Populate Select
-                flattenedSongOptions.forEach((opt, index) => {
-                    const el = document.createElement('option');
-                    el.value = index.toString();
-                    el.textContent = opt.label;
-                    songSelect.appendChild(el);
+                        // Create Row
+                        const tr = document.createElement('tr');
+                        tr.style.borderBottom = '1px solid #444';
+                        tr.style.cursor = 'pointer';
+                        tr.style.background = '#222';
+
+                        tr.onmouseover = () => tr.style.background = '#333';
+                        tr.onmouseout = () => tr.style.background = '#222';
+
+                        tr.innerHTML = `
+                        <td style="padding: 4px;">${song.title}</td>
+                        <td style="padding: 4px;">${diff.toUpperCase()}</td>
+                        <td style="padding: 4px; text-align: center; color: ${mode === '8key' ? '#e040fb' : '#00bcd4'};">${mode.toUpperCase()}</td>
+                    `;
+
+                        // Click -> Load
+                        // We need to pass the INDEX of flattenedSongOptions
+                        const idx = flattenedSongOptions.length - 1;
+                        tr.onclick = () => loadSongByIndex(idx);
+
+                        if (tableBody) tableBody.appendChild(tr);
+                    });
                 });
-            }
+            });
+
+            if (statusDiv) statusDiv.textContent = `Status: Loaded ${flattenedSongOptions.length} chart options.`;
+
         } catch (e) {
             console.error('Failed to load song list', e);
             alert('Failed to load song list: ' + e);
@@ -176,54 +233,66 @@
     }
     loadEditorSongList();
 
-    if (btnLoadSong && songSelect) {
-        btnLoadSong.addEventListener('click', async () => {
-            const index = parseInt(songSelect.value);
-            if (isNaN(index) || !flattenedSongOptions[index]) {
-                alert('Please select a song from the list first.');
-                return;
-            }
 
-            const opt = flattenedSongOptions[index];
-            const song = opt.song;
-            statusDiv.textContent = `Status: Loading ${opt.label}...`;
 
-            try {
-                // 1. Load Audio
-                audio.src = `songs/${song.folder}/${song.audio}`;
+    async function loadSongByIndex(index: number) {
+        if (isNaN(index) || !flattenedSongOptions[index]) {
+            alert('Invalid song selection.');
+            return;
+        }
 
-                // 2. Load Chart
-                const chartRes = await fetch(`songs/${song.folder}/${opt.filename}?t=${Date.now()}`);
-                if (chartRes.ok) {
-                    const chartText = await chartRes.text();
-                    let text = chartText;
-                    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+        const opt = flattenedSongOptions[index];
+        const song = opt.song;
+        statusDiv.textContent = `Status: Loading ${opt.label}...`;
 
-                    const json = JSON.parse(text);
-                    importChartJSON(json);
+        try {
+            // 1. Load Audio
+            audio.src = `songs/${song.folder}/${song.audio}`;
 
-                    // Update current filename for saving?
-                    // We might need to store "currentChartFilename" or similar global if we want to save back to the same file.
-                    // For now, the user manually saves or we assume consistent naming?
-                    // The "Save to Disk" assumes we send a "target path".
-                    // Let's attach metadata to a global variable for the save logic.
-                    (window as any).currentEditingFilename = opt.filename;
-                    (window as any).currentEditingFolder = song.folder;
+            // 2. Load Chart
+            // Use cache buster ?t=...
+            const chartRes = await fetch(`songs/${song.folder}/${opt.filename}?t=${Date.now()}`);
+            if (chartRes.ok) {
+                const chartText = await chartRes.text();
+                let text = chartText;
+                if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
 
-                } else {
-                    // Start fresh if no chart (or missing file)
-                    recordedNotes.length = 0;
-                    bpmInput.value = song.bpm;
-                    offsetInput.value = '0';
-                    statusDiv.textContent = `Status: Loaded ${song.title} (New Chart)`;
-                    (window as any).currentEditingFilename = opt.filename;
-                    (window as any).currentEditingFolder = song.folder;
+                const json = JSON.parse(text);
+                importChartJSON(json);
+
+                (window as any).currentEditingFilename = opt.filename;
+                (window as any).currentEditingFolder = song.folder;
+                statusDiv.textContent = `Status: Loaded ${opt.label}`;
+
+                // Auto-set Mode Selector
+                const editorModeSelect = document.getElementById('editor-mode-select') as HTMLSelectElement;
+                if (editorModeSelect && opt.mode) {
+                    editorModeSelect.value = opt.mode;
+                    // Trigger change manually to update grid
+                    editorModeSelect.dispatchEvent(new Event('change'));
                 }
 
-            } catch (e) {
-                alert('Error loading song: ' + e);
+            } else {
+                // Start fresh if no chart (or missing file)
+                recordedNotes.length = 0;
+                bpmInput.value = song.bpm;
+                offsetInput.value = '0';
+                statusDiv.textContent = `Status: Created New Config for ${opt.label}`;
+
+                (window as any).currentEditingFilename = opt.filename;
+                (window as any).currentEditingFolder = song.folder;
+
+                // Set Mode
+                const editorModeSelect = document.getElementById('editor-mode-select') as HTMLSelectElement;
+                if (editorModeSelect && opt.mode) {
+                    editorModeSelect.value = opt.mode;
+                    editorModeSelect.dispatchEvent(new Event('change'));
+                }
             }
-        });
+
+        } catch (e) {
+            alert('Error loading song: ' + e);
+        }
     }
 
     function importChartJSON(json: any) {
@@ -618,31 +687,39 @@
     }
 
     // Editor Mode Logic
-    const editorModeRadios = document.getElementsByName('editor-mode') as NodeListOf<HTMLInputElement>;
-    let editorMode: '4-lane' | '9-lane' = '4-lane';
+    const editorModeSelect = document.getElementById('editor-mode-select') as HTMLSelectElement;
+    let editorMode: '4key' | '6key' | '8key' | '9key' | '12key' = '9key';
     const visualEditorContainer = document.getElementById('visual-editor-container') as HTMLDivElement;
 
-    if (editorModeRadios) {
-        editorModeRadios.forEach(radio => {
-            radio.addEventListener('change', () => {
-                if (radio.checked) {
-                    editorMode = radio.value as '4-lane' | '9-lane';
-                    pendingHold = null;
+    // Default width per lane
+    const LANE_WIDTH_4K = 50;
+    const LANE_WIDTH_6K = 40;
+    const LANE_WIDTH_8K = 40;
+    const LANE_WIDTH_9K = 80; // Original
+    const LANE_WIDTH_12K = 35;
 
-                    // Update UI for mode
-                    if (editorMode === '9-lane') {
-                        if (layerSelectorContainer) layerSelectorContainer.style.display = 'none';
-                        if (visualEditorContainer) visualEditorContainer.style.width = '800px';
-                        editorCanvas.width = 800;
-                    } else {
-                        if (layerSelectorContainer) layerSelectorContainer.style.display = 'block';
-                        if (visualEditorContainer) visualEditorContainer.style.width = '220px';
-                        editorCanvas.width = 220;
-                    }
-                    calculateLaneLayout(editorCanvas.width);
-                }
-            });
+    if (editorModeSelect) {
+        editorModeSelect.addEventListener('change', () => {
+            editorMode = editorModeSelect.value as '4key' | '6key' | '8key' | '9key' | '12key';
+            pendingHold = null;
+
+            // Update UI for mode
+            let newWidth = 220;
+            if (editorMode === '4key') newWidth = 220;
+            else if (editorMode === '6key') newWidth = 300;
+            else if (editorMode === '8key') newWidth = 400;
+            else if (editorMode === '9key') newWidth = 800;
+            else if (editorMode === '12key') newWidth = 500;
+
+            if (visualEditorContainer) visualEditorContainer.style.width = `${newWidth}px`;
+            editorCanvas.width = newWidth;
+            calculateLaneLayout(editorCanvas.width);
+
+            // Hide Layer Selector completely?
+            if (layerSelectorContainer) layerSelectorContainer.style.display = 'none';
         });
+        // Init logic
+        editorModeSelect.dispatchEvent(new Event('change'));
     }
 
     // Import Logic
@@ -684,7 +761,7 @@
 
     function calculateLaneLayout(canvasW: number) {
         LANE_DEFS = [];
-        if (editorMode === '9-lane') {
+        if (editorMode === '9key') {
             // Original 9-lane logic
             const w = 80;
             const gap = 10;
@@ -705,8 +782,12 @@
             LANE_DEFS[7] = { x: cx, width: w }; cx += w;
             LANE_DEFS[8] = { x: cx, width: w }; cx += w;
         } else {
-            // Refactor to 4 equal lanes
-            const totalLanes = 4;
+            // Generic linear layout
+            let totalLanes = 4;
+            if (editorMode === '6key') totalLanes = 6;
+            if (editorMode === '8key') totalLanes = 8;
+            if (editorMode === '12key') totalLanes = 12;
+
             const w = Math.floor(canvasW / totalLanes);
             for (let i = 0; i < totalLanes; i++) {
                 LANE_DEFS[i] = { x: i * w, width: w };
@@ -735,19 +816,28 @@
         if (clickedLane === -1) return; // Clicked in gap
 
         // Map Clicked Lane to Game Key Index
+        // Map Clicked Lane to Game Key Index
         let targetKeyIndex = -1;
-        if (editorMode === '9-lane') {
+
+        if (editorMode === '9key') {
             targetKeyIndex = clickedLane;
-        } else {
-            if (currentEditLayer === 'white') {
-                const mapping = [1, 3, 6, 8];
-                targetKeyIndex = mapping[clickedLane];
-            } else if (currentEditLayer === 'blue') {
-                const mapping = [0, 2, 5, 7];
-                targetKeyIndex = mapping[clickedLane];
-            } else if (currentEditLayer === 'space') {
-                targetKeyIndex = 4; // Space
-            }
+        } else if (editorMode === '4key') {
+            // d, f, j, k -> 1, 3, 6, 8
+            const mapping = [1, 3, 6, 8];
+            targetKeyIndex = mapping[clickedLane];
+        } else if (editorMode === '6key') {
+            // s, d, f, j, k, l -> 9, 1, 3, 6, 8, 10
+            const mapping = [9, 1, 3, 6, 8, 10];
+            targetKeyIndex = mapping[clickedLane];
+        } else if (editorMode === '8key') {
+            // e, d, r, f, u, j, i, k -> 0, 1, 2, 3, 5, 6, 7, 8
+            const mapping = [0, 1, 2, 3, 5, 6, 7, 8];
+            targetKeyIndex = mapping[clickedLane];
+        } else if (editorMode === '12key') {
+            // s, l, w, o + others...
+            // Visual Order from getLayoutData: 9, 11, 1, 0, 3, 2, 5, 6, 7, 8, 12, 10
+            const mapping = [9, 11, 1, 0, 3, 2, 5, 6, 7, 8, 12, 10];
+            targetKeyIndex = mapping[clickedLane];
         }
 
         if (targetKeyIndex === -1) return;
@@ -765,32 +855,17 @@
 
         const n = Math.round((clickedTimeRaw - offset) / snapMs);
         const quantizedTime = offset + (n * snapMs);
-
         // Check if note exists nearby (tolerance of snap/2)
         const hitWindow = snapMs / 2;
         let existingNoteIndex = -1;
 
-        if (editorMode === '4-lane') {
-            // In 4-lane mode, allow deleting any note that appears in that visual lane
-            existingNoteIndex = recordedNotes.findIndex(note => {
-                const sameTime = Math.abs(note.time - quantizedTime) < hitWindow;
-                if (!sameTime) return false;
-
-                const whiteIndices = [1, 3, 6, 8];
-                const blueIndices = [0, 2, 5, 7];
-
-                if (currentEditLayer === 'space') {
-                    return note.lane === 4;
-                } else {
-                    // Check if the note's lane maps to the clicked visual lane
-                    let nVisualLane = -1;
-                    if (whiteIndices.includes(note.lane)) nVisualLane = whiteIndices.indexOf(note.lane);
-                    else if (blueIndices.includes(note.lane)) nVisualLane = blueIndices.indexOf(note.lane);
-
-                    return nVisualLane === clickedLane;
-                }
-            });
+        if (editorMode === '9key') {
+            existingNoteIndex = recordedNotes.findIndex(note =>
+                note.lane === targetKeyIndex && Math.abs(note.time - quantizedTime) < hitWindow
+            );
         } else {
+            // Multi-mode deletion logic: 
+            // If we click a visual lane, delete the note mapped to it.
             existingNoteIndex = recordedNotes.findIndex(note =>
                 note.lane === targetKeyIndex && Math.abs(note.time - quantizedTime) < hitWindow
             );
@@ -1022,24 +1097,39 @@
             let visualLane = -1;
             let color = '#ffffff';
             let isSpace = false;
-            const whiteIndices = [1, 3, 6, 8];
-            const blueIndices = [0, 2, 5, 7];
 
-            if (editorMode === '9-lane') {
+            if (editorMode === '9key') {
                 visualLane = lane;
+                const whiteIndices = [1, 3, 6, 8];
+                const blueIndices = [0, 2, 5, 7];
                 if (whiteIndices.includes(lane)) color = '#ffffff';
                 else if (blueIndices.includes(lane)) color = '#7CA4FF';
                 else if (lane === 4) { color = '#e040fb'; isSpace = true; }
             } else {
-                if (whiteIndices.includes(lane)) {
-                    visualLane = whiteIndices.indexOf(lane);
-                    color = '#ffffff';
-                } else if (blueIndices.includes(lane)) {
-                    visualLane = blueIndices.indexOf(lane);
-                    color = '#7CA4FF';
-                } else if (lane === 4) {
-                    isSpace = true;
-                    color = '#e040fb';
+                // Determine Visual Lane for current mode
+                let mapping: number[] = [];
+                if (editorMode === '4key') mapping = [1, 3, 6, 8];
+                else if (editorMode === '6key') mapping = [9, 1, 3, 6, 8, 10];
+                else if (editorMode === '8key') mapping = [0, 1, 2, 3, 5, 6, 7, 8];
+                else if (editorMode === '12key') mapping = [9, 11, 1, 0, 3, 2, 5, 6, 7, 8, 12, 10];
+
+                const idx = mapping.indexOf(lane);
+                if (idx !== -1) {
+                    visualLane = idx;
+                    // Auto Color logic based on generic lane patterns
+                    if (editorMode === '4key') {
+                        color = (idx === 1 || idx === 2) ? '#7CA4FF' : '#ffffff';
+                    } else if (editorMode === '6key') {
+                        // S, D, F, J, K, L -> B, W, B, B, W, B
+                        color = (idx === 1 || idx === 4) ? '#ffffff' : '#7CA4FF';
+                    } else if (editorMode === '8key') {
+                        // E, D, R, F, U, J, I, K -> B, W, B, W...
+                        color = (idx % 2 === 0) ? '#7CA4FF' : '#ffffff';
+                    } else if (editorMode === '12key') {
+                        // S, W, D, E, F, R ...
+                        // Let's use alternating for simplicity or a pattern
+                        color = (idx % 2 === 0) ? '#7CA4FF' : '#ffffff';
+                    }
                 }
             }
 
@@ -1048,10 +1138,10 @@
 
             if (isGhost) {
                 ctx.globalAlpha = 0.5;
-                if (isSpace && editorMode === '4-lane') {
+                if (isSpace && editorMode === '9key') { // Only draw space ghost in 9key
                     ctx.fillStyle = 'rgba(224, 64, 251, 0.5)';
                     ctx.fillRect(0, y - 5, editorCanvas.width, 10);
-                } else {
+                } else if (visualLane !== -1) {
                     const ld = LANE_DEFS[visualLane];
                     if (ld) {
                         ctx.fillStyle = 'rgba(255, 255, 0, 0.5)';
@@ -1066,7 +1156,7 @@
             }
 
             ctx.fillStyle = color;
-            if (isSpace && editorMode === '4-lane') {
+            if (isSpace && editorMode === '9key') { // Only draw space in 9key
                 const drawH = 15;
                 ctx.globalAlpha = 0.5; // Transparency for Space bars
                 if (duration > 0) {
@@ -1075,7 +1165,7 @@
                 }
                 ctx.fillRect(0, y - drawH / 2, editorCanvas.width, drawH);
                 ctx.globalAlpha = 1.0;
-            } else {
+            } else if (visualLane !== -1) {
                 const ld = LANE_DEFS[visualLane];
                 if (!ld) return;
                 const drawX = ld.x + 5;
@@ -1147,6 +1237,7 @@
         }).sort((a, b) => a.beat - b.beat);
 
         const json = {
+            mode: editorMode,
             bpm: bpm,
             offset: offset,
             notes: notes,
@@ -1170,12 +1261,13 @@
 
             // Get filename
             let defaultName = 'chart.json';
-            if (songSelect && songList) {
-                const index = parseInt(songSelect.value);
-                if (!isNaN(index) && songList[index]) {
-                    const song = songList[index];
-                    defaultName = song.chart || 'chart.json';
-                }
+            let index = -1;
+            // Find index of currently loaded song if possible, or just default
+            // We don't have a specific "selected index" state easily accessible unless we store it.
+            // But for download, we just need the content. The filename is secondary.
+            // Let's rely on global currentEditingFilename if available.
+            if ((window as any).currentEditingFilename) {
+                defaultName = (window as any).currentEditingFilename;
             }
 
             const filename = prompt('Enter filename to save as:', defaultName);
@@ -1203,14 +1295,8 @@
 
             // Determine Target Path
             let targetPath = '';
-            // We need the relative path from root, e.g. "songs/熱異常/netsu_ijo_chart.txt"
-            // We need the relative path from root, e.g. "songs/熱異常/netsu_ijo_chart.txt"
-            if (songSelect && flattenedSongOptions) {
-                const index = parseInt(songSelect.value);
-                if (!isNaN(index) && flattenedSongOptions[index]) {
-                    const opt = flattenedSongOptions[index];
-                    targetPath = `songs/${opt.song.folder}/${opt.filename}`;
-                }
+            if ((window as any).currentEditingFilename && (window as any).currentEditingFolder) {
+                targetPath = `songs/${(window as any).currentEditingFolder}/${(window as any).currentEditingFilename}`;
             }
 
             if (!targetPath) {
@@ -1243,5 +1329,6 @@
             }
         });
     }
-
 })();
+
+
