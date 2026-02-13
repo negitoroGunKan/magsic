@@ -160,17 +160,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 return;
             }
             // 1. Logo Pulsation
-            // 100 + (2 * sin(t) * 5) -> 100 + 10 * sin(t)
+            // Subtle pulsation +/- 3%
             const elapsed = (time - startTime) / 1000;
-            const scale = 100 + (10 * Math.sin(elapsed * 2)); // Speed 2
-            logo.style.width = `${scale}%`;
-            // Note: modifying width % might be jerky if container fluxuates. 
-            // Better to use transform scale?
-            // User asked for: "magnitude 100 + (2 * sin * 5)"
-            // Let's stick to user formula relative to base size.
-            // But logo.style.width = 80% originally. 
-            // Let's apply transform scale instead for smoothness.
-            const scaleFactor = 1 + (0.1 * Math.sin(elapsed * 2)); // 1.0 +/- 0.1
+            const scaleFactor = 1 + (0.03 * Math.sin(elapsed * 2));
             logo.style.transform = `scale(${scaleFactor})`;
             // 2. Rain Animation
             titleCtx.clearRect(0, 0, titleCanvas.width, titleCanvas.height);
