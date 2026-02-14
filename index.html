@@ -77,6 +77,45 @@
             background: rgba(0, 188, 212, 0.2);
             /* Cyan subtle glow */
         }
+
+        /* Shutter Transition */
+        #shutter-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transform: translateX(-200%);
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none;
+            background: none;
+
+            /* Device Tuning Variables */
+            --shutter-scale: 3.0;
+            --shutter-y-offset: 0px;
+        }
+
+        #shutter-overlay.closed {
+            transform: translateX(0);
+            pointer-events: all;
+        }
+
+        #shutter-overlay.opened-right {
+            transform: translateX(200%);
+            pointer-events: none;
+        }
+
+        #shutter-img {
+            width: calc(100% * var(--shutter-scale));
+            height: calc(100% * var(--shutter-scale));
+            object-fit: fill;
+            flex-shrink: 0;
+            transform: translateY(var(--shutter-y-offset));
+        }
     </style>
 </head>
 
@@ -101,6 +140,11 @@
         </style>
     </div>
 
+    <!-- Shutter Transition -->
+    <div id="shutter-overlay">
+        <img id="shutter-img" src="assets/シャッター.png" alt="Shutter">
+    </div>
+
     <!-- Start Screen -->
     <div id="start-screen"
         style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: url('assets/backdrop1.png') no-repeat center center; background-size: cover; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10;">
@@ -110,7 +154,7 @@
             style="max-width: 900px; width: 80%; margin-bottom: 20px; z-index: 2; position: relative;">
         <p
             style="color: #fff; font-size: 1.2em; margin-bottom: 30px; letter-spacing: 1px; text-shadow: 0 0 5px black; z-index: 2; position: relative;">
-            initial 1.4.13</p>
+            initial 1.3.15</p>
 
         <div id="title-ui-content"
             style="display: flex; flex-direction: column; align-items: center; z-index: 2; position: relative;">
@@ -129,7 +173,7 @@
                 VIEW RECORDS
             </button>
         </div>
-        <p style="margin-top:20px; color:#aaa; font-size: 0.9em;">MagsicBeat initial 1.4.13</p>
+        <p style="margin-top:20px; color:#aaa; font-size: 0.9em;">MagsicBeat initial 1.3.15</p>
     </div>
 
     <!-- Records Overlay -->

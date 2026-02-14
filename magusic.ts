@@ -42,6 +42,7 @@
     const recordsOverlay = document.getElementById('records-overlay') as HTMLDivElement;
     const pauseOverlay = document.getElementById('pause-overlay') as HTMLDivElement;
     const loadingOverlay = document.getElementById('loading-overlay') as HTMLDivElement;
+    const shutterOverlay = document.getElementById('shutter-overlay') as HTMLDivElement;
 
     const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
     const ctx = canvas ? canvas.getContext('2d') : null;
@@ -362,91 +363,107 @@
     // State
     let selectedModeFilter: '4key' | '6key' | '8key' | '12key' = '8key'; // Default to Legacy
 
-    function openSongSelect() {
+    if (btnStartSelect) {
+        btnStartSelect.addEventListener('click', () => {
+            performImageShutterTransition(() => {
+                openSongSelectForReal();
+            }).then(() => {
+                // Play Select BGM AFTER shutter opens
+                playBGM('bgm_select');
+            });
+        });
+    }
+
+    function openSongSelectForReal() {
         if (startScreen) startScreen.style.display = 'none';
         controlsDiv.classList.remove('open'); // Close drawer if open
         songSelectOverlay.style.display = 'block';
 
-        // Play Select BGM
-        playBGM('bgm_select');
-
         // Add Mode Tabs if not present
         if (!document.getElementById('mode-tabs-container')) {
-            const container = document.createElement('div');
-            container.id = 'mode-tabs-container';
-            container.style.display = 'flex';
-            container.style.justifyContent = 'center';
-            container.style.gap = '10px';
-            container.style.marginBottom = '20px';
-            container.style.padding = '10px';
-            container.style.background = '#222';
-            container.style.borderRadius = '8px';
-
-            ['4key', '6key', '8key', '12key'].forEach(mode => {
-                // Filter Button by Mode
-                // Detect Mode for this chart
-                // This block seems to be misplaced here. It looks like it belongs inside the song list rendering loop,
-                // where `filename` and `diffKey` would be available.
-                // For the purpose of this edit, I will insert it as requested, but note it might cause issues
-                // if `filename` and `diffKey` are not defined in this scope.
-                // Assuming `btn.textContent = diffKey.toUpperCase();` is meant to be `btn.textContent = mode.toUpperCase();`
-                // to match the existing button creation logic.
-                // I will insert the filtering logic, but comment out the `filename` and `diffKey` parts as they are out of scope here.
-                // The `if (chartMode === selectedModeFilter)` condition would also need `chartMode` to be defined,
-                // which it isn't in this context.
-                // I will only insert the comment and the `btn.textContent = diffKey.toUpperCase();` line,
-                // assuming `diffKey` is a placeholder for `mode` in this context.
-
-                // Filter Button by Mode
-                // Detect Mode for this chart
-                // let chartMode = '8key'; // Default Legacy
-                // const lower = filename.toLowerCase();
-                // if (lower.includes('4k')) chartMode = '4key';
-                // else if (lower.includes('6k')) chartMode = '6key';
-                // else if (lower.includes('12k')) chartMode = '12key';
-                // else if (lower.includes('8k')) chartMode = '8key'; // Explicit 8k also 8key
-
-                // if (chartMode === selectedModeFilter) {
-                //     hasMatchingChart = true; // Flag for Song Row visibility (optimization?)
-
-                const btn = document.createElement('button');
-                btn.textContent = mode.toUpperCase(); // Changed from diffKey.toUpperCase() to mode.toUpperCase() to fit context
-
-                btn.className = 'mode-tab-btn'; // Hook for styling if needed
-                btn.style.padding = '10px 20px';
-                btn.style.cursor = 'pointer';
-                btn.style.border = '2px solid #555';
-                btn.style.background = mode === selectedModeFilter ? '#00bcd4' : '#333';
-                btn.style.color = 'white';
-                btn.style.fontWeight = 'bold';
-
-                btn.onclick = () => {
-                    selectedModeFilter = mode as any;
-                    loadSongList(); // Re-render list
-
-                    // Update Tab Styles
-                    Array.from(container.children).forEach((c: any) => {
-                        c.style.background = '#333';
-                        c.style.border = '2px solid #555';
-                    });
-                    btn.style.background = '#00bcd4';
-                    btn.style.border = '2px solid #00bcd4';
-                };
-                container.appendChild(btn);
-            });
-
-            // Insert before song list
-            songSelectOverlay.insertBefore(container, songListDiv);
+            initModeTabs();
         }
 
         loadSongList();
     }
 
-    if (btnStartSelect) {
-        btnStartSelect.addEventListener('click', () => {
-            playSE('se_start');
-            openSongSelect();
+    // Wrap openSongSelect to handle transition if called elsewhere
+    function openSongSelect() {
+        performImageShutterTransition(() => {
+            openSongSelectForReal();
+        }).then(() => {
+            playBGM('bgm_select');
         });
+    }
+
+    async function performImageShutterTransition(midAction: () => void | Promise<void>) {
+        if (!shutterOverlay) {
+            await midAction();
+            return;
+        }
+
+        // 1. Play Shutter SE
+        playSE('se_start');
+
+        // 2. Slide In (Left to Center)
+        shutterOverlay.style.transition = 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+        shutterOverlay.classList.remove('opened-right');
+        shutterOverlay.classList.add('closed');
+
+        // Wait for slide-in
+        await new Promise(r => setTimeout(r, 600));
+
+        // 3. Middle Action
+        await midAction();
+
+        // Buffer
+        await new Promise(r => setTimeout(r, 200));
+
+        // 4. Slide Out (Center to Right)
+        shutterOverlay.classList.remove('closed');
+        shutterOverlay.classList.add('opened-right');
+
+        // Wait for slide-out
+        await new Promise(r => setTimeout(r, 600));
+
+        // 5. Reset for next time (teleport to left)
+        shutterOverlay.style.transition = 'none';
+        shutterOverlay.classList.remove('opened-right');
+        void shutterOverlay.offsetWidth; // Force reflow
+        shutterOverlay.style.transition = '';
+    }
+
+    // Factored out mode tabs init
+    function initModeTabs() {
+        const container = document.createElement('div');
+        container.id = 'mode-tabs-container';
+        container.style.display = 'flex';
+        container.style.justifyContent = 'center';
+        container.style.gap = '10px';
+        container.style.marginBottom = '20px';
+        container.style.padding = '10px';
+        container.style.background = '#222';
+        container.style.borderRadius = '8px';
+
+        ['4key', '6key', '8key', '12key'].forEach(mode => {
+            const btn = document.createElement('button');
+            btn.textContent = mode.toUpperCase();
+            btn.className = 'mode-tab-btn';
+            btn.style.padding = '10px 20px';
+            btn.style.cursor = 'pointer';
+            btn.style.border = '2px solid #555';
+            btn.style.background = mode === selectedModeFilter ? '#00bcd4' : '#333';
+            btn.style.color = 'white';
+            btn.style.fontWeight = 'bold';
+
+            btn.onclick = () => {
+                selectedModeFilter = mode as any;
+                loadSongList();
+                updateModeTabsUI();
+            };
+            container.appendChild(btn);
+        });
+        songSelectOverlay.insertBefore(container, songListDiv);
     }
 
     // Records Overlay Logic
@@ -932,6 +949,7 @@
         // We'll handle playback trigger in UI events mostly.
     }
     loadAudioAssets();
+    applyDeviceShutterTuning();
 
     function playBGM(key: string) {
         const nextBGM = AUDIO_ASSETS[key];
@@ -1401,6 +1419,26 @@
         // Spawn notes at least 2000 pixels before they hit. 
         // This ensures they start way off-screen at any speed.
         return 2000 / speed;
+    }
+
+    function applyDeviceShutterTuning() {
+        if (!shutterOverlay) return;
+
+        const ua = navigator.userAgent;
+        console.log('Detecting platform for shutter tuning:', ua);
+
+        // Windows Detection
+        if (ua.indexOf('Windows') !== -1) {
+            console.log('Applying Windows-specific shutter tuning (+5% vertical offset)');
+            // Shift down more to correct the "too high" issue
+            shutterOverlay.style.setProperty('--shutter-y-offset', '5%');
+        }
+
+        // Potential Mobile Detection
+        if (/Android|iPhone|iPad|iPod/i.test(ua)) {
+            console.log('Mobile device detected - using standard centering');
+            shutterOverlay.style.setProperty('--shutter-scale', '2.8'); // Slightly larger for safety
+        }
     }
 
     function spawnNote(laneIndex: number, scheduledTime: number, isLong: boolean = false, duration: number = 0) {
@@ -2898,125 +2936,109 @@
     let currentSongAudio = '';
 
     async function loadSong(songFolder: string, chartFilename: string, audioFilename: string) {
-        currentSongFolder = songFolder;
-        currentChartFilename = chartFilename;
-        currentSongAudio = audioFilename;
+        performImageShutterTransition(async () => {
+            currentSongFolder = songFolder;
+            currentChartFilename = chartFilename;
+            currentSongAudio = audioFilename;
 
-        // 0. Init Audio & Show Loading
-        if (loadingOverlay) {
-            loadingOverlay.style.display = 'flex';
-            if (loadingText) loadingText.textContent = `LOADING...`;
-        }
-
-        try { initAudio(); } catch (e) { alert(e); return; }
-
-
-
-        // 1. Fetch Audio & Chart
-        try {
-            // Load Audio
-            console.log(`Loading audio: songs/${songFolder}/${audioFilename}`);
-
-            // Clean up previous video
-            if (bgVideo) {
-                bgVideo.pause();
-                bgVideo.src = "";
-                bgVideo = null;
-            }
-            isVideoReady = false;
-
-            // Find the song object from availableSongs
-            const song = availableSongs.find(s => s.folder === songFolder);
-
-            // Load Video if exists
-            if (song && song.video) {
-                console.log(`Loading video: songs/${song.folder}/${song.video}`);
-                bgVideo = document.createElement('video');
-                bgVideo.src = `songs/${song.folder}/${song.video}`;
-                bgVideo.muted = true; // Audio handles sound
-                bgVideo.loop = false;
-                bgVideo.preload = 'auto';
-                bgVideo.addEventListener('canplay', () => {
-                    isVideoReady = true;
-                    console.log('Video ready');
-                });
-                bgVideo.load();
+            // Show internal loading if transition takes time
+            if (loadingOverlay) {
+                loadingOverlay.style.display = 'flex';
+                if (loadingText) loadingText.textContent = `LOADING...`;
             }
 
-            const audioRes = await fetch(`songs/${songFolder}/${audioFilename}`);
-            const audioBuf = await audioRes.arrayBuffer();
-            audioBuffer = await audioContext!.decodeAudioData(audioBuf);
+            try { initAudio(); } catch (e) { alert(e); return; }
 
-            const chartRes = await fetch(`songs/${songFolder}/${chartFilename}?t=${Date.now()}`);
-            const chartText = await chartRes.text();
-            // BOM removal not typically needed for fetch unless file saved with BOM
-            let text = chartText;
-            if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+            // 1. Fetch Audio & Chart
+            try {
+                // Find the song object from availableSongs
+                const song = availableSongs.find(s => s.folder === songFolder);
 
-            const json = JSON.parse(text);
-
-            // Determine Mode from Chart or Filename
-            if (json.mode && GAME_MODES[json.mode as KeyMode]) {
-                currentKeyMode = json.mode as KeyMode;
-                console.log(`Mode set from chart: ${currentKeyMode}`);
-            } else {
-                if (currentChartFilename.toLowerCase().includes('4k')) currentKeyMode = '4key';
-                else if (currentChartFilename.toLowerCase().includes('6k')) currentKeyMode = '6key';
-                else if (currentChartFilename.toLowerCase().includes('8k')) currentKeyMode = '8key';
-                else if (currentChartFilename.toLowerCase().includes('12k')) currentKeyMode = '12key';
-                else if (currentChartFilename.toLowerCase().includes('12k')) currentKeyMode = '12key';
-                else currentKeyMode = '8key';
-                console.log(`Mode inferred from file: ${currentKeyMode}`);
-            }
-
-            // Recalculate layout for the new mode
-            resize();
-
-            if (!json.notes || !Array.isArray(json.notes)) {
-                alert('Invalid Chart Data');
-                return;
-            }
-            chartData = parseChart(json);
-
-            // Apply Modifiers
-            if (assistSelect && randomSelect) {
-                const assistMode = assistSelect.value;
-                const randomMode = randomSelect.value;
-                if (assistMode !== 'none' || randomMode !== 'none') {
-                    console.log(`Applying Modifiers: Assist=${assistMode}, Random=${randomMode}`);
-                    chartData = applyModifiers(chartData, assistMode, randomMode);
+                // Load Video if exists
+                if (song && song.video) {
+                    if (bgVideo) {
+                        bgVideo.pause();
+                        bgVideo.src = "";
+                        bgVideo = null;
+                    }
+                    isVideoReady = false;
+                    bgVideo = document.createElement('video');
+                    bgVideo.src = `songs/${song.folder}/${song.video}`;
+                    bgVideo.muted = true;
+                    bgVideo.loop = false;
+                    bgVideo.preload = 'auto';
+                    bgVideo.addEventListener('canplay', () => {
+                        isVideoReady = true;
+                    });
+                    bgVideo.load();
                 }
+
+                const audioRes = await fetch(`songs/${songFolder}/${audioFilename}`);
+                const audioBuf = await audioRes.arrayBuffer();
+                audioBuffer = await audioContext!.decodeAudioData(audioBuf);
+
+                const chartRes = await fetch(`songs/${songFolder}/${chartFilename}?t=${Date.now()}`);
+                const chartText = await chartRes.text();
+                let text = chartText;
+                if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+                const json = JSON.parse(text);
+
+                // Determine Mode
+                if (json.mode && GAME_MODES[json.mode as KeyMode]) {
+                    currentKeyMode = json.mode as KeyMode;
+                } else {
+                    if (currentChartFilename.toLowerCase().includes('4k')) currentKeyMode = '4key';
+                    else if (currentChartFilename.toLowerCase().includes('6k')) currentKeyMode = '6key';
+                    else if (currentChartFilename.toLowerCase().includes('8k')) currentKeyMode = '8key';
+                    else if (currentChartFilename.toLowerCase().includes('12k')) currentKeyMode = '12key';
+                    else currentKeyMode = '8key';
+                }
+
+                // Recalculate layout
+                resize();
+
+                if (!json.notes || !Array.isArray(json.notes)) {
+                    alert('Invalid Chart Data');
+                    return;
+                }
+                chartData = parseChart(json);
+
+                // Apply Modifiers
+                if (assistSelect && randomSelect) {
+                    const assistMode = assistSelect.value;
+                    const randomMode = randomSelect.value;
+                    if (assistMode !== 'none' || randomMode !== 'none') {
+                        chartData = applyModifiers(chartData, assistMode, randomMode);
+                    }
+                }
+
+                // 2. Prepare Game State
+                if (loadingOverlay) loadingOverlay.style.display = 'none';
+
+                currentMode = 'chart';
+                resetStats();
+                notes.length = 0;
+                nextNoteIndex = 0;
+
+                songSelectOverlay.style.display = 'none';
+                if (resultsOverlay) resultsOverlay.style.display = 'none';
+                if (startScreen) startScreen.style.display = 'none';
+                if (controlsDiv) controlsDiv.style.display = 'none';
+
+                isPaused = false;
+                isCountdown = false;
+                pausedOffset = 0;
+                if (btnPauseUI) btnPauseUI.style.display = 'block';
+
+            } catch (e) {
+                if (loadingOverlay) loadingOverlay.style.display = 'none';
+                alert('Error loading song: ' + e);
             }
-
-            // 2. Start Game Logic (with Loading & Countdown)
-
-            // Hide Loading
-            if (loadingOverlay) loadingOverlay.style.display = 'none';
-
-            currentMode = 'chart';
-            resetStats();
-            notes.length = 0;
-            nextNoteIndex = 0;
-
-            songSelectOverlay.style.display = 'none'; // Close UI
-            // Controls already hidden by Select button logic
-            if (resultsOverlay) resultsOverlay.style.display = 'none';
-            if (startScreen) startScreen.style.display = 'none';
-
-            // Reset pause states
-            isPaused = false;
-            isCountdown = false; // Will trigger via startCountdown
-            pausedOffset = 0;
-            if (btnPauseUI) btnPauseUI.style.display = 'block';
-
-            // Start Countdown instead of immediate play
+        }).then(() => {
+            // 3. Start Delay Sequence AFTER Shutter Opens
+            // isStarting = true, START_DELAY_MS = 3000
             startCountdown();
-
-        } catch (e) {
-            if (loadingOverlay) loadingOverlay.style.display = 'none';
-            if (loadingOverlay) loadingOverlay.style.display = 'none';
-            alert('Error loading song: ' + e);
-        }
+        });
     }
 
     function startCountdown() {
