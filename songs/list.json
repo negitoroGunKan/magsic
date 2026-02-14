@@ -53,7 +53,8 @@
             "st": "knights_st.json",
             "ad": "knights_ad.json",
             "pr": "knights_pr.json",
-            "et": "knights_et.json"
+            "et": "knights_et.json",
+            "et_6k": "knight_of_nights_et_6k.json"
         }
     },
     {

@@ -20,6 +20,7 @@ const mimeTypes = {
     '.mp4': 'video/mp4',
     '.webm': 'video/webm',
     '.ogv': 'video/ogg',
+    '.svg': 'image/svg+xml',
 };
 
 const server = http.createServer((req, res) => {

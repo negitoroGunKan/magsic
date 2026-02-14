@@ -43,7 +43,7 @@
     const pauseOverlay = document.getElementById('pause-overlay') as HTMLDivElement;
     const loadingOverlay = document.getElementById('loading-overlay') as HTMLDivElement;
 
-    const canvas = document.getElementById('canvas') as HTMLCanvasElement;
+    const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
     const ctx = canvas ? canvas.getContext('2d') : null;
 
     const titleCanvas = document.getElementById('title-rain-canvas') as HTMLCanvasElement;
@@ -138,6 +138,8 @@
         const sprites: { img: HTMLImageElement, prob: number }[] = [];
         const loadSprite = (src: string, prob: number) => {
             const img = new Image();
+            img.onload = () => console.log(`Sprite loaded: ${src}`, { w: img.naturalWidth, h: img.naturalHeight });
+            img.onerror = () => console.error(`Sprite load FAILED: ${src}`);
             img.src = src;
             sprites.push({ img, prob });
         };
@@ -164,11 +166,12 @@
 
         function animLoop(time: number) {
             frameCount++;
-            if (frameCount % 60 === 0) {
+            if (frameCount % 180 === 0) {
                 console.log('AnimLoop Running...', {
                     display: startScreen.style.display,
                     particles: particles.length,
-                    canvas: `${titleCanvas.width}x${titleCanvas.height}`
+                    canvas: `${titleCanvas.width}x${titleCanvas.height}`,
+                    sprites: sprites.map(s => ({ src: s.img.src.split('/').pop(), complete: s.img.complete, nw: s.img.naturalWidth }))
                 });
             }
 
@@ -1905,14 +1908,29 @@
             });
         }
 
-        // Pass 1: Space (4) - Behind
-        drawNotesForLane(4);
+        // Draw Notes (Multi-pass based on Layering)
+        const currentModeIndices = GAME_MODES[currentKeyMode].indices;
 
-        // Pass 2: White Notes (1, 3, 6, 8)
-        [1, 3, 6, 8].forEach(idx => drawNotesForLane(idx));
+        // 1. Space Layers (at the back)
+        if (currentModeIndices.includes(4)) drawNotesForLane(4);
 
-        // Pass 3: Blue Notes (0, 2, 5, 7) - On Top
-        [0, 2, 5, 7].forEach(idx => drawNotesForLane(idx));
+        // 2. Main Layers (Non-Blue)
+        currentModeIndices.forEach(idx => {
+            if (idx === 4) return;
+            const config = LANE_CONFIGS[idx];
+            if (config && config.color !== '#7CA4FF') {
+                drawNotesForLane(idx);
+            }
+        });
+
+        // 3. Highlight Layers (Blue Notes on Top)
+        currentModeIndices.forEach(idx => {
+            if (idx === 4) return;
+            const config = LANE_CONFIGS[idx];
+            if (config && config.color === '#7CA4FF') {
+                drawNotesForLane(idx);
+            }
+        });
 
         // Draw Lane Cover (Hidden Bar)
         if (isLaneCoverEnabled && VISUAL_LANES.length > 0) {
@@ -2382,101 +2400,108 @@
                 // Render Buttons
                 if (song.charts) {
                     let visibleButtons = 0;
-                    DIFF_ORDER.forEach(diffKey => {
-                        if (song.charts && song.charts[diffKey]) {
-                            const filename = song.charts[diffKey];
 
-                            // Detect Mode
-                            let chartMode = '8key'; // Default Legacy
-                            const lower = filename.toLowerCase();
-                            if (lower.includes('4k')) chartMode = '4key';
-                            else if (lower.includes('6k')) chartMode = '6key';
-                            else if (lower.includes('12k')) chartMode = '12key';
-                            // else if (lower.includes('8k')) chartMode = '8key';
+                    // Support dynamic keys like "et_6k" by finding all available charts first
+                    const allCharts = Object.keys(song.charts).map(chartKey => {
+                        const filename = song.charts![chartKey];
+                        let chartMode = '8key';
+                        const lower = filename.toLowerCase();
+                        if (lower.includes('4k')) chartMode = '4key';
+                        else if (lower.includes('6k')) chartMode = '6key';
+                        else if (lower.includes('12k')) chartMode = '12key';
 
-                            // Filter
-                            if (chartMode !== selectedModeFilter) return;
+                        // Derive base difficulty (for icon/color) - "et_6k" -> "et"
+                        const baseDiff = chartKey.split('_')[0];
 
-                            visibleButtons++;
-                            const btnWrapper = document.createElement('div');
-                            btnWrapper.style.display = 'flex';
-                            btnWrapper.style.flexDirection = 'column';
-                            btnWrapper.style.alignItems = 'center';
-                            btnWrapper.style.gap = '5px';
+                        return { chartKey, filename, chartMode, baseDiff };
+                    });
 
-                            const btn = document.createElement('button');
-                            btn.style.border = 'none';
-                            btn.style.background = 'transparent';
-                            btn.style.cursor = 'pointer';
-                            btn.style.padding = '0';
+                    // Sort according to DIFF_ORDER
+                    allCharts.sort((a, b) => {
+                        const idxA = DIFF_ORDER.indexOf(a.baseDiff);
+                        const idxB = DIFF_ORDER.indexOf(b.baseDiff);
+                        return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+                    });
 
-                            const img = document.createElement('img');
-                            img.src = `assets/diff_${diffKey}.png`;
-                            img.alt = diffKey.toUpperCase();
-                            img.style.height = '40px'; // Adjust size as needed
-                            img.style.objectFit = 'contain';
-                            img.style.display = 'block';
+                    allCharts.forEach(chart => {
+                        if (chart.chartMode !== selectedModeFilter) return;
 
-                            // Hover effect
-                            img.onmouseover = () => img.style.filter = 'brightness(1.2)';
-                            img.onmouseout = () => img.style.filter = 'brightness(1.0)';
+                        const diffKey = chart.baseDiff;
+                        const filename = chart.filename;
 
-                            // Fallback to text if image missing
-                            img.onerror = () => {
-                                btn.textContent = DIFF_LABELS[diffKey] || diffKey.toUpperCase();
-                                btn.style.padding = '5px 10px';
-                                btn.style.borderRadius = '4px';
-                                btn.style.color = '#fff';
-                                btn.style.fontWeight = 'bold';
-                                btn.style.background = DIFF_COLORS[diffKey] || '#777';
-                            };
+                        visibleButtons++;
+                        const btnWrapper = document.createElement('div');
+                        btnWrapper.style.display = 'flex';
+                        btnWrapper.style.flexDirection = 'column';
+                        btnWrapper.style.alignItems = 'center';
+                        btnWrapper.style.gap = '5px';
 
-                            btn.appendChild(img);
+                        const btn = document.createElement('button');
+                        btn.style.border = 'none';
+                        btn.style.background = 'transparent';
+                        btn.style.cursor = 'pointer';
+                        btn.style.padding = '0';
 
-                            btn.onclick = (e) => {
-                                e.stopPropagation();
+                        const img = document.createElement('img');
+                        img.src = `assets/diff_${diffKey}.png`;
+                        img.alt = diffKey.toUpperCase();
+                        img.style.height = '40px';
+                        img.style.objectFit = 'contain';
+                        img.style.display = 'block';
 
-                                // Decide SE
-                                if (selectedModeFilter === '12key') playSE('se_decide_extra');
-                                else playSE('se_decide');
+                        // Hover effect
+                        img.onmouseover = () => img.style.filter = 'brightness(1.2)';
+                        img.onmouseout = () => img.style.filter = 'brightness(1.0)';
 
-                                stopBGM();
-                                loadSong(song, filename);
-                            };
+                        // Fallback to text if image missing
+                        img.onerror = () => {
+                            btn.textContent = DIFF_LABELS[diffKey] || diffKey.toUpperCase();
+                            btn.style.padding = '5px 10px';
+                            btn.style.borderRadius = '4px';
+                            btn.style.color = '#fff';
+                            btn.style.fontWeight = 'bold';
+                            btn.style.background = DIFF_COLORS[diffKey] || '#777';
+                        };
 
-                            btnWrapper.appendChild(btn);
+                        btn.appendChild(img);
 
-                            // High Score Label
-                            const songScores = allScores[song.id] || [];
+                        btn.onclick = (e) => {
+                            e.stopPropagation();
+                            if (selectedModeFilter === '12key') playSE('se_decide_extra');
+                            else playSE('se_decide');
+                            stopBGM();
+                            loadSong(song, filename);
+                        };
 
-                            // Overall Best
-                            const overallBest = songScores
-                                .filter((s: any) => s.difficulty === filename)
-                                .sort((a: any, b: any) => b.score - a.score)[0];
+                        btnWrapper.appendChild(btn);
 
-                            // Personal Best
-                            const myBest = songScores
-                                .filter((s: any) => s.difficulty === filename && s.playerName === currentPlayer)
-                                .sort((a: any, b: any) => b.score - a.score)[0];
+                        // High Score Label
+                        const songScores = allScores[song.id] || [];
+                        const overallBest = songScores
+                            .filter((s: any) => s.difficulty === filename)
+                            .sort((a: any, b: any) => b.score - a.score)[0];
 
-                            if (overallBest || myBest) {
-                                const scoreDiv = document.createElement('div');
-                                scoreDiv.style.fontSize = '10px';
-                                scoreDiv.style.color = '#ccc';
-                                scoreDiv.style.fontFamily = 'monospace';
-                                scoreDiv.style.marginTop = '2px';
+                        const myBest = songScores
+                            .filter((s: any) => s.difficulty === filename && s.playerName === currentPlayer)
+                            .sort((a: any, b: any) => b.score - a.score)[0];
 
-                                let text = '';
-                                if (myBest) text += `My: ${myBest.score.toLocaleString()}`;
-                                if (overallBest && (!myBest || overallBest.score > myBest.score)) {
-                                    text += ` (Top: ${overallBest.score.toLocaleString()} ${overallBest.playerName})`;
-                                }
-                                scoreDiv.textContent = text;
-                                btnWrapper.appendChild(scoreDiv);
+                        if (overallBest || myBest) {
+                            const scoreDiv = document.createElement('div');
+                            scoreDiv.style.fontSize = '10px';
+                            scoreDiv.style.color = '#ccc';
+                            scoreDiv.style.fontFamily = 'monospace';
+                            scoreDiv.style.marginTop = '2px';
+
+                            let text = '';
+                            if (myBest) text += `My: ${myBest.score.toLocaleString()}`;
+                            if (overallBest && (!myBest || overallBest.score > myBest.score)) {
+                                text += ` (Top: ${overallBest.score.toLocaleString()} ${overallBest.playerName})`;
                             }
-
-                            btnContainer.appendChild(btnWrapper);
+                            scoreDiv.textContent = text;
+                            btnWrapper.appendChild(scoreDiv);
                         }
+
+                        btnContainer.appendChild(btnWrapper);
                     });
 
                     if (visibleButtons === 0) {
@@ -2778,8 +2803,24 @@
                 if (map[n.lane] !== undefined) {
                     n.lane = map[n.lane];
                 }
+                if (map[n.lane] !== undefined) {
+                    n.lane = map[n.lane];
+                }
             });
-        } else if (assist === 'space_boost') {
+        }
+        else if (currentKeyMode === '6key') {
+            // Remap 8key patterns to 6key
+            // 2(r) -> 3(f), 5(u) -> 6(j)
+            // This aligns 8key inner lanes to 6key inner lanes
+            const map: { [key: number]: number } = { 2: 3, 5: 6 };
+            modified.forEach((n: any) => {
+                if (map[n.lane] !== undefined) {
+                    n.lane = map[n.lane];
+                }
+            });
+        }
+
+        else if (assist === 'space_boost') {
             // Convert random % of non-space notes to space
             // Let's say 20%? or maybe simplify complex streams?
             // "Increase space, decrease others"
@@ -2922,8 +2963,9 @@
 
                 const indices = [9, 1, 3, 6, 8, 10];
                 const labels = ['S', 'D', 'F', 'J', 'K', 'L'];
-                // Pattern: Blue White Blue | Blue White Blue?
-                const colors = ['#7CA4FF', '#ffffff', '#7CA4FF', '#7CA4FF', '#ffffff', '#7CA4FF'];
+                // Pattern: All White (S D F J K L = White)
+                // User requested: "sdfjkl is white, weruio is blue"
+                const colors = ['#ffffff', '#ffffff', '#ffffff', '#ffffff', '#ffffff', '#ffffff'];
 
                 indices.forEach((kIdx, i) => {
                     const x = sx + (i * tempWidth);
@@ -2963,12 +3005,15 @@
                 // (Note: U is index, J is index. U is above J. So U, J typically same column or adjacent? Usually adjacent in 7k+1)
 
                 // My proposed linear order: [S, W, D, E, F, R, U, J, I, K, O, L]
-                // Indices:
+                // Indices: 9, 11, 1, 0, 3, 2, 5, 6, 7, 8, 12, 10
                 const indices = [9, 11, 1, 0, 3, 2, 5, 6, 7, 8, 12, 10];
                 const labels = ['S', 'W', 'D', 'E', 'F', 'R', 'U', 'J', 'I', 'K', 'O', 'L'];
+                // Colors based on user request: S D F J K L = White (#ffffff), W E R U I O = Blue (#7CA4FF)
+                // Map indices to color:
+                // 9(S):W, 11(W):B, 1(D):W, 0(E):B, 3(F):W, 2(R):B, 5(U):B, 6(J):W, 7(I):B, 8(K):W, 12(O):B, 10(L):W
                 const colors = [
-                    '#7CA4FF', '#e040fb', '#ffffff', '#e040fb', '#7CA4FF', '#e040fb',
-                    '#e040fb', '#7CA4FF', '#e040fb', '#ffffff', '#e040fb', '#7CA4FF'
+                    '#ffffff', '#7CA4FF', '#ffffff', '#7CA4FF', '#ffffff', '#7CA4FF',
+                    '#7CA4FF', '#ffffff', '#7CA4FF', '#ffffff', '#7CA4FF', '#ffffff'
                 ];
 
                 indices.forEach((kIdx, i) => {
@@ -2999,6 +3044,16 @@
                 VISUAL_LANES[i].x = lerp(VISUAL_LANES[i].x, VISUAL_LANE_TARGETS[i].x);
                 VISUAL_LANES[i].width = lerp(VISUAL_LANES[i].width, VISUAL_LANE_TARGETS[i].width);
             }
+        }
+
+        // Lane Configs
+        // Always ensure length match or structure copy if target differs significantly
+        if (LANE_CONFIGS.length !== LANE_CONFIG_TARGETS.length) {
+            // Need to resize LANE_CONFIGS array to match target size (sparse array size)
+            // Or just copy structure for safety if we are changing modes
+            // If we just expand, interpolation might be weird for new elements (undefined -> target)
+            // Let's just snap if length mismatch (Mode Change)
+            LANE_CONFIGS = JSON.parse(JSON.stringify(LANE_CONFIG_TARGETS));
         }
 
         // Lane Configs
