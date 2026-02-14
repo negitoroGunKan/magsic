@@ -40,6 +40,8 @@
             /* Above canvas/overlays */
             display: block;
             /* Default state */
+            overflow-y: auto;
+            /* Enable scrolling for small screens/iPad */
         }
 
         #controls.open {
@@ -154,7 +156,7 @@
             style="max-width: 900px; width: 80%; margin-bottom: 20px; z-index: 2; position: relative;">
         <p
             style="color: #fff; font-size: 1.2em; margin-bottom: 30px; letter-spacing: 1px; text-shadow: 0 0 5px black; z-index: 2; position: relative;">
-            initial 1.3.15</p>
+            initial 1.5.1</p>
 
         <div id="title-ui-content"
             style="display: flex; flex-direction: column; align-items: center; z-index: 2; position: relative;">
@@ -173,7 +175,7 @@
                 VIEW RECORDS
             </button>
         </div>
-        <p style="margin-top:20px; color:#aaa; font-size: 0.9em;">MagsicBeat initial 1.3.15</p>
+        <p style="margin-top:20px; color:#aaa; font-size: 0.9em;">MagsicBeat initial 1.5.1</p>
     </div>
 
     <!-- Records Overlay -->
@@ -245,6 +247,10 @@
 
     <!-- Options Drawer -->
     <div id="controls">
+        <button id="btn-close-options"
+            style="width: 100%; padding: 10px; background: #e040fb; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; margin-bottom: 20px;">
+            CLOSE OPTIONS
+        </button>
         <h3>Game Mode</h3>
         <button id="btn-random">Start Random Mode</button>
         <hr style="border-color: #555;">

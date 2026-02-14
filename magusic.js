@@ -82,6 +82,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     const btnRetry = document.getElementById('btn-retry');
     const btnQuit = document.getElementById('btn-quit');
     const btnOptionsToggle = document.getElementById('btn-options-toggle');
+    const btnCloseOptions = document.getElementById('btn-close-options');
     const btnAddPlayer = document.getElementById('btn-add-player');
     const btnClosePlayer = document.getElementById('btn-close-player');
     const playerDisplay = document.getElementById('player-display');
@@ -795,6 +796,24 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             controlsDiv.classList.toggle('open');
             playSE('se_option');
         });
+        if (btnCloseOptions) {
+            btnCloseOptions.addEventListener('click', () => {
+                controlsDiv.classList.remove('open');
+            });
+        }
+        // Touch swipe-to-close logic
+        let touchStartX = 0;
+        controlsDiv.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+        }, { passive: true });
+        controlsDiv.addEventListener('touchend', (e) => {
+            const touchEndX = e.changedTouches[0].clientX;
+            const diffX = touchEndX - touchStartX;
+            // If swiped significantly to the right (e.g. > 50px), close drawer
+            if (diffX > 50) {
+                controlsDiv.classList.remove('open');
+            }
+        }, { passive: true });
         document.addEventListener('click', (e) => {
             const target = e.target;
             if (controlsDiv.classList.contains('open')) {

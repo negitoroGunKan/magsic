@@ -82,6 +82,7 @@
     const btnRetry = document.getElementById('btn-retry') as HTMLButtonElement;
     const btnQuit = document.getElementById('btn-quit') as HTMLButtonElement;
     const btnOptionsToggle = document.getElementById('btn-options-toggle') as HTMLButtonElement;
+    const btnCloseOptions = document.getElementById('btn-close-options') as HTMLButtonElement;
     const btnAddPlayer = document.getElementById('btn-add-player') as HTMLButtonElement;
     const btnClosePlayer = document.getElementById('btn-close-player') as HTMLButtonElement;
     const playerDisplay = document.getElementById('player-display') as HTMLDivElement;
@@ -872,6 +873,27 @@
             controlsDiv.classList.toggle('open');
             playSE('se_option');
         });
+
+        if (btnCloseOptions) {
+            btnCloseOptions.addEventListener('click', () => {
+                controlsDiv.classList.remove('open');
+            });
+        }
+
+        // Touch swipe-to-close logic
+        let touchStartX = 0;
+        controlsDiv.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+        }, { passive: true });
+
+        controlsDiv.addEventListener('touchend', (e) => {
+            const touchEndX = e.changedTouches[0].clientX;
+            const diffX = touchEndX - touchStartX;
+            // If swiped significantly to the right (e.g. > 50px), close drawer
+            if (diffX > 50) {
+                controlsDiv.classList.remove('open');
+            }
+        }, { passive: true });
 
         document.addEventListener('click', (e) => {
             const target = e.target as HTMLElement;
