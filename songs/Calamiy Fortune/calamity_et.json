@@ -1,4 +1,6 @@
 {
+  "mode": "8key",
+  "difficulty": "et",
   "bpm": 200,
   "offset": 443,
   "notes": [
@@ -1078,5 +1080,6 @@
       "duration": 0
     }
   ],
-  "layoutChanges": []
+  "layoutChanges": [],
+  "level": 20
 }

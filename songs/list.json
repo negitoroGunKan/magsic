@@ -71,5 +71,61 @@
             "pr": "calamity_pr.json",
             "et": "calamity_et.json"
         }
+    },
+    {
+        "id": "poison_and_or_affection",
+        "title": "Poison AND÷OR Affection",
+        "artist": "Unknown",
+        "bpm": 150,
+        "folder": "poison_and_or_affection",
+        "audio": "Poison AND_OR Affection.wav",
+        "charts": {
+            "et_6k": "poison_and_or_affection_et_6k.json"
+        }
+    },
+    {
+        "id": "chromania",
+        "title": "CHromania",
+        "artist": "Unknown",
+        "bpm": 150,
+        "folder": "chromania",
+        "audio": "Chronomia.wav",
+        "charts": {}
+    },
+    {
+        "id": "shining_star",
+        "title": "シャイニングスター",
+        "artist": "魔王魂",
+        "bpm": 150,
+        "folder": "shining_star",
+        "audio": "シャイニングスター.wav",
+        "charts": {}
+    },
+    {
+        "id": "kyuukurarin",
+        "title": "きゅうくらりん",
+        "artist": "いよわ",
+        "bpm": 150,
+        "folder": "kyuukurarin",
+        "audio": "きゅうくらりん.mp3",
+        "charts": {}
+    },
+    {
+        "id": "amara",
+        "title": "AMARA(大未来電脳)",
+        "artist": "sasakure.UK",
+        "bpm": 150,
+        "folder": "amara",
+        "audio": "ÅMARA(大未来電脳)  feat.mp3",
+        "charts": {}
+    },
+    {
+        "id": "seimeisei_syndrome",
+        "title": "生命性シンドロウム",
+        "artist": "Unknown",
+        "bpm": 150,
+        "folder": "seimeisei_syndrome",
+        "audio": "生命性シンドロウム (feat.mp3",
+        "charts": {}
     }
 ]

@@ -1,0 +1,555 @@
+{
+  "mode": "6key",
+  "difficulty": "et",
+  "bpm": 120,
+  "offset": -115,
+  "notes": [
+    {
+      "beat": 0.26,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 0.26,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 0.26,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 0.26,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 0.51,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 0.76,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 1.01,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 1.26,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 1.26,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 1.26,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 1.26,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 1.76,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 1.76,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 2.01,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 2.01,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 2.26,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 2.26,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 2.5,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 2.625,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 2.75,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 2.875,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 3.01,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 3.01,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 3.135,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 3.26,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 3.385,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 3.51,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 3.51,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 3.635,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 3.76,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 3.885,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 4.01,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 4.01,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 4.01,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 4.76,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 5.26,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 5.76,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 6.26,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 6.26,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 6.5,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 6.5,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 6.635,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 6.75,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 6.76,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 7.01,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 7.01,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 7.26,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 7.385,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 7.51,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 7.635,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 7.635,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 7.76,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 7.885,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 8,
+      "lane": 4,
+      "duration": 0
+    },
+    {
+      "beat": 8.01,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 8.01,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 8.01,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 8.01,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 8.75,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 8.833,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 8.917,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 9,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 9,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 9,
+      "lane": 4,
+      "duration": 0
+    },
+    {
+      "beat": 9,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 9.75,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 9.833,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 9.917,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 10,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 10,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 10,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 10,
+      "lane": 4,
+      "duration": 0
+    },
+    {
+      "beat": 10,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 10.75,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 10.833,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 10.917,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 11,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 11,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 11,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 11,
+      "lane": 4,
+      "duration": 0.75
+    },
+    {
+      "beat": 11.75,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 11.75,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 11.833,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 11.917,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 12,
+      "lane": 6,
+      "duration": 0.75
+    },
+    {
+      "beat": 12,
+      "lane": 10,
+      "duration": 0.75
+    },
+    {
+      "beat": 12.75,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 12.833,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 12.917,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 13,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 13,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 13,
+      "lane": 3,
+      "duration": 0.75
+    },
+    {
+      "beat": 13.75,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 13.833,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 13.917,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 14,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 14,
+      "lane": 9,
+      "duration": 0.75
+    },
+    {
+      "beat": 14,
+      "lane": 3,
+      "duration": 0.75
+    },
+    {
+      "beat": 14.75,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 14.833,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 14.917,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 15,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 15,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 15,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 15.25,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 15.25,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 15.25,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 27.51,
+      "lane": 6,
+      "duration": 0
+    }
+  ],
+  "layoutChanges": [
+    {
+      "beat": 0.484,
+      "type": "type-a"
+    }
+  ],
+  "level": 15
+}

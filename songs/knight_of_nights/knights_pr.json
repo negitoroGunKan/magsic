@@ -353,5 +353,6 @@
       "beat": 0.171,
       "type": "type-a"
     }
-  ]
+  ],
+  "difficulty": "pr"
 }

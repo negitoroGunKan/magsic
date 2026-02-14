@@ -323,5 +323,6 @@
       "beat": 0,
       "type": "type-a"
     }
-  ]
+  ],
+  "difficulty": "pr"
 }

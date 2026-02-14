@@ -1,4 +1,3 @@
-"use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -78,6 +77,28 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + duration);
         osc.start();
         osc.stop(actx.currentTime + duration);
+    }
+    // --- Difficulty & Level State ---
+    let currentClass = 'no';
+    const levelSelect = document.getElementById('level-select');
+    let currentLevel = '1';
+    if (levelSelect) {
+        // Populate Level Dropdown (1-21) if empty
+        if (levelSelect.options.length === 0) {
+            const defaultOpt = document.createElement('option');
+            defaultOpt.value = '0';
+            defaultOpt.textContent = 'Not Set';
+            levelSelect.appendChild(defaultOpt);
+            for (let i = 1; i <= 21; i++) {
+                const opt = document.createElement('option');
+                opt.value = i.toString();
+                opt.textContent = i.toString();
+                levelSelect.appendChild(opt);
+            }
+        }
+        levelSelect.addEventListener('change', () => {
+            currentLevel = levelSelect.value;
+        });
     }
     if (!ctx)
         throw new Error('Canvas context not supported');
@@ -208,6 +229,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             const opt = flattenedSongOptions[index];
             const song = opt.song;
             statusDiv.textContent = `Status: Loading ${opt.label}...`;
+            // Auto-set Class from selection
+            if (opt.diff) {
+                currentClass = opt.diff.toLowerCase();
+            }
             try {
                 // 1. Load Audio
                 audio.src = `songs/${song.folder}/${song.audio}`;
@@ -222,6 +247,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     const json = JSON.parse(text);
                     importChartJSON(json);
                     window.currentEditingFilename = opt.filename;
+                    window.currentEditingFolder = song.folder;
+                    statusDiv.textContent = `Status: Loaded ${opt.label}`;
+                    // Import Logic (btn-import) handled globally below
                     window.currentEditingFolder = song.folder;
                     statusDiv.textContent = `Status: Loaded ${opt.label}`;
                     // Auto-set Mode Selector
@@ -285,6 +313,18 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                         type: lc.type
                     });
                 });
+            }
+            // Import Difficulty/Level
+            if (json.difficulty) {
+                currentClass = json.difficulty;
+            }
+            if (json.level !== undefined && levelSelect) {
+                levelSelect.value = json.level.toString();
+                currentLevel = json.level.toString();
+            }
+            else if (levelSelect) {
+                levelSelect.value = '0';
+                currentLevel = '0';
             }
             statusDiv.textContent = `Status: Loaded Chart (${recordedNotes.length} notes, ${layoutChanges.length} layout changes)`;
             alert(`Loaded ${recordedNotes.length} notes and ${layoutChanges.length} layout changes successfully!`);
@@ -1192,11 +1232,16 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         }).sort((a, b) => a.beat - b.beat);
         const json = {
             mode: editorMode,
+            difficulty: currentClass,
             bpm: bpm,
             offset: offset,
             notes: notes,
             layoutChanges: layoutChangesOut
         };
+        const levelNum = parseInt(currentLevel);
+        if (levelNum > 0) {
+            json.level = levelNum;
+        }
         return JSON.stringify(json, null, 2);
     }
     // Export Button

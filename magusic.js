@@ -1,4 +1,3 @@
-"use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -1321,13 +1320,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     judgementTimer = 1000;
                     addHit('perfect');
                     spawnHitEffect(note.laneIndex, '#00ffff');
-                    if (isAutoPlay) {
+                    if (isAutoPlay || (assistSelect.value === 'auto_space' && note.laneIndex === 4)) {
                         pressedKeys[note.laneIndex] = false;
                         heldNotes[note.laneIndex] = null;
                     }
                 }
             }
-            else if (isAutoPlay && !note.isLong && !note.processed && currentTimeMs >= note.scheduledTime) {
+            else if ((isAutoPlay || (assistSelect.value === 'auto_space' && note.laneIndex === 4)) && !note.isLong && !note.processed && currentTimeMs >= note.scheduledTime) {
                 // AUTO PLAY HIT (Head)
                 note.active = false;
                 judgementText = `PERFECT\nAUTO`;
@@ -1339,7 +1338,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 pressedKeys[note.laneIndex] = true;
                 setTimeout(() => pressedKeys[note.laneIndex] = false, 50);
             }
-            else if (isAutoPlay && note.isLong && !note.processed && currentTimeMs >= note.scheduledTime && !note.beingHeld) {
+            else if ((isAutoPlay || (assistSelect.value === 'auto_space' && note.laneIndex === 4)) && note.isLong && !note.processed && currentTimeMs >= note.scheduledTime && !note.beingHeld) {
                 // AUTO PLAY HOLD START
                 note.processed = true;
                 note.beingHeld = true;
@@ -1353,7 +1352,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 pressedKeys[note.laneIndex] = true;
                 // We don't release key yet
             }
-            else if (isAutoPlay && note.isLong && note.beingHeld && currentTimeMs >= note.scheduledTime + note.duration) {
+            else if ((isAutoPlay || (assistSelect.value === 'auto_space' && note.laneIndex === 4)) && note.isLong && note.beingHeld && currentTimeMs >= note.scheduledTime + note.duration) {
                 // AUTO PLAY HOLD END
                 // The first block (line 536 in original) handles the end of hold if it's being held.
                 // But we need to ensure the key is released.
@@ -1650,8 +1649,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 let bodyColor = 'rgba(255, 255, 255, 0.5)';
                 if (config.color === '#7CA4FF')
                     bodyColor = 'rgba(124, 164, 255, 0.5)';
-                else if (config.color === '#e040fb')
-                    bodyColor = 'rgba(224, 64, 251, 0.5)';
+                else if (config.color === '#e040fb') {
+                    if (assistSelect.value === 'auto_space')
+                        bodyColor = 'rgba(0, 255, 0, 0.5)'; // Green for Auto
+                    else
+                        bodyColor = 'rgba(224, 64, 251, 0.5)';
+                }
                 const x = config.x;
                 const w = config.width;
                 const H_GAP = 2; // Horizontal Gap (shrink width)
@@ -1662,8 +1665,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 }
                 // Determine Skin Image
                 let skinImg = null;
-                if (config.label === 'SPACE')
-                    skinImg = SKIN.space;
+                if (config.label === 'SPACE') {
+                    if (assistSelect.value === 'auto_space')
+                        skinImg = null; // Use code color for Green
+                    else
+                        skinImg = SKIN.space;
+                }
                 else if (config.color === '#7CA4FF')
                     skinImg = SKIN.blue;
                 else
@@ -1685,7 +1692,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                         ctx.drawImage(skinImg, x + H_GAP, headY - (drawHeight / 2), w - (H_GAP * 2), drawHeight);
                     }
                     else {
-                        ctx.fillStyle = config.color;
+                        if (config.label === 'SPACE' && assistSelect.value === 'auto_space')
+                            ctx.fillStyle = '#00ff00';
+                        else
+                            ctx.fillStyle = config.color;
                         ctx.fillRect(x + H_GAP, headY - (drawHeight / 2), w - (H_GAP * 2), drawHeight);
                     }
                 }
@@ -1695,7 +1705,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                         ctx.drawImage(skinImg, x + H_GAP, noteY - (drawHeight / 2), w - (H_GAP * 2), drawHeight);
                     }
                     else {
-                        ctx.fillStyle = config.color;
+                        if (config.label === 'SPACE' && assistSelect.value === 'auto_space')
+                            ctx.fillStyle = '#00ff00';
+                        else
+                            ctx.fillStyle = config.color;
                         ctx.fillRect(x + H_GAP, noteY - (drawHeight / 2), w - (H_GAP * 2), drawHeight);
                     }
                 }
@@ -1910,8 +1923,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         isPaused = false;
         isCountdown = false;
         pauseOverlay.style.display = 'none';
-        if (currentSongData && currentChartFilename) {
-            loadSong(currentSongData, currentChartFilename); // Restart
+        if (currentSongFolder && currentChartFilename && currentSongAudio) {
+            loadSong(currentSongFolder, currentChartFilename, currentSongAudio); // Restart
         }
     }
     function quitGame() {
@@ -2000,6 +2013,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 descriptiveModifiers += "-white";
             else if ((assistSelect === null || assistSelect === void 0 ? void 0 : assistSelect.value) === 'space_boost')
                 descriptiveModifiers += "-boost";
+            else if ((assistSelect === null || assistSelect === void 0 ? void 0 : assistSelect.value) === 'auto_space')
+                descriptiveModifiers += "-AUTOSPACE";
             // 3. Random
             if ((randomSelect === null || randomSelect === void 0 ? void 0 : randomSelect.value) === 'shuffle_color')
                 descriptiveModifiers += "-RANDOM";
@@ -2068,7 +2083,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         });
     }
     if (btnChart) {
-        btnChart.addEventListener('click', () => __awaiter(void 0, void 0, void 0, function* () {
+        btnChart.addEventListener('click', () => __awaiter(this, void 0, void 0, function* () {
             if (startScreen)
                 startScreen.style.display = 'none'; // Hide Start Screen
             // 0. Initialize Audio Context (User Gesture)
@@ -2138,14 +2153,110 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         'no': 'Normal', 'st': 'Standard', 'ad': 'Advanced', 'pr': 'Provecta', 'et': 'Eternal'
     };
     const DIFF_COLORS = {
-        'no': '#4caf50', 'st': '#2196f3', 'ad': '#ffeb3b', 'pr': '#ff5722', 'et': '#9c27b0'
+        'no': '#4caf50', // Green
+        'st': '#2196f3', // Blue
+        'ad': '#f5deb3', // Wheat (小麦色)
+        'pr': '#f44336', // Red (Original)
+        'et': '#e040fb' // Purple (Eternal)
     };
+    const DIFF_FILTERS = {
+        'no': 'hue-rotate(120deg) saturate(1.2)', // Green
+        'st': 'hue-rotate(240deg) saturate(1.2)', // Blue
+        'ad': 'hue-rotate(40deg) brightness(1.7) saturate(0.6)', // Wheat
+        'pr': 'none', // Red (Original)
+        'et': 'hue-rotate(270deg) saturate(1.2)' // Purple
+    };
+    let selectedSongIndex = 0;
+    let availableSongs = [];
+    // Handle Song Select Navigation
+    window.addEventListener('keydown', (e) => {
+        if (songSelectOverlay.style.display === 'block') {
+            if (e.key.toLowerCase() === 'k') {
+                selectedSongIndex = (selectedSongIndex + 1) % availableSongs.length;
+                renderSongSelectInternal();
+                playSE('se_select'); // Assuming se_select exists or use se_decide? se_select usually cleaner.
+                // If se_select doesn't exist, use se_decide short?
+                // Using se_decide for now as it's confirmed existing
+            }
+            else if (e.key.toLowerCase() === 'd') {
+                selectedSongIndex = (selectedSongIndex - 1 + availableSongs.length) % availableSongs.length;
+                renderSongSelectInternal();
+                playSE('se_select');
+            }
+            else if (e.key.toLowerCase() === 's') {
+                // Mode Switch: Left
+                const modes = ['4key', '6key', '8key', '12key'];
+                const curIdx = modes.indexOf(selectedModeFilter);
+                const nextIdx = (curIdx - 1 + modes.length) % modes.length;
+                selectedModeFilter = modes[nextIdx];
+                updateModeTabsUI();
+                loadSongList();
+                playSE('se_select');
+            }
+            else if (e.key.toLowerCase() === 'l') {
+                // Mode Switch: Right
+                const modes = ['4key', '6key', '8key', '12key'];
+                const curIdx = modes.indexOf(selectedModeFilter);
+                const nextIdx = (curIdx + 1) % modes.length;
+                selectedModeFilter = modes[nextIdx];
+                updateModeTabsUI();
+                loadSongList();
+                playSE('se_select');
+            }
+        }
+    });
+    function updateModeTabsUI() {
+        const container = document.getElementById('mode-tabs-container');
+        if (container) {
+            Array.from(container.children).forEach((child) => {
+                const isSelected = child.textContent.toLowerCase().replace(' ', '') === selectedModeFilter;
+                child.style.background = isSelected ? '#00bcd4' : '#333';
+                child.style.border = isSelected ? '2px solid #00bcd4' : '2px solid #555';
+            });
+        }
+    }
     function loadSongList() {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const res = yield fetch(`songs/list.json?t=${Date.now()}`);
                 const list = yield res.json();
-                // Fetch High Scores
+                // Fetch Chart Details (Difficulty)
+                // We need to fetch every chart to know its internal difficulty setting
+                yield Promise.all(list.map((song) => __awaiter(this, void 0, void 0, function* () {
+                    song.chartInfos = {}; // filename -> { difficulty: string }
+                    if (song.charts) {
+                        const filenames = Object.keys(song.charts).map(k => song.charts[k]);
+                        // Deduplicate filenames to avoid double fetching
+                        const uniqueFilenames = [...new Set(filenames)];
+                        yield Promise.all(uniqueFilenames.map((filename) => __awaiter(this, void 0, void 0, function* () {
+                            try {
+                                const cRes = yield fetch(`songs/${song.folder}/${filename}?t=${Date.now()}`);
+                                if (cRes.ok) {
+                                    // handling BOM
+                                    const blob = yield cRes.blob();
+                                    const text = yield blob.text();
+                                    // simple parse, ignoring BOM for now or relying on JSON.parse laxity? 
+                                    // JSON.parse usually hates BOM.
+                                    const cleanText = text.replace(/^\uFEFF/, '');
+                                    const val = JSON.parse(cleanText);
+                                    song.chartInfos[filename] = {};
+                                    if (val.difficulty) {
+                                        song.chartInfos[filename].difficulty = val.difficulty;
+                                    }
+                                    if (val.level !== undefined) {
+                                        song.chartInfos[filename].level = val.level;
+                                    }
+                                    console.log(`Loaded metadata for ${filename}:`, song.chartInfos[filename]);
+                                }
+                            }
+                            catch (e) {
+                                // console.warn('Diff check failed', filename);
+                            }
+                        })));
+                    }
+                })));
+                availableSongs = list;
+                // Fetch High Scores (Keep existing logic)
                 let allScores = {};
                 try {
                     const scoresRes = yield fetch(`scores.json?t=${Date.now()}`);
@@ -2156,206 +2267,380 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 catch (e) {
                     console.error('Failed to fetch scores.json', e);
                 }
-                songListDiv.innerHTML = '';
-                list.forEach((song) => {
-                    const div = document.createElement('div');
-                    div.style.background = '#333';
-                    div.style.padding = '15px';
-                    div.style.marginBottom = '10px';
-                    div.style.border = '1px solid #555';
-                    div.style.display = 'flex';
-                    div.style.flexDirection = 'column';
-                    div.style.gap = '10px';
-                    // Header
-                    div.innerHTML = `
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <div>
-                            <div style="font-size:1.2em; color:white; font-weight:bold;">${song.title}</div>
-                            <div style="font-size:0.9em; color:#aaa;">${song.artist} | BPM: ${song.bpm}</div>
-                        </div>
-                    </div>
-                `;
-                    // Difficulty Buttons Container
-                    const btnContainer = document.createElement('div');
-                    btnContainer.style.display = 'flex';
-                    btnContainer.style.gap = '15px';
-                    btnContainer.style.marginTop = '5px';
-                    btnContainer.style.flexWrap = 'wrap';
-                    // Render Buttons
-                    if (song.charts) {
-                        let visibleButtons = 0;
-                        // Support dynamic keys like "et_6k" by finding all available charts first
-                        const allCharts = Object.keys(song.charts).map(chartKey => {
-                            const filename = song.charts[chartKey];
-                            let chartMode = '8key';
-                            const lower = filename.toLowerCase();
-                            if (lower.includes('4k'))
-                                chartMode = '4key';
-                            else if (lower.includes('6k'))
-                                chartMode = '6key';
-                            else if (lower.includes('12k'))
-                                chartMode = '12key';
-                            // Derive base difficulty (for icon/color) - "et_6k" -> "et"
-                            const baseDiff = chartKey.split('_')[0];
-                            return { chartKey, filename, chartMode, baseDiff };
-                        });
-                        // Sort according to DIFF_ORDER
-                        allCharts.sort((a, b) => {
-                            const idxA = DIFF_ORDER.indexOf(a.baseDiff);
-                            const idxB = DIFF_ORDER.indexOf(b.baseDiff);
-                            return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
-                        });
-                        allCharts.forEach(chart => {
-                            if (chart.chartMode !== selectedModeFilter)
-                                return;
-                            const diffKey = chart.baseDiff;
-                            const filename = chart.filename;
-                            visibleButtons++;
-                            const btnWrapper = document.createElement('div');
-                            btnWrapper.style.display = 'flex';
-                            btnWrapper.style.flexDirection = 'column';
-                            btnWrapper.style.alignItems = 'center';
-                            btnWrapper.style.gap = '5px';
-                            const btn = document.createElement('button');
-                            btn.style.border = 'none';
-                            btn.style.background = 'transparent';
-                            btn.style.cursor = 'pointer';
-                            btn.style.padding = '0';
-                            const img = document.createElement('img');
-                            img.src = `assets/diff_${diffKey}.png`;
-                            img.alt = diffKey.toUpperCase();
-                            img.style.height = '40px';
-                            img.style.objectFit = 'contain';
-                            img.style.display = 'block';
-                            // Hover effect
-                            img.onmouseover = () => img.style.filter = 'brightness(1.2)';
-                            img.onmouseout = () => img.style.filter = 'brightness(1.0)';
-                            // Fallback to text if image missing
-                            img.onerror = () => {
-                                btn.textContent = DIFF_LABELS[diffKey] || diffKey.toUpperCase();
-                                btn.style.padding = '5px 10px';
-                                btn.style.borderRadius = '4px';
-                                btn.style.color = '#fff';
-                                btn.style.fontWeight = 'bold';
-                                btn.style.background = DIFF_COLORS[diffKey] || '#777';
-                            };
-                            btn.appendChild(img);
-                            btn.onclick = (e) => {
-                                e.stopPropagation();
-                                if (selectedModeFilter === '12key')
-                                    playSE('se_decide_extra');
-                                else
-                                    playSE('se_decide');
-                                stopBGM();
-                                loadSong(song, filename);
-                            };
-                            btnWrapper.appendChild(btn);
-                            // High Score Label
-                            const songScores = allScores[song.id] || [];
-                            const overallBest = songScores
-                                .filter((s) => s.difficulty === filename)
-                                .sort((a, b) => b.score - a.score)[0];
-                            const myBest = songScores
-                                .filter((s) => s.difficulty === filename && s.playerName === currentPlayer)
-                                .sort((a, b) => b.score - a.score)[0];
-                            if (overallBest || myBest) {
-                                const scoreDiv = document.createElement('div');
-                                scoreDiv.style.fontSize = '10px';
-                                scoreDiv.style.color = '#ccc';
-                                scoreDiv.style.fontFamily = 'monospace';
-                                scoreDiv.style.marginTop = '2px';
-                                let text = '';
-                                if (myBest)
-                                    text += `My: ${myBest.score.toLocaleString()}`;
-                                if (overallBest && (!myBest || overallBest.score > myBest.score)) {
-                                    text += ` (Top: ${overallBest.score.toLocaleString()} ${overallBest.playerName})`;
-                                }
-                                scoreDiv.textContent = text;
-                                btnWrapper.appendChild(scoreDiv);
-                            }
-                            btnContainer.appendChild(btnWrapper);
-                        });
-                        if (visibleButtons === 0) {
-                            div.style.display = 'none';
-                        }
-                    }
-                    else if (song.chart) {
-                        // Legacy Fallback (Single Chart)
-                        // Infer mode for single chart too
-                        let chartMode = '8key';
-                        if (song.chart) {
-                            const lower = song.chart.toLowerCase();
-                            if (lower.includes('4k'))
-                                chartMode = '4key';
-                            else if (lower.includes('6k'))
-                                chartMode = '6key';
-                            else if (lower.includes('12k'))
-                                chartMode = '12key';
-                        }
-                        if (chartMode === selectedModeFilter) {
-                            const btn = document.createElement('button');
-                            btn.textContent = 'PLAY';
-                            btn.style.padding = '5px 15px';
-                            btn.style.background = '#e040fb';
-                            btn.style.border = 'none';
-                            btn.style.color = 'white';
-                            btn.style.cursor = 'pointer';
-                            btn.onclick = (e) => {
-                                e.stopPropagation();
-                                // Decide SE
-                                playSE('se_decide'); // Legacy charts are usually Normal/Hard, treat as Normal for now.
-                                // Or check mode?
-                                if (selectedModeFilter === '12key')
-                                    playSE('se_decide_extra');
-                                else
-                                    playSE('se_decide');
-                                loadSong(song, song.chart);
-                                stopBGM();
-                                // playSE('se_start'); // loadSong already plays se_start? 
-                                // Wait, loadSong had "playClickSound()" which was undefined.
-                                // I should remove playClickSound() from loadSong or define it.
-                                // NEW: User wants "Game Start Button" sound on start.
-                                // Where is "Game Start"? Title -> Select -> Song -> Load -> Start Countdown.
-                                // loadSong starts the sequence.
-                                // se_decide is for CHOOSING the song.
-                                // se_start is for TITLE SCREEN start? "Game Start Button Press".
-                                // Usage:
-                                // Title -> Click "Select Song" (Start Button?) -> se_start
-                                // Song Select -> Click Song -> se_decide
-                                // loadSong -> Countdown.
-                                // I put se_start on btnStartSelect above.
-                                // So here just se_decide.
-                                // And remove se_start from loadSong if I added it?
-                                // In step 616 I added:
-                                // loadSong(song, song.chart!);
-                                // stopBGM();
-                                // playSE('se_start');
-                                // This might be redundant or wrong if se_start is for Title.
-                                // Let's assume:
-                                // Title Screen Start -> se_start
-                                // Song Choose -> se_decide
-                            };
-                            btnContainer.appendChild(btn);
-                        }
-                        else {
-                            div.style.display = 'none';
-                        }
-                    }
-                    div.appendChild(btnContainer);
-                    songListDiv.appendChild(div);
-                });
+                window.currentAllScores = allScores;
+                // Initial Render
+                initSongSelect();
+                updateSongSelectVisuals();
             }
             catch (e) {
                 songListDiv.innerHTML = '<p style="color:red">Failed to load song list. Make sure "songs/list.json" exists.</p>';
             }
         });
     }
+    function initSongSelect() {
+        songListDiv.innerHTML = '';
+        songListDiv.style.display = 'flex';
+        songListDiv.style.flexDirection = 'row';
+        songListDiv.style.height = '100%';
+        songListDiv.style.overflow = 'hidden';
+        // --- LEFT COLUMN: Song Roll ---
+        const leftCol = document.createElement('div');
+        leftCol.id = 'song-select-left-col';
+        leftCol.style.flex = '1';
+        leftCol.style.display = 'flex';
+        leftCol.style.flexDirection = 'column';
+        leftCol.style.alignItems = 'center';
+        leftCol.style.justifyContent = 'center';
+        leftCol.style.overflow = 'hidden';
+        leftCol.style.position = 'relative';
+        const rollContainer = document.createElement('div');
+        rollContainer.id = 'song-roll-container';
+        rollContainer.style.display = 'flex';
+        rollContainer.style.flexDirection = 'column';
+        rollContainer.style.alignItems = 'center';
+        rollContainer.style.transition = 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)'; // Smooth ease-out
+        rollContainer.style.position = 'absolute';
+        rollContainer.style.top = '50%';
+        rollContainer.style.width = '100%';
+        // Render ALL songs into roll
+        availableSongs.forEach((song, idx) => {
+            const banner = document.createElement('div');
+            banner.className = 'song-banner'; // Class specifically for easier selection
+            banner.style.width = '400px';
+            banner.style.height = '100px'; // 4:1 aspect
+            banner.style.marginBottom = '20px';
+            banner.style.transition = 'all 0.3s cubic-bezier(0.25, 1, 0.5, 1)';
+            banner.style.backgroundSize = 'cover';
+            banner.style.backgroundPosition = 'center';
+            banner.style.borderRadius = '10px';
+            banner.style.border = '2px solid transparent';
+            banner.style.transformOrigin = 'center';
+            // Image
+            if (song.id === 'knight_of_nights') {
+                banner.style.backgroundImage = `url('assets/選曲ロゴ-ナイトオブナイツ.png')`;
+            }
+            else {
+                // Fallback / Placeholder
+                banner.style.backgroundColor = '#333';
+                banner.textContent = song.title; // Text if no image
+                banner.style.display = 'flex';
+                banner.style.justifyContent = 'center';
+                banner.style.alignItems = 'center';
+                banner.style.color = 'white';
+                banner.style.fontSize = '1.5em';
+                banner.style.fontWeight = 'bold';
+            }
+            rollContainer.appendChild(banner);
+        });
+        leftCol.appendChild(rollContainer);
+        songListDiv.appendChild(leftCol);
+        // --- RIGHT COLUMN: Diff Buttons ---
+        const rightCol = document.createElement('div');
+        rightCol.id = 'song-select-right-col';
+        rightCol.style.flex = '1';
+        rightCol.style.display = 'flex';
+        rightCol.style.flexDirection = 'column';
+        rightCol.style.alignItems = 'center';
+        rightCol.style.justifyContent = 'center';
+        rightCol.style.gap = '20px';
+        rightCol.style.background = 'rgba(0,0,0,0.5)'; // Slight dim backdrop
+        rightCol.style.borderLeft = '1px solid #444';
+        songListDiv.appendChild(rightCol);
+    }
+    function updateSongSelectVisuals() {
+        // Update Roll Transform
+        const rollContainer = document.getElementById('song-roll-container');
+        if (rollContainer) {
+            const translateY = -((selectedSongIndex * 120) + 50);
+            rollContainer.style.transform = `translateY(${translateY}px)`;
+            // Update Banner Styles
+            Array.from(rollContainer.children).forEach((child, idx) => {
+                const banner = child;
+                if (idx === selectedSongIndex) {
+                    banner.style.opacity = '1.0';
+                    banner.style.transform = 'scale(1.1)';
+                    banner.style.border = '2px solid #e040fb';
+                    banner.style.boxShadow = '0 0 20px rgba(224, 64, 251, 0.5)';
+                    banner.style.zIndex = '10';
+                }
+                else {
+                    banner.style.opacity = '0.5';
+                    banner.style.transform = 'scale(0.9)';
+                    banner.style.border = '2px solid transparent';
+                    banner.style.boxShadow = 'none';
+                    banner.style.zIndex = '1';
+                }
+            });
+        }
+        // Re-render Right Column (Diff Buttons) because selected song changed
+        renderRightColumn();
+    }
+    function renderRightColumn() {
+        const rightCol = document.getElementById('song-select-right-col');
+        if (!rightCol)
+            return;
+        rightCol.innerHTML = ''; // Clear old buttons
+        const song = availableSongs[selectedSongIndex];
+        const allScores = window.currentAllScores || {};
+        if (song && song.charts) {
+            // Title Header for Right Col
+            const title = document.createElement('h2');
+            title.textContent = song.title;
+            title.style.color = 'white';
+            title.style.marginBottom = '30px';
+            title.style.textShadow = '0 0 10px #e040fb';
+            rightCol.appendChild(title);
+            // Diff Buttons
+            // Fixed 5 slots: Normal, Standard, Advanced, Provecta, Eternal
+            const buttonOrder = ['no', 'st', 'ad', 'pr', 'et'];
+            // Need chartInfos map
+            const chartInfos = song.chartInfos || {};
+            // Horizontal Container for Icons
+            const btnContainer = document.createElement('div');
+            btnContainer.style.display = 'flex';
+            btnContainer.style.flexDirection = 'row';
+            btnContainer.style.flexWrap = 'wrap';
+            btnContainer.style.justifyContent = 'center';
+            btnContainer.style.gap = '30px';
+            btnContainer.style.marginTop = '20px';
+            rightCol.appendChild(btnContainer);
+            buttonOrder.forEach(diffKey => {
+                // Find chart for this diffKey AND selectedModeFilter
+                const charts = song.charts || {};
+                // Find a chartKey where the EFFECTIVE difficulty matches diffKey
+                const matchingKey = Object.keys(charts).find(k => {
+                    const filename = charts[k];
+                    const info = chartInfos[filename];
+                    // Determine Mode
+                    let mode = '8key';
+                    if (filename.toLowerCase().includes('4k'))
+                        mode = '4key';
+                    else if (filename.toLowerCase().includes('6k'))
+                        mode = '6key';
+                    else if (filename.toLowerCase().includes('12k'))
+                        mode = '12key';
+                    if (mode !== selectedModeFilter)
+                        return false;
+                    // Determine Difficulty
+                    let effectiveDiff = '';
+                    if (info && info.difficulty) {
+                        effectiveDiff = info.difficulty;
+                    }
+                    else {
+                        effectiveDiff = k.split('_')[0];
+                    }
+                    return effectiveDiff === diffKey;
+                });
+                const btn = document.createElement('div'); // Using div instead of button to avoid default styles
+                const label = DIFF_LABELS[diffKey];
+                const color = DIFF_COLORS[diffKey];
+                btn.style.display = 'flex';
+                btn.style.flexDirection = 'column';
+                btn.style.alignItems = 'center';
+                btn.style.cursor = matchingKey ? 'pointer' : 'default';
+                btn.style.transition = 'transform 0.2s';
+                if (matchingKey) {
+                    btn.onmouseover = () => btn.style.transform = 'scale(1.1)';
+                    btn.onmouseout = () => btn.style.transform = 'scale(1.0)';
+                }
+                const img = document.createElement('img');
+                // Determine Image Source
+                let imgSrc = '';
+                const filename = matchingKey ? charts[matchingKey] : '';
+                const chartInfo = filename ? chartInfos[filename] : null;
+                if (matchingKey && chartInfo && chartInfo.level && chartInfo.level > 0) {
+                    const levelStr = chartInfo.level.toString();
+                    // Robust encoding for Japanese filenames
+                    imgSrc = `assets/${encodeURIComponent('難易度ロゴ')}${levelStr}.png`;
+                }
+                else {
+                    // Use "No Chart" icon if missing or level not set
+                    imgSrc = `assets/${encodeURIComponent('難易度ロゴ譜面なし')}.png`;
+                }
+                img.src = imgSrc;
+                img.alt = `${diffKey.toUpperCase()}`;
+                img.style.height = '100px'; // Significantly larger
+                img.style.objectFit = 'contain';
+                img.style.display = 'block';
+                if (!matchingKey) {
+                    img.style.opacity = '0.2';
+                    img.style.filter = 'grayscale(1)';
+                }
+                else {
+                    img.style.filter = DIFF_FILTERS[diffKey] || 'none';
+                }
+                // Fallback to text if image missing
+                img.onerror = () => {
+                    img.style.display = 'none';
+                    const textSpan = document.createElement('span');
+                    textSpan.textContent = DIFF_LABELS[diffKey] || diffKey.toUpperCase();
+                    textSpan.style.color = matchingKey ? color : '#333';
+                    textSpan.style.fontSize = '1.5em';
+                    textSpan.style.fontWeight = 'bold';
+                    btn.prepend(textSpan);
+                };
+                btn.appendChild(img);
+                // Score display below icon
+                if (matchingKey) {
+                    const songScores = allScores[song.id] || [];
+                    const myBest = songScores
+                        .filter((s) => s.difficulty === filename && s.playerName === currentPlayer)
+                        .sort((a, b) => b.score - a.score)[0];
+                    if (myBest) {
+                        const scoreSpan = document.createElement('span');
+                        scoreSpan.textContent = myBest.score.toLocaleString();
+                        scoreSpan.style.fontSize = '1em';
+                        scoreSpan.style.color = '#fff';
+                        scoreSpan.style.marginTop = '10px';
+                        scoreSpan.style.textShadow = '0 0 5px rgba(0,0,0,0.8)';
+                        btn.appendChild(scoreSpan);
+                    }
+                    btn.onclick = (e) => {
+                        e.stopPropagation();
+                        if (selectedModeFilter === '12key')
+                            playSE('se_decide_extra');
+                        else
+                            playSE('se_decide');
+                        const targetChartName = charts[matchingKey];
+                        loadSong(song.folder, targetChartName, song.audio);
+                    };
+                }
+                btnContainer.appendChild(btn);
+            });
+        }
+    }
+    // Keep renderSongSelectInternal as a stub or remove usage?
+    // Key handler calls renderSongSelectInternal()
+    function renderSongSelectInternal() {
+        updateSongSelectVisuals();
+    }
+    // No need for scrollIntoView anymore
+    // --- RIGHT COLUMN: Diff Buttons ---
+    // --- RIGHT COLUMN: Diff Buttons ---
+    // This block is now handled by initSongSelect and renderRightColumn
+    // const rightCol = document.createElement('div');
+    // rightCol.style.flex = '1';
+    // rightCol.style.display = 'flex';
+    // rightCol.style.flexDirection = 'column';
+    // rightCol.style.alignItems = 'center';
+    // rightCol.style.justifyContent = 'center';
+    // rightCol.style.gap = '20px';
+    // rightCol.style.background = 'rgba(0,0,0,0.5)'; // Slight dim backdrop
+    // rightCol.style.borderLeft = '1px solid #444';
+    // const song = availableSongs[selectedSongIndex];
+    // if (song && song.charts) {
+    //     // Title Header for Right Col
+    //     const title = document.createElement('h2');
+    //     title.textContent = song.title;
+    //     title.style.color = 'white';
+    //     title.style.marginBottom = '30px';
+    //     title.style.textShadow = '0 0 10px #e040fb';
+    //     rightCol.appendChild(title);
+    //     // Diff Buttons
+    //     // Fixed 5 slots: Normal, Standard, Advanced, Provecta, Eternal
+    //     const buttonOrder = ['no', 'st', 'ad', 'pr', 'et'];
+    //     buttonOrder.forEach(diffKey => {
+    //         // Check if chart exists
+    //         let chartKey = '';
+    //         // Need to find key in song.charts that matches baseDiff
+    //         // e.g. "et", "et_6k", etc. based on SELECTED MODE?
+    //         // The prompt says "Right side has 5 difficulties... button function".
+    //         // Does it filter by Mode?
+    //         // Previously logic filtered by `selectedModeFilter`. Let's assume we maintain that.
+    //         // Find chart for this diffKey AND selectedModeFilter
+    //         const charts = song.charts || {};
+    //         const chartInfos = (song as any).chartInfos || {};
+    //         // Find a chartKey where the EFFECTIVE difficulty matches diffKey
+    //         const matchingKey = Object.keys(charts).find(k => {
+    //             const filename = charts[k];
+    //             const info = chartInfos[filename];
+    //             // Determine Mode
+    //             let mode = '8key';
+    //             if (filename.toLowerCase().includes('4k')) mode = '4key';
+    //             else if (filename.toLowerCase().includes('6k')) mode = '6key';
+    //             else if (filename.toLowerCase().includes('12k')) mode = '12key';
+    //             if (mode !== selectedModeFilter) return false;
+    //             // Determine Difficulty
+    //             // 1. JSON 'difficulty'
+    //             // 2. Key prefix (legacy)
+    //             let effectiveDiff = '';
+    //             if (info && info.difficulty) {
+    //                 effectiveDiff = info.difficulty;
+    //             } else {
+    //                 effectiveDiff = k.split('_')[0];
+    //             }
+    //             return effectiveDiff === diffKey;
+    //         });
+    //         const btn = document.createElement('button');
+    //         const label = DIFF_LABELS[diffKey];
+    //         const color = DIFF_COLORS[diffKey];
+    //         btn.style.width = '300px';
+    //         btn.style.height = '60px';
+    //         btn.style.fontSize = '1.2em';
+    //         btn.style.fontWeight = 'bold';
+    //         btn.style.color = 'white';
+    //         btn.style.background = matchingKey ? color : '#330000'; // Dim/Red if disabled? "Base image is Red" -> Red bg?
+    //         if (!matchingKey) {
+    //             // "Base is Red" - maybe standard unselected state? 
+    //             // User said: "Original image is Red... Eternal Purple..."
+    //             // If chart exists -> Color. If not -> Gray/Disabled? or Red?
+    //             // Let's use Red (#500) for disabled/missing states to match "Red base"? 
+    //             // Or maybe the user meant the button graphic is red. 
+    //             // I'll stick to Dark Red for disabled/missing.
+    //             btn.style.background = '#330000';
+    //             btn.style.opacity = '0.5';
+    //             btn.style.cursor = 'default';
+    //         } else {
+    //             btn.style.cursor = 'pointer';
+    //             btn.style.boxShadow = `0 0 10px ${color}`;
+    //             btn.style.border = `2px solid ${color}`;
+    //         }
+    //         btn.style.border = matchingKey ? `2px solid ${color}` : '1px solid #550000';
+    //         btn.style.display = 'flex';
+    //         btn.style.alignItems = 'center';
+    //         btn.style.justifyContent = 'space-between';
+    //         btn.style.padding = '0 20px';
+    //         btn.style.borderRadius = '10px'; // Rounded
+    //         // Inner content
+    //         btn.innerHTML = `<span>${label.toUpperCase()}</span>`;
+    //         if (matchingKey) {
+    //             btn.onclick = (e) => {
+    //                 e.stopPropagation();
+    //                 // Mode specific SE
+    //                 if (selectedModeFilter === '12key') playSE('se_decide_extra');
+    //                 else playSE('se_decide');
+    //                 stopBGM();
+    //                 loadSong(song, charts[matchingKey]);
+    //             };
+    //             // Add High Score if available
+    //             // Logic for score lookup
+    //             const filename = charts[matchingKey];
+    //             const songScores = allScores[song.id] || [];
+    //             const myBest = songScores
+    //                 .filter((s: any) => s.difficulty === filename && s.playerName === currentPlayer)
+    //                 .sort((a: any, b: any) => b.score - a.score)[0];
+    //             if (myBest) {
+    //                 const scoreSpan = document.createElement('span');
+    //                 scoreSpan.textContent = myBest.score.toLocaleString();
+    //                 scoreSpan.style.fontSize = '0.9em';
+    //                 scoreSpan.style.color = '#fff';
+    //                 btn.appendChild(scoreSpan);
+    //             }
+    //         }
+    //         rightCol.appendChild(btn);
+    //     });
+    // }
+    // songListDiv.appendChild(rightCol);
+    // }
     // State for Retry
     let currentChartFilename = '';
-    function loadSong(song, chartFilename) {
+    let currentSongFolder = '';
+    let currentSongAudio = '';
+    function loadSong(songFolder, chartFilename, audioFilename) {
         return __awaiter(this, void 0, void 0, function* () {
-            currentSongData = song; // Store for Retry
+            currentSongFolder = songFolder;
             currentChartFilename = chartFilename;
+            currentSongAudio = audioFilename;
             // 0. Init Audio & Show Loading
             if (loadingOverlay) {
                 loadingOverlay.style.display = 'flex';
@@ -2372,7 +2657,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             // 1. Fetch Audio & Chart
             try {
                 // Load Audio
-                console.log(`Loading audio: songs/${song.folder}/${song.audio}`);
+                console.log(`Loading audio: songs/${songFolder}/${audioFilename}`);
                 // Clean up previous video
                 if (bgVideo) {
                     bgVideo.pause();
@@ -2380,8 +2665,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     bgVideo = null;
                 }
                 isVideoReady = false;
+                // Find the song object from availableSongs
+                const song = availableSongs.find(s => s.folder === songFolder);
                 // Load Video if exists
-                if (song.video) {
+                if (song && song.video) {
                     console.log(`Loading video: songs/${song.folder}/${song.video}`);
                     bgVideo = document.createElement('video');
                     bgVideo.src = `songs/${song.folder}/${song.video}`;
@@ -2394,10 +2681,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     });
                     bgVideo.load();
                 }
-                const audioRes = yield fetch(`songs/${song.folder}/${song.audio}`);
+                const audioRes = yield fetch(`songs/${songFolder}/${audioFilename}`);
                 const audioBuf = yield audioRes.arrayBuffer();
                 audioBuffer = yield audioContext.decodeAudioData(audioBuf);
-                const chartRes = yield fetch(`songs/${song.folder}/${chartFilename}?t=${Date.now()}`);
+                const chartRes = yield fetch(`songs/${songFolder}/${chartFilename}?t=${Date.now()}`);
                 const chartText = yield chartRes.text();
                 // BOM removal not typically needed for fetch unless file saved with BOM
                 let text = chartText;

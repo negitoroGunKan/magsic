@@ -1,5 +1,6 @@
 {
-    "bpm": 200,
-    "offset": 0,
-    "notes": []
+  "bpm": 200,
+  "offset": 0,
+  "notes": [],
+  "difficulty": "ad"
 }

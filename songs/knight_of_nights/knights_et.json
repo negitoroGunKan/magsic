@@ -1,4 +1,6 @@
 {
+  "mode": "8key",
+  "difficulty": "et",
   "bpm": 180,
   "offset": 112,
   "notes": [
@@ -1013,5 +1015,6 @@
       "beat": 0,
       "type": "type-a"
     }
-  ]
+  ],
+  "level": 17
 }
