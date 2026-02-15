@@ -944,6 +944,7 @@
     };
 
     let currentBGM: HTMLAudioElement | null = null;
+    let currentSongBackground: HTMLImageElement | null = null;
 
     function loadAudioAssets() {
         const assets = [
@@ -1038,11 +1039,12 @@
     let laneStartX = 0;
 
     // Judgement Configuration (ms)
-    const THRESHOLD_PERFECT = 33;
-    const THRESHOLD_GREAT = 66;
-    const THRESHOLD_NICE = 100;
-    const THRESHOLD_BAD = 133;
-    const MISS_BOUNDARY = 150;
+    // Judgement Configuration (ms)
+    const THRESHOLD_PERFECT = 40;
+    const THRESHOLD_GREAT = 80;
+    const THRESHOLD_NICE = 133;
+    const THRESHOLD_BAD = 150;
+    const MISS_BOUNDARY = 180; // Explicit MISS window: 150-180ms
 
     // Stats
     interface ChartNote {
@@ -1680,6 +1682,9 @@
                 // Draw Video Frame
                 // Maintain Aspect Ratio? Or Fill? Fill for now.
                 ctx.drawImage(bgVideo, 0, 0, canvas.width, canvas.height);
+            } else if (currentSongBackground) {
+                // Song Specific Background
+                ctx.drawImage(currentSongBackground, 0, 0, canvas.width, canvas.height);
             } else if (SKIN.gameBg) {
                 // Fallback Image
                 ctx.drawImage(SKIN.gameBg, 0, 0, canvas.width, canvas.height);
@@ -2959,9 +2964,11 @@
 
     async function loadSong(songFolder: string, chartFilename: string, audioFilename: string) {
         performImageShutterTransition(async () => {
+            stopBGM(); // Stop selection BGM before loading game song
             currentSongFolder = songFolder;
             currentChartFilename = chartFilename;
             currentSongAudio = audioFilename;
+            currentSongBackground = null; // Reset background
 
             // Show internal loading if transition takes time
             if (loadingOverlay) {
@@ -2993,6 +3000,16 @@
                         isVideoReady = true;
                     });
                     bgVideo.load();
+                }
+
+
+                // Load Background Image if exists
+                if (song && (song as any).background) {
+                    const bgImg = new Image();
+                    bgImg.src = (song as any).background;
+                    bgImg.onload = () => {
+                        currentSongBackground = bgImg;
+                    };
                 }
 
                 const audioRes = await fetch(`songs/${songFolder}/${audioFilename}`);
@@ -3534,29 +3551,38 @@
                 const msError = msErrorRaw - globalOffset; // Apply User Offset
                 const absError = Math.abs(msError);
 
-                if (absError < THRESHOLD_BAD) {
+                if (absError < MISS_BOUNDARY) {
                     const sign = msError > 0 ? '+' : '';
+                    let msDisplay = `\n${sign}${Math.floor(msError)}ms`;
+                    if (absError <= 20) {
+                        msDisplay = ''; // Hide if error is small
+                    }
 
                     if (absError < THRESHOLD_PERFECT) {
-                        judgementText = `PERFECT\n${sign}${Math.floor(msError)}ms`;
+                        judgementText = `PERFECT${msDisplay}`;
                         judgementColor = '#00ffff';
                         addHit('perfect', msError);
                         spawnHitEffect(note.laneIndex, '#00ffff');
                     } else if (absError < THRESHOLD_GREAT) {
-                        judgementText = `GREAT\n${sign}${Math.floor(msError)}ms`;
+                        judgementText = `GREAT${msDisplay}`;
                         judgementColor = '#ffeb3b';
                         addHit('great', msError);
                         spawnHitEffect(note.laneIndex, '#ffeb3b');
                     } else if (absError < THRESHOLD_NICE) {
-                        judgementText = `NICE\n${sign}${Math.floor(msError)}ms`;
+                        judgementText = `NICE${msDisplay}`;
                         judgementColor = '#00ff00';
                         addHit('nice', msError);
                         spawnHitEffect(note.laneIndex, '#00ff00');
-                    } else {
-                        judgementText = `BAD\n${sign}${Math.floor(msError)}ms`;
+                    } else if (absError < THRESHOLD_BAD) {
+                        judgementText = `BAD${msDisplay}`;
                         judgementColor = '#ffae00';
                         addHit('bad', msError);
                         // No effect for BAD? optional
+                    } else {
+                        // 150ms - 180ms: Explicit MISS
+                        judgementText = `MISS${msDisplay}`;
+                        judgementColor = '#ff0000';
+                        addHit('miss', msError);
                     }
                     judgementTimer = 1000;
 

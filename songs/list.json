@@ -90,7 +90,10 @@
         "bpm": 150,
         "folder": "chromania",
         "audio": "Chronomia.wav",
-        "charts": {}
+        "background": "assets/Chromania背景.png",
+        "charts": {
+            "et_6k": "chromania_et_6k.json"
+        }
     },
     {
         "id": "shining_star",
