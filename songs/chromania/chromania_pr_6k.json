@@ -1,0 +1,31 @@
+{
+  "mode": "6key",
+  "difficulty": "pr",
+  "bpm": 227,
+  "offset": 35,
+  "notes": [
+    {
+      "beat": 0,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 0,
+      "lane": 4,
+      "duration": 0
+    },
+    {
+      "beat": 0,
+      "lane": 8,
+      "duration": 0
+    }
+  ],
+  "layoutChanges": [
+    {
+      "beat": 0.991,
+      "type": "type-a"
+    }
+  ],
+  "bpmChanges": [],
+  "level": 15
+}

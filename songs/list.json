@@ -8,8 +8,7 @@
         "audio": "netsu_ijo.mp3",
         "video": "pv.mp4",
         "charts": {
-            "no": "netsu_ijo_no.json",
-            "st": "netsu_ijo_st.json",
+            "no": "chart.json",
             "ad": "netsu_ijo_ad.json",
             "pr": "netsu_ijo_pr.json",
             "et": "netsu_ijo_et.json"
@@ -49,9 +48,6 @@
         "folder": "knight_of_nights",
         "audio": "knight_of_nights.wav",
         "charts": {
-            "no": "knights_no.json",
-            "st": "knights_st.json",
-            "ad": "knights_ad.json",
             "pr": "knights_pr.json",
             "et": "knights_et.json",
             "et_6k": "knight_of_nights_et_6k.json"
@@ -96,39 +92,52 @@
         }
     },
     {
-        "id": "shining_star",
-        "title": "シャイニングスター",
-        "artist": "魔王魂",
-        "bpm": 150,
-        "folder": "shining_star",
-        "audio": "シャイニングスター.wav",
-        "charts": {}
-    },
-    {
         "id": "kyuukurarin",
         "title": "きゅうくらりん",
         "artist": "いよわ",
         "bpm": 150,
         "folder": "kyuukurarin",
         "audio": "きゅうくらりん.mp3",
-        "charts": {}
+        "charts": {
+            "et_6k": "kyuukurarin_et_6k.json"
+        }
     },
     {
         "id": "amara",
         "title": "AMARA(大未来電脳)",
         "artist": "sasakure.UK",
-        "bpm": 150,
+        "bpm": 230,
         "folder": "amara",
         "audio": "ÅMARA(大未来電脳)  feat.mp3",
-        "charts": {}
+        "charts": {
+            "et_6k": "amara_et_6k.json"
+        }
+    },
+    {
+        "id": "shining_star",
+        "title": "Shining Star",
+        "artist": "Maou Damashii",
+        "bpm": 159,
+        "folder": "shining_star",
+        "audio": "シャイニングスター.wav",
+        "previewStart": 45,
+        "previewDuration": 15,
+        "charts": {
+            "no": "shining_star_no_6k.json",
+            "et_6k": "shining_star_et_6k.json"
+        }
     },
     {
         "id": "seimeisei_syndrome",
-        "title": "生命性シンドロウム",
-        "artist": "Unknown",
-        "bpm": 150,
+        "title": "生命性シンドロウム (feat. かぴ)",
+        "artist": "しゃろう",
+        "bpm": 225,
         "folder": "seimeisei_syndrome",
         "audio": "生命性シンドロウム (feat.mp3",
-        "charts": {}
+        "previewStart": 60,
+        "previewDuration": 15,
+        "charts": {
+            "et_6k": "seimeisei_syndrome_et_6k.json"
+        }
     }
 ]

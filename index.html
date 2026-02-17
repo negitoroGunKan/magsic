@@ -118,6 +118,45 @@
             flex-shrink: 0;
             transform: translateY(var(--shutter-y-offset));
         }
+
+        @keyframes pulse-text {
+            0% {
+                opacity: 0.5;
+                transform: scale(0.95);
+            }
+
+            50% {
+                opacity: 1;
+                transform: scale(1.05);
+            }
+
+            100% {
+                opacity: 0.5;
+                transform: scale(0.95);
+            }
+        }
+
+        .menu-item {
+            font-size: 2em;
+            color: #888;
+            padding: 20px 40px;
+            border: 2px solid transparent;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: monospace;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .menu-item.selected {
+            color: #fff;
+            background: rgba(224, 64, 251, 0.2);
+            border-color: #e040fb;
+            transform: scale(1.2);
+            box-shadow: 0 0 20px rgba(224, 64, 251, 0.4);
+            z-index: 10;
+        }
     </style>
 </head>
 
@@ -147,6 +186,15 @@
         <img id="shutter-img" src="assets/シャッター.png" alt="Shutter">
     </div>
 
+    <!-- Menu Overlay -->
+    <div id="menu-overlay"
+        style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:15; flex-direction:row; justify-content:center; align-items:center; gap: 40px;">
+        <div class="menu-item" id="menu-btn-play">PLAY</div>
+        <div class="menu-item" id="menu-btn-dani">段位認定</div>
+        <div class="menu-item" id="menu-btn-records">記録</div>
+        <div class="menu-item" id="menu-btn-back">戻る</div>
+    </div>
+
     <!-- Start Screen -->
     <div id="start-screen"
         style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: url('assets/backdrop1.png') no-repeat center center; background-size: cover; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10;">
@@ -156,7 +204,7 @@
             style="max-width: 900px; width: 80%; margin-bottom: 20px; z-index: 2; position: relative;">
         <p
             style="color: #fff; font-size: 1.2em; margin-bottom: 30px; letter-spacing: 1px; text-shadow: 0 0 5px black; z-index: 2; position: relative;">
-            initial 1.5.1</p>
+            initial 1.6.1</p>
 
         <div id="title-ui-content"
             style="display: flex; flex-direction: column; align-items: center; z-index: 2; position: relative;">
@@ -166,16 +214,12 @@
                 Player: Guest ▼
             </div>
 
-            <button id="btn-start-select"
-                style="padding: 20px 40px; font-size: 2em; background: #e040fb; color: white; border: none; border-radius: 50px; cursor: pointer; box-shadow: 0 0 20px rgba(224, 64, 251, 0.5); transition: transform 0.2s;">
-                SELECT SONG
-            </button>
-            <button id="btn-view-records"
-                style="margin-top: 15px; padding: 10px 20px; font-size: 1.2em; background: rgba(0,0,0,0.5); color: #00ffff; border: 1px solid #00ffff; border-radius: 25px; cursor: pointer; transition: all 0.2s;">
-                VIEW RECORDS
-            </button>
+            <p id="press-button-text"
+                style="color: #fff; font-family: 'Courier New', monospace; font-size: 2em; letter-spacing: 5px; animation: pulse-text 2s infinite;">
+                PRESS BUTTON
+            </p>
         </div>
-        <p style="margin-top:20px; color:#aaa; font-size: 0.9em;">MagsicBeat initial 1.5.1</p>
+        <p style="margin-top:20px; color:#aaa; font-size: 0.9em;">MagsicBeat initial 1.6.1</p>
     </div>
 
     <!-- Records Overlay -->
@@ -272,6 +316,16 @@
             </label>
         </div>
         <br>
+        <div style="margin-bottom: 20px;">
+            <label style="cursor: pointer; display: flex; align-items: center; gap: 10px;">
+                <span style="font-weight: bold; color: #fff;">Scroll Mode:</span>
+                <select id="scroll-mode-select"
+                    style="padding: 5px; background: #222; color: white; border: 1px solid #555; border-radius: 5px;">
+                    <option value="beat">Beat (Variable)</option>
+                    <option value="time">Time (Constant)</option>
+                </select>
+            </label>
+        </div>
         <label>
             Audio: <input type="file" id="audio-input" accept="audio/*">
         </label>

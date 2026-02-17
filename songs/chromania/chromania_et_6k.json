@@ -30,12 +30,12 @@
       "duration": 0
     },
     {
-      "beat": 6,
+      "beat": 5.5,
       "lane": 3,
       "duration": 0
     },
     {
-      "beat": 6,
+      "beat": 5.5,
       "lane": 10,
       "duration": 0
     },
@@ -3576,5 +3576,6 @@
       "type": "type-a"
     }
   ],
+  "bpmChanges": [],
   "level": 18
 }

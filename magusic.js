@@ -74,7 +74,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     const btnCalibrate = document.getElementById('btn-calibrate');
     const btnCancelCalibration = document.getElementById('btn-cancel-calibration');
     const btnSelectSong = document.getElementById('btn-select-song');
-    const btnStartSelect = document.getElementById('btn-start-select');
+    // btnStartSelect removed (using startScreen click instead)
     const btnViewRecords = document.getElementById('btn-view-records');
     const btnCloseSelect = document.getElementById('btn-close-select');
     const btnCloseResults = document.getElementById('btn-close-results');
@@ -282,6 +282,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     // (offsetInput, offsetDisplay, globalOffset handled at top)
     // Layout Selector
     // (currentLayoutType and targetLayoutType handled at top or below)
+    const scrollModeSelect = document.getElementById('scroll-mode-select'); // [NEW]
     const layoutRadios = document.getElementsByName('layout-type');
     layoutRadios.forEach(radio => {
         radio.addEventListener('change', (e) => {
@@ -325,25 +326,49 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     }
     // State
     let selectedModeFilter = '8key'; // Default to Legacy
-    if (btnStartSelect) {
-        btnStartSelect.addEventListener('click', () => {
+    // Start Screen Click Transition (Press Button)
+    if (startScreen) {
+        startScreen.addEventListener('click', () => {
+            console.log('Start Screen Clicked'); // DEBUG
+            // 1. Initialize Audio Context (User Gesture)
+            try {
+                initAudio();
+                console.log('Audio Context Initialized'); // DEBUG
+            }
+            catch (e) {
+                console.error('Audio Init Error:', e);
+            }
             performImageShutterTransition(() => {
+                console.log('Shutter Transition Middle Action - Opening Song Select'); // DEBUG
                 openSongSelectForReal();
             }).then(() => {
+                console.log('Shutter Transition Complete - Playing Select BGM'); // DEBUG
                 // Play Select BGM AFTER shutter opens
                 playBGM('bgm_select');
             });
         });
     }
     function openSongSelectForReal() {
-        if (startScreen)
+        console.log('openSongSelectForReal called'); // DEBUG
+        if (startScreen) {
             startScreen.style.display = 'none';
-        controlsDiv.classList.remove('open'); // Close drawer if open
-        songSelectOverlay.style.display = 'block';
+            console.log('startScreen display set to none'); // DEBUG
+        }
+        if (controlsDiv)
+            controlsDiv.classList.remove('open'); // Close drawer if open
+        if (songSelectOverlay) {
+            songSelectOverlay.style.display = 'flex'; // Fix: Use FLEX not BLOCK
+            console.log('songSelectOverlay display set to FLEX'); // DEBUG
+        }
+        else {
+            console.error('songSelectOverlay NOT FOUND');
+        }
         // Add Mode Tabs if not present
         if (!document.getElementById('mode-tabs-container')) {
+            console.log('Initializing Mode Tabs'); // DEBUG
             initModeTabs();
         }
+        console.log('Loading Song List...'); // DEBUG
         loadSongList();
     }
     // Wrap openSongSelect to handle transition if called elsewhere
@@ -560,6 +585,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         playerDisplay.textContent = `Player: ${currentPlayer} ▼`;
     if (playerDisplayInSelect)
         playerDisplayInSelect.textContent = `Player: ${currentPlayer} ▼`;
+    let scrollMode = 'beat';
     // --- Per-Player Settings Logic ---
     function loadPlayerSettings() {
         const key = `magsic_settings_${currentPlayer}`;
@@ -613,6 +639,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     if (laneCoverSpeedDisplay)
                         laneCoverSpeedDisplay.textContent = laneCoverSpeedMult.toFixed(1);
                 }
+                if (settings.scrollMode) {
+                    scrollMode = settings.scrollMode;
+                    if (scrollModeSelect)
+                        scrollModeSelect.value = scrollMode;
+                }
                 resize(); // Apply loaded lane width
             }
             else {
@@ -647,7 +678,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 enabled: isLaneCoverEnabled,
                 height: laneCoverHeight,
                 speed: laneCoverSpeedMult
-            }
+            },
+            scrollMode: scrollModeSelect ? scrollModeSelect.value : 'beat'
         };
         localStorage.setItem(key, JSON.stringify(settings));
     }
@@ -790,6 +822,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     }
     // Option Drawer Toggle
     // (btnOptionsToggle and controlsDiv handled at top)
+    if (scrollModeSelect) {
+        scrollModeSelect.addEventListener('change', () => {
+            savePlayerSettings();
+        });
+    }
     if (btnOptionsToggle && controlsDiv) {
         btnOptionsToggle.addEventListener('click', (e) => {
             e.stopPropagation(); // Stop bubbling
@@ -944,6 +981,38 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     let bgVideo = null;
     let isVideoReady = false;
     let chart = null;
+    let bpmChanges = [];
+    // Helper: Beat <-> Time Conversions (Global Re-use)
+    function getTimeFromBeat(beat) {
+        if (bpmChanges.length === 0)
+            return 0;
+        let lastBp = bpmChanges[0];
+        for (let i = 1; i < bpmChanges.length; i++) {
+            if (bpmChanges[i].beat <= beat) {
+                lastBp = bpmChanges[i];
+            }
+            else {
+                break;
+            }
+        }
+        const msPerBeat = 60000 / lastBp.bpm;
+        return lastBp.time + ((beat - lastBp.beat) * msPerBeat);
+    }
+    function getBeatFromTime(time) {
+        if (bpmChanges.length === 0)
+            return 0;
+        let lastBp = bpmChanges[0];
+        for (let i = 1; i < bpmChanges.length; i++) {
+            if (bpmChanges[i].time <= time) {
+                lastBp = bpmChanges[i];
+            }
+            else {
+                break;
+            }
+        }
+        const msPerBeat = 60000 / lastBp.bpm;
+        return lastBp.beat + (time - lastBp.time) / msPerBeat;
+    }
     let stats = {
         perfect: 0, great: 0, nice: 0, bad: 0, miss: 0, combo: 0, maxCombo: 0, totalErrorMs: 0, hitCount: 0, score: 0
     };
@@ -1199,7 +1268,16 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         audioSource = audioContext.createBufferSource();
         audioSource.buffer = audioBuffer;
         audioSource.connect(audioContext.destination);
-        audioSource.start(0, offset);
+        // Fix for negative offset (e.g. resuming during start sequence)
+        if (offset < 0) {
+            // Schedule start in the future
+            const delay = -offset;
+            audioSource.start(audioContext.currentTime + delay, 0);
+        }
+        else {
+            // Start immediately from offset
+            audioSource.start(0, offset);
+        }
         audioStartTime = audioContext.currentTime - offset;
         audioSource.onended = () => {
             // Only trigger if we reached the actual end and are still playing normally
@@ -1246,10 +1324,30 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         // Current time in seconds
         return Math.max(0, audioContext.currentTime - audioStartTime);
     }
-    function getNoteY(scheduledTime) {
-        const currentTimeMs = getAudioTime() * 1000;
-        const speed = currentNoteSpeed * (isLaneCoverEnabled ? laneCoverSpeedMult : 1.0);
-        return HIT_Y - (scheduledTime - currentTimeMs) * speed;
+    function getNoteY(scheduledTime, beat = 0) {
+        if (scrollMode === 'beat') {
+            // Beat Based: Constant Space Per Beat.
+            // We use 120 BPM (500ms/beat) as the reference for "speed".
+            // Pixels = (BeatDiff) * (Speed * RefPixelsPerBeat).
+            // RefPixelsPerBeat = 500 (ms) equivalent.
+            // So: Y = HIT_Y - (noteBeat - currentBeat) * (speed * 500)
+            // But speed is multiplier * BASE (0.6).
+            // Let's rely on pixel distance.
+            // TimeMode: dist = timeDiff * speed.
+            // BeatMode: dist = beatDiff * (speed * 500).
+            const currentBeat = getBeatFromTime(getAudioTime() * 1000);
+            const distBeats = beat - currentBeat;
+            // Apply Lane Cover Speed if enabled (assumes cover affects scroll speed visually)
+            const effectiveSpeed = currentNoteSpeed * (isLaneCoverEnabled ? laneCoverSpeedMult : 1.0);
+            // 500 is the constant to match 120 BPM feel
+            return HIT_Y - distBeats * 500 * effectiveSpeed;
+        }
+        else {
+            // Time Based (Legacy)
+            const currentTimeMs = getAudioTime() * 1000;
+            const speed = currentNoteSpeed * (isLaneCoverEnabled ? laneCoverSpeedMult : 1.0);
+            return HIT_Y - (scheduledTime - currentTimeMs) * speed;
+        }
     }
     function getSpawnAheadTime() {
         const speed = currentNoteSpeed * (isLaneCoverEnabled ? laneCoverSpeedMult : 1.0);
@@ -1274,7 +1372,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             shutterOverlay.style.setProperty('--shutter-scale', '2.8'); // Slightly larger for safety
         }
     }
-    function spawnNote(laneIndex, scheduledTime, isLong = false, duration = 0) {
+    // Overload or just update spawnNote call sites?
+    // Let's update spawnNote signature.
+    function spawnNote(laneIndex, scheduledTime, isLong, duration, beat) {
         notes.push({
             laneIndex: laneIndex,
             scheduledTime: scheduledTime,
@@ -1282,7 +1382,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             isLong: isLong,
             duration: duration,
             processed: false,
-            beingHeld: false
+            beingHeld: false,
+            beat: beat
         });
     }
     function update(deltaTime) {
@@ -1331,7 +1432,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             if (Math.random() < 0.02) {
                 const lane = Math.floor(Math.random() * KEYS.length);
                 const spawnAheadTime = getSpawnAheadTime();
-                spawnNote(lane, currentTimeMs + spawnAheadTime, Math.random() < 0.2, Math.random() * 500);
+                // Random mode beats are approximate or just ignore beat-scrolling
+                const noteTime = currentTimeMs + spawnAheadTime;
+                // Ensure valid beat for random mode
+                let noteBeat = 0;
+                if (bpmChanges.length > 0) {
+                    noteBeat = getBeatFromTime(noteTime);
+                }
+                spawnNote(lane, noteTime, Math.random() < 0.2, Math.random() * 500, noteBeat);
             }
         }
         else {
@@ -1343,7 +1451,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 // We should spawn if (noteData.time - currentTime) * speed < HIT_Y
                 // i.e. noteData.time < currentTime + spawnAheadTime
                 if (noteData.time <= currentTimeMs + spawnAheadTime) {
-                    spawnNote(noteData.lane, noteData.time, noteData.duration > 0, noteData.duration);
+                    spawnNote(noteData.lane, noteData.time, noteData.duration > 0, noteData.duration, noteData.beat);
                     nextNoteIndex++;
                 }
                 else {
@@ -1472,6 +1580,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             judgementTimer -= deltaTime;
     }
     function draw() {
+        var _a;
         if (!ctx)
             return;
         // Clear / Draw Background
@@ -1523,6 +1632,67 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 ctx.stroke();
             }
         });
+        // Draw Beat Grid (Measure Lines) [NEW]
+        if (bpmChanges.length > 0) {
+            const currentTime = getAudioTime(); // seconds
+            const currentTimeMs = currentTime * 1000;
+            const speed = currentNoteSpeed * (isLaneCoverEnabled ? laneCoverSpeedMult : 1.0);
+            // We need to draw lines that are within the visible range
+            // Visible range: [currentTimeMs, currentTimeMs + (HIT_Y / speed) + margin] (roughly)
+            // But since lines move down, a line at time T has Y = HIT_Y - (T - current) * speed
+            // Visible if Y >= 0 && Y <= canvas.height
+            // 0 <= HIT_Y - (T - C) * speed <= H
+            // ... solving for T is complex, simpler to iterate segments that overlap visible time.
+            // Visible Time Window
+            const maxVisibleTime = currentTimeMs + (HIT_Y / speed) + 2000; // Extra buffer
+            const minVisibleTime = currentTimeMs - ((canvas.height - HIT_Y) / speed) - 1000;
+            const allChanges = [{ time: -999999, bpm: ((_a = bpmChanges[0]) === null || _a === void 0 ? void 0 : _a.bpm) || 120, beat: 0 }, ...bpmChanges];
+            // Sort just in case
+            allChanges.sort((a, b) => a.time - b.time);
+            for (let i = 0; i < allChanges.length; i++) {
+                const change = allChanges[i];
+                const nextChange = allChanges[i + 1];
+                // Segment Time Range
+                const segStart = Math.max(minVisibleTime, change.time);
+                const segEnd = nextChange ? Math.min(maxVisibleTime, nextChange.time) : maxVisibleTime;
+                if (segStart < segEnd) {
+                    const msPerBeat = 60000 / change.bpm;
+                    // We want to iterate GLOBAL beats 'g'
+                    // Time(g) = change.time + (g - change.beat) * msPerBeat
+                    // Find smallest integer 'g' such that Time(g) >= segStart
+                    // change.time + (g - change.beat) * msPerBeat >= segStart
+                    // (g - change.beat) >= (segStart - change.time) / msPerBeat
+                    // g >= change.beat + (segStart - change.time) / msPerBeat
+                    const minGlobalBeat = change.beat + (segStart - change.time) / msPerBeat;
+                    const startGlobalBeat = Math.ceil(minGlobalBeat);
+                    // Safety break
+                    let safeguard = 0;
+                    for (let g = startGlobalBeat; safeguard < 1000; g++) {
+                        safeguard++;
+                        const beatTime = change.time + (g - change.beat) * msPerBeat;
+                        if (beatTime > segEnd + 1)
+                            break;
+                        // Measure line? (Assuming 4/4)
+                        // Use epsilon for float safety if g was float, but here g is integer loop
+                        // But change.beat might be float, so g is integer? Yes, we ceil to integer.
+                        const isMeasure = (g % 4 === 0);
+                        const y = HIT_Y - (beatTime - currentTimeMs) * speed;
+                        if (isMeasure) {
+                            ctx.strokeStyle = '#888';
+                            ctx.lineWidth = 2;
+                        }
+                        else {
+                            ctx.strokeStyle = '#444'; // Faint beat line
+                            ctx.lineWidth = 1;
+                        }
+                        ctx.beginPath();
+                        ctx.moveTo(0, y);
+                        ctx.lineTo(canvas.width, y);
+                        ctx.stroke();
+                    }
+                }
+            }
+        }
         // Draw Target Line
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 3;
@@ -1735,9 +1905,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 else
                     skinImg = SKIN.white;
                 if (note.isLong) {
-                    const tailTime = note.scheduledTime + note.duration;
-                    const headY = getNoteY(note.scheduledTime);
-                    const tailY = getNoteY(tailTime);
+                    const headY = getNoteY(note.scheduledTime, note.beat);
+                    // Calculate tail beat
+                    // We can approximate or calculate exactly.
+                    // note.duration is time.
+                    const tailBeat = getBeatFromTime(note.scheduledTime + note.duration);
+                    const tailY = getNoteY(note.scheduledTime + note.duration, tailBeat);
                     // Set transparency for long notes (50% as requested)
                     const originalAlpha = ctx.globalAlpha;
                     ctx.globalAlpha = 0.5;
@@ -1759,7 +1932,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     }
                 }
                 else {
-                    const noteY = getNoteY(note.scheduledTime);
+                    const noteY = getNoteY(note.scheduledTime, note.beat);
+                    if (noteY > canvas.height + 100)
+                        return; // Optimization check?
+                    // Draw regular note
+                    // ...
                     if (skinImg) {
                         ctx.drawImage(skinImg, x + H_GAP, noteY - (drawHeight / 2), w - (H_GAP * 2), drawHeight);
                     }
@@ -2132,6 +2309,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             currentMode = 'random';
             isPlaying = true;
             resetStats();
+            // Ensure BPM changes exist for random mode (beat calculation)
+            bpmChanges = [{ beat: 0, bpm: 120, time: 0 }];
             notes.length = 0;
             stopAudio();
             if (controlsDiv)
@@ -2229,7 +2408,20 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     let availableSongs = [];
     // Handle Song Select Navigation
     window.addEventListener('keydown', (e) => {
-        if (songSelectOverlay.style.display === 'block') {
+        // Fix: Allow 'flex' or just check not hidden
+        if (songSelectOverlay.style.display !== 'none') {
+            // ESCAPE to Close
+            if (e.key === 'Escape') {
+                if (isInfosLoading)
+                    return; // Prevent closing if loading (fixes spam bug)
+                playSE('se_cancel');
+                songSelectOverlay.style.display = 'none';
+                if (startScreen)
+                    startScreen.style.display = 'flex';
+                playBGM('bgm_title');
+                return;
+            }
+            console.log('Song Select Nav Key:', e.key); // DEBUG
             if (e.key.toLowerCase() === 'k') {
                 selectedSongIndex = (selectedSongIndex + 1) % availableSongs.length;
                 renderSongSelectInternal();
@@ -2274,8 +2466,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             });
         }
     }
+    let isInfosLoading = false;
     function loadSongList() {
         return __awaiter(this, void 0, void 0, function* () {
+            if (isInfosLoading)
+                return;
+            isInfosLoading = true;
+            // Show loading indicator if needed, or just rely on speed
+            // songListDiv.innerHTML = '<p style="color:white; padding:20px;">Loading...</p>';
             try {
                 const res = yield fetch(`songs/list.json?t=${Date.now()}`);
                 const list = yield res.json();
@@ -2330,24 +2528,66 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 // Initial Render
                 initSongSelect();
                 updateSongSelectVisuals();
+                isInfosLoading = false;
             }
             catch (e) {
                 songListDiv.innerHTML = '<p style="color:red">Failed to load song list. Make sure "songs/list.json" exists.</p>';
+                isInfosLoading = false;
             }
         });
     }
     function initSongSelect() {
         songListDiv.innerHTML = '';
         songListDiv.style.display = 'flex';
-        songListDiv.style.flexDirection = 'row';
-        songListDiv.style.height = '100%';
         songListDiv.style.overflow = 'hidden';
+        songListDiv.style.flexDirection = 'column'; // Change to column to allow Header + Content
+        // --- Header: Mode Tabs ---
+        const header = document.createElement('div');
+        header.style.width = '100%';
+        header.style.height = '60px'; // Header height
+        header.style.background = '#222';
+        header.style.borderBottom = '1px solid #444';
+        header.style.display = 'flex';
+        header.style.justifyContent = 'center';
+        header.style.alignItems = 'center';
+        header.style.gap = '20px';
+        header.id = 'mode-tabs-container';
+        const modes = ['4key', '6key', '8key', '12key'];
+        modes.forEach(mode => {
+            const tab = document.createElement('div');
+            tab.textContent = mode.toUpperCase(); // e.g. "4KEY"
+            tab.style.padding = '10px 20px';
+            tab.style.cursor = 'pointer';
+            tab.style.color = 'white';
+            tab.style.fontWeight = 'bold';
+            tab.style.borderBottom = '3px solid transparent';
+            tab.style.transition = 'all 0.2s';
+            tab.addEventListener('click', () => {
+                selectedModeFilter = mode;
+                updateModeTabsUI();
+                playSE('se_select');
+                // Re-render Song Select to update checks/diffs
+                // Actually, renderRightColumn updates diffs. renderSongSelectInternal updates left?
+                // Left column doesn't filter by mode (shows all songs).
+                // Right column filters by mode.
+                renderRightColumn();
+            });
+            header.appendChild(tab);
+        });
+        songListDiv.appendChild(header);
+        // --- Main Content Area (Columns) ---
+        const contentArea = document.createElement('div');
+        contentArea.style.flex = '1';
+        contentArea.style.display = 'flex';
+        contentArea.style.width = '100%';
+        contentArea.style.overflow = 'hidden';
+        songListDiv.appendChild(contentArea);
         // --- LEFT COLUMN: Song Roll ---
         const leftCol = document.createElement('div');
         leftCol.id = 'song-select-left-col';
         leftCol.style.flex = '1';
         leftCol.style.display = 'flex';
-        leftCol.style.flexDirection = 'column';
+        leftCol.style.flexDirection = 'column'; // ... rest of existing leftCol style
         leftCol.style.alignItems = 'center';
         leftCol.style.justifyContent = 'center';
         leftCol.style.overflow = 'hidden';
@@ -2374,9 +2614,16 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             banner.style.borderRadius = '10px';
             banner.style.border = '2px solid transparent';
             banner.style.transformOrigin = 'center';
+            banner.style.cursor = 'pointer';
             // Image
             if (song.id === 'knight_of_nights') {
                 banner.style.backgroundImage = `url('assets/選曲ロゴ-ナイトオブナイツ.png')`;
+            }
+            else if (song.id === 'shining_star') {
+                banner.style.backgroundImage = `url('assets/選曲ロゴ-シャイニングスター.png')`;
+            }
+            else if (song.id === 'seimeisei_syndrome') {
+                banner.style.backgroundImage = `url('assets/選曲ロゴ-生命性シンドロウム.png')`;
             }
             else {
                 // Fallback / Placeholder
@@ -2389,10 +2636,16 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 banner.style.fontSize = '1.5em';
                 banner.style.fontWeight = 'bold';
             }
+            // Allow clicking banner to select
+            banner.addEventListener('click', () => {
+                selectedSongIndex = idx;
+                renderSongSelectInternal();
+                playSE('se_select');
+            });
             rollContainer.appendChild(banner);
         });
         leftCol.appendChild(rollContainer);
-        songListDiv.appendChild(leftCol);
+        contentArea.appendChild(leftCol); // Append to contentArea
         // --- RIGHT COLUMN: Diff Buttons ---
         const rightCol = document.createElement('div');
         rightCol.id = 'song-select-right-col';
@@ -2404,7 +2657,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         rightCol.style.gap = '20px';
         rightCol.style.background = 'rgba(0,0,0,0.5)'; // Slight dim backdrop
         rightCol.style.borderLeft = '1px solid #444';
-        songListDiv.appendChild(rightCol);
+        contentArea.appendChild(rightCol); // Append to contentArea
     }
     function updateSongSelectVisuals() {
         // Update Roll Transform
@@ -2828,23 +3081,68 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         // Audio will be triggered in update() when getAudioTime() >= 0
     }
     function parseChart(json) {
-        const bpm = json.bpm || 120;
         const offset = json.offset || 0;
-        const msPerBeat = 60000 / bpm;
+        // 1. Parse BPM Changes
+        bpmChanges = [];
+        if (json.bpmChanges && Array.isArray(json.bpmChanges)) {
+            // New Format
+            json.bpmChanges.forEach((bc) => {
+                bpmChanges.push({
+                    beat: bc.beat,
+                    bpm: bc.bpm,
+                    time: 0 // Will Calculate
+                });
+            });
+            bpmChanges.sort((a, b) => a.beat - b.beat);
+        }
+        else {
+            // Legacy / Single BPM
+            bpmChanges.push({
+                beat: 0,
+                bpm: json.bpm || 120,
+                time: 0
+            });
+        }
+        // 2. Calculate Times for BPM Changes
+        // We need a base time. The first BPM change usually starts at beat 0, time 'offset'.
+        // If there are negative beats, we might need backward calc, but let's assume forwards.
+        // Always ensure there's a change at beat 0 or earlier?
+        // If the first change is at beat 10, what is the BPM before that?
+        // Usually implied initial BPM.
+        // Let's assume the first entry in bpmChanges IS the initial one if beat is 0.
+        // If not, we prepend one?
+        if (bpmChanges.length === 0 || bpmChanges[0].beat > 0) {
+            bpmChanges.unshift({ beat: 0, bpm: json.bpm || 120, time: 0 });
+        }
+        let cTime = offset;
+        let cBeat = 0;
+        let cBpm = bpmChanges[0].bpm;
+        bpmChanges[0].time = offset; // Base time
+        for (let i = 0; i < bpmChanges.length; i++) {
+            const bc = bpmChanges[i];
+            if (i > 0) {
+                const prev = bpmChanges[i - 1];
+                const beatsPassed = bc.beat - prev.beat;
+                const msPerBeat = 60000 / prev.bpm;
+                bc.time = prev.time + (beatsPassed * msPerBeat);
+            }
+        }
+        // Helpers moved to global scope
         // Parse Notes
         const notes = json.notes.map((n) => ({
-            time: offset + (n.beat * msPerBeat),
+            time: getTimeFromBeat(n.beat),
             lane: n.lane,
-            duration: (n.duration || 0) * msPerBeat,
+            duration: n.duration ? (getTimeFromBeat(n.beat + n.duration) - getTimeFromBeat(n.beat)) : 0,
             isLong: (n.duration > 0),
-            hit: false
+            hit: false,
+            beat: n.beat // Store beat for scrolling
         })).sort((a, b) => a.time - b.time);
         // Parse Layout Changes
         layoutChanges = [];
         if (Array.isArray(json.layoutChanges)) {
             json.layoutChanges.forEach((lc) => {
                 layoutChanges.push({
-                    time: offset + (lc.beat * msPerBeat),
+                    time: getTimeFromBeat(lc.beat),
                     type: lc.type
                 });
             });
@@ -2939,6 +3237,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         return modified;
     }
     function generateAutoChart(bpm, durationSec) {
+        // Initialize BPM for grid
+        bpmChanges = [{ time: 0, bpm: bpm, beat: 0 }];
         const msPerBeat = 60000 / bpm;
         const totalBeats = (durationSec * 1000) / msPerBeat;
         const data = [];
@@ -2949,7 +3249,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 lane: laneMap[i % 4],
                 duration: 0,
                 isLong: false,
-                hit: false
+                hit: false,
+                beat: i // Assign beat
             });
         }
         return data;
@@ -3215,11 +3516,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             }
         }
         const keyIndex = KEYS.indexOf(e.key.toLowerCase());
+        console.log(`Key: ${keyLower}, Index: ${keyIndex}, Mode: ${currentKeyMode}`); // DEBUG
         // Filter by Mode
         if (keyIndex !== -1) {
             const allowedIndices = GAME_MODES[currentKeyMode].indices;
-            if (!allowedIndices.includes(keyIndex))
+            if (!allowedIndices.includes(keyIndex)) {
+                console.log(`Key ${keyIndex} NOT ALLOWED in ${currentKeyMode}`); // DEBUG
                 return;
+            }
         }
         if (keyIndex !== -1 && !pressedKeys[keyIndex]) {
             pressedKeys[keyIndex] = true;
@@ -3344,7 +3648,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     }
     // Attach to UI Buttons
     const uiButtons = [
-        btnSelectSong, btnCloseSelect, btnStartSelect,
+        btnSelectSong, btnCloseSelect, // btnStartSelect removed
         btnResume, btnRetry, btnQuit, btnCloseResults,
         btnPauseUI, btnCalibrate, btnCancelCalibration,
         btnOptionsToggle, btnRandom, btnChart,
