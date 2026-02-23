@@ -1694,7 +1694,8 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         for (let i = notes.length - 1; i >= 0; i--) {
             const note = notes[i];
             const tailTime = note.scheduledTime + note.duration;
-            const tailY = getNoteY(tailTime);
+            const tailBeat = getBeatFromTime(tailTime);
+            const tailY = getNoteY(tailTime, tailBeat);
 
             // 1. Check if Off Screen
             if (tailY > canvas.height + 100) {

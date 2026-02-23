@@ -1384,7 +1384,8 @@ AUTO`;
       for (let i = notes.length - 1; i >= 0; i--) {
         const note = notes[i];
         const tailTime = note.scheduledTime + note.duration;
-        const tailY = getNoteY(tailTime);
+        const tailBeat = getBeatFromTime$1(tailTime);
+        const tailY = getNoteY(tailTime, tailBeat);
         if (tailY > canvas.height + 100) {
           if (note.active) {
             note.active = false;
