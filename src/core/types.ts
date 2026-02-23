@@ -13,6 +13,7 @@ export interface ChartNote {
   isLong: boolean;
   hit: boolean;
   beat: number;
+  visualY?: number;
 }
 
 export type JudgmentType = 'perfect' | 'great' | 'nice' | 'bad' | 'miss';
