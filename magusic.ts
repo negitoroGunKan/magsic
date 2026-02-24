@@ -1,3 +1,12 @@
+import type { BPMChange, ChartNote, JudgmentType, GaugeType, KeyMode } from './src/core/types';
+import type { LayoutChangeEvent } from './src/core/chart';
+import { getTimeFromBeat as _getTimeFromBeat, getBeatFromTime as _getBeatFromTime } from './src/core/bpm';
+import { JUDGMENT_THRESHOLDS } from './src/core/judgment';
+import { SCORE_WEIGHTS, calculateMaxScore, calculateLoss, calculateScore } from './src/core/score';
+import { getInitialHealth, applyGaugeHit, isTrackCleared } from './src/core/gauge';
+import { parseChart as _parseChart } from './src/core/chart';
+import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src/core/modifiers';
+
 (() => {
     console.log('Magusic script executing...');
 
@@ -5,7 +14,6 @@
     const BASE_NOTE_SPEED = 0.5;
     let currentNoteSpeed = BASE_NOTE_SPEED * 2.5;
     const KEYS = ['e', 'd', 'r', 'f', ' ', 'u', 'j', 'i', 'k', 's', 'l', 'w', 'o'];
-    type KeyMode = '4key' | '6key' | '8key' | '12key';
     const GAME_MODES: { [key in KeyMode]: { indices: number[], label: string } } = {
         '4key': { indices: [1, 3, 6, 8, 4], label: '4 KEY' },
         '6key': { indices: [9, 1, 3, 6, 8, 10, 4], label: '6 KEY' },
@@ -1076,29 +1084,15 @@
     let LANE_CONFIGS: LaneConfig[] = [];
     let laneStartX = 0;
 
-    // Judgement Configuration (ms)
-    // Judgement Configuration (ms)
-    const THRESHOLD_PERFECT = 40;
-    const THRESHOLD_GREAT = 80;
-    const THRESHOLD_NICE = 133;
-    const THRESHOLD_BAD = 150;
-    const MISS_BOUNDARY = 180; // Explicit MISS window: 150-180ms
+    // Judgement Configuration (ms) — delegated to src/core/judgment
+    const THRESHOLD_PERFECT = JUDGMENT_THRESHOLDS.perfect;
+    const THRESHOLD_GREAT = JUDGMENT_THRESHOLDS.great;
+    const THRESHOLD_NICE = JUDGMENT_THRESHOLDS.nice;
+    const THRESHOLD_BAD = JUDGMENT_THRESHOLDS.bad;
+    const MISS_BOUNDARY = JUDGMENT_THRESHOLDS.miss;
 
     // Stats
-    interface ChartNote {
-        time: number;
-        lane: number;
-        duration: number;
-        isLong: boolean;
-        hit: boolean;
-        beat: number; // [NEW] For beat-based scrolling
-        visualY?: number;
-    }
-
-    interface LayoutChangeEvent {
-        time: number;
-        type: 'type-a' | 'type-b';
-    }
+    // ChartNote, LayoutChangeEvent → imported from src/core/types and src/core/chart
 
     interface Song {
         id: string;
@@ -1117,40 +1111,14 @@
     let isVideoReady = false;
     let chart: any = null;
     let bpmChanges: BPMChange[] = [];
+    // BPMChange → imported from src/core/types
 
-    interface BPMChange {
-        beat: number;
-        bpm: number;
-        time: number;
-    }
-
-    // Helper: Beat <-> Time Conversions (Global Re-use)
+    // Helper: Beat <-> Time Conversions (delegated to src/core/bpm)
     function getTimeFromBeat(beat: number): number {
-        if (bpmChanges.length === 0) return 0;
-        let lastBp = bpmChanges[0];
-        for (let i = 1; i < bpmChanges.length; i++) {
-            if (bpmChanges[i].beat <= beat) {
-                lastBp = bpmChanges[i];
-            } else {
-                break;
-            }
-        }
-        const msPerBeat = 60000 / lastBp.bpm;
-        return lastBp.time + ((beat - lastBp.beat) * msPerBeat);
+        return _getTimeFromBeat(beat, bpmChanges);
     }
-
     function getBeatFromTime(time: number): number {
-        if (bpmChanges.length === 0) return 0;
-        let lastBp = bpmChanges[0];
-        for (let i = 1; i < bpmChanges.length; i++) {
-            if (bpmChanges[i].time <= time) {
-                lastBp = bpmChanges[i];
-            } else {
-                break;
-            }
-        }
-        const msPerBeat = 60000 / lastBp.bpm;
-        return lastBp.beat + (time - lastBp.time) / msPerBeat;
+        return _getBeatFromTime(time, bpmChanges);
     }
 
 
@@ -1173,7 +1141,7 @@
 
 
 
-    const SCORE_WEIGHTS = { perfect: 9, great: 8, nice: 2, bad: 1, miss: 0 };
+    // SCORE_WEIGHTS → imported from src/core/score
 
     function resetStats() {
         stats = {
@@ -1190,15 +1158,13 @@
         };
         rawScore = 0;
         lostScore = 0;
-        currentHealth = (gaugeType === 'life' || gaugeType === 'life_hard') ? 100 : 0;
+        currentHealth = getInitialHealth(gaugeType);
         isTrackFailed = false;
         shutterHeight = 0;
         if (resultsOverlay) resultsOverlay.style.display = 'none';
 
-        // Calculate Max Score based on current chart (Long Note = Head(9) + Tail(9) = 18)
-        totalMaxScore = (chartData && chartData.length > 0)
-            ? chartData.reduce((acc, n) => acc + (n.duration > 0 ? 18 : 9), 0)
-            : 1;
+        // Calculate Max Score based on current chart
+        totalMaxScore = calculateMaxScore(chartData || []);
     }
 
 
@@ -1219,38 +1185,14 @@
         }
 
         if (!isAutoPlay) {
-            const weight = SCORE_WEIGHTS[type];
-            const loss = 9 - weight;
+            const loss = calculateLoss(type);
             lostScore += loss;
-            rawScore += weight;
+            rawScore += SCORE_WEIGHTS[type];
 
             // Health Logic
-            let recovery = 0;
-            if (gaugeType === 'norma') {
-                if (type === 'perfect') recovery = 2.0;
-                else if (type === 'great') recovery = 1.0;
-                else if (type === 'nice') recovery = 0.2;
-                else if (type === 'bad') recovery = -2.0;
-                else if (type === 'miss') recovery = -5.0;
-            } else if (gaugeType === 'life') { // NORMAL
-                if (type === 'perfect') recovery = 0.2;
-                else if (type === 'great') recovery = 0.1;
-                else if (type === 'nice') recovery = 0.0;
-                else if (type === 'bad') recovery = -4.0;
-                else if (type === 'miss') recovery = -5.0;
-            } else { // 'life_hard'
-                if (type === 'perfect') recovery = 0.2;
-                else if (type === 'great') recovery = 0.1;
-                else if (type === 'nice') recovery = 0.0;
-                else if (type === 'bad') recovery = -5.0;
-                else if (type === 'miss') recovery = -10.0;
-            }
-
-            currentHealth += recovery;
-            currentHealth = Math.max(0, Math.min(100, currentHealth));
-
-            // LIFE Gauge Death Check
-            if ((gaugeType === 'life' || gaugeType === 'life_hard') && currentHealth <= 0) {
+            const gaugeResult = applyGaugeHit(currentHealth, type, gaugeType);
+            currentHealth = gaugeResult.health;
+            if (gaugeResult.isDead) {
                 console.log('LIFE DEPLETED - GAME OVER');
                 failGame();
             }
@@ -1752,7 +1694,8 @@
         for (let i = notes.length - 1; i >= 0; i--) {
             const note = notes[i];
             const tailTime = note.scheduledTime + note.duration;
-            const tailY = getNoteY(tailTime);
+            const tailBeat = getBeatFromTime(tailTime);
+            const tailY = getNoteY(tailTime, tailBeat);
 
             // 1. Check if Off Screen
             if (tailY > canvas.height + 100) {
@@ -2446,33 +2389,24 @@
             resAvg.textContent = avg;
         }
 
-        // Calculate Final Scaled Score (0 - 1,000,000)
-        const finalRatio = totalMaxScore > 0 ? (totalMaxScore - lostScore) / totalMaxScore : 0;
-        const scaledScore = Math.floor(finalRatio * 1000000);
+        // Calculate Final Score and Rank
+        const isClear = isTrackCleared(gaugeType, currentHealth, isTrackFailed);
 
-        // Calculate Rank
-        let rank = 'D';
-        if (finalRatio >= 0.95) rank = 'S';
-        else if (finalRatio >= 0.9) rank = 'A';
-        else if (finalRatio >= 0.8) rank = 'B';
-        else if (finalRatio >= 0.7) rank = 'C';
+        const scoreResult = calculateScore(totalMaxScore, lostScore, isClear);
+        const scaledScore = scoreResult.scaledScore;
+        let rank = scoreResult.rank;
 
         resultsOverlay.style.display = 'block';
 
         // Update Title based on Gauge Result
         const resTitle = resultsOverlay.querySelector('h2');
-        let isClear = true;
         if (resTitle) {
-            if (isTrackFailed) isClear = false;
-            else if (gaugeType === 'norma' && currentHealth < 70) isClear = false;
-
             if (isClear) {
                 resTitle.textContent = "TRACK CLEAR";
                 resTitle.style.color = "#00ffff"; // Cyan
             } else {
                 resTitle.textContent = "TRACK FAILED";
                 resTitle.style.color = "#ff0000"; // Red
-                rank = 'F'; // Force Rank F?
             }
         }
 
@@ -3382,181 +3316,14 @@
     }
 
     function parseChart(json: any): ChartNote[] {
-        const offset = json.offset || 0;
-
-        // 1. Parse BPM Changes
-        bpmChanges = [];
-        if (json.bpmChanges && Array.isArray(json.bpmChanges)) {
-            // New Format
-            json.bpmChanges.forEach((bc: any) => {
-                bpmChanges.push({
-                    beat: bc.beat,
-                    bpm: bc.bpm,
-                    time: 0 // Will Calculate
-                });
-            });
-            bpmChanges.sort((a, b) => a.beat - b.beat);
-        } else {
-            // Legacy / Single BPM
-            bpmChanges.push({
-                beat: 0,
-                bpm: json.bpm || 120,
-                time: 0
-            });
-        }
-
-        // 2. Calculate Times for BPM Changes
-        // We need a base time. The first BPM change usually starts at beat 0, time 'offset'.
-        // If there are negative beats, we might need backward calc, but let's assume forwards.
-
-        // Always ensure there's a change at beat 0 or earlier?
-        // If the first change is at beat 10, what is the BPM before that?
-        // Usually implied initial BPM.
-        // Let's assume the first entry in bpmChanges IS the initial one if beat is 0.
-        // If not, we prepend one?
-        if (bpmChanges.length === 0 || bpmChanges[0].beat > 0) {
-            bpmChanges.unshift({ beat: 0, bpm: json.bpm || 120, time: 0 });
-        }
-
-        let cTime = offset;
-        let cBeat = 0;
-        let cBpm = bpmChanges[0].bpm;
-        bpmChanges[0].time = offset; // Base time
-
-        for (let i = 0; i < bpmChanges.length; i++) {
-            const bc = bpmChanges[i];
-            if (i > 0) {
-                const prev = bpmChanges[i - 1];
-                const beatsPassed = bc.beat - prev.beat;
-                const msPerBeat = 60000 / prev.bpm;
-                bc.time = prev.time + (beatsPassed * msPerBeat);
-            }
-        }
-
-        // Helpers moved to global scope
-
-
-        // Parse Notes
-        const notes = json.notes.map((n: any) => ({
-            time: getTimeFromBeat(n.beat),
-            lane: n.lane,
-            duration: n.duration ? (getTimeFromBeat(n.beat + n.duration) - getTimeFromBeat(n.beat)) : 0,
-            isLong: (n.duration > 0),
-            hit: false,
-            beat: n.beat // Store beat for scrolling
-        })).sort((a: any, b: any) => a.time - b.time);
-
-        // Parse Layout Changes
-        layoutChanges = [];
-        if (Array.isArray(json.layoutChanges)) {
-            json.layoutChanges.forEach((lc: any) => {
-                layoutChanges.push({
-                    time: getTimeFromBeat(lc.beat),
-                    type: lc.type
-                });
-            });
-            layoutChanges.sort((a, b) => a.time - b.time);
-        }
-
-        return notes;
+        const result = _parseChart(json);
+        bpmChanges = result.bpmChanges;
+        layoutChanges = result.layoutChanges;
+        return result.notes;
     }
 
     function applyModifiers(notes: ChartNote[], assist: string, random: string): ChartNote[] {
-        let modified = JSON.parse(JSON.stringify(notes)); // Deep copy
-
-        // 1. Random (Lane Shuffle)
-        // Map original lanes to new lanes
-        let laneMap = [0, 1, 2, 3, 4, 5, 6, 7, 8]; // Identity
-
-        if (random === 'shuffle_color') {
-            // Shuffle Blues [0, 2, 5, 7] independent of Whites [1, 3, 6, 8]
-            const blues = [0, 2, 5, 7];
-            const whites = [1, 3, 6, 8];
-
-            // Helper shuffle
-            const shuffle = (arr: number[]) => {
-                for (let i = arr.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [arr[i], arr[j]] = [arr[j], arr[i]];
-                }
-                return arr;
-            };
-
-            const newBlues = shuffle([...blues]);
-            const newWhites = shuffle([...whites]);
-
-            // Assign back to map
-            // Original Blue at index i goes to New Blue at index i?
-            // No, we need to map "Lane X" -> "Lane Y".
-            // Since original chart has fixed lanes, we map semantic position?
-            // Actually, we just want to swap them around.
-            // Map: if note is in blues[i], move to newBlues[i].
-
-            blues.forEach((original, i) => { laneMap[original] = newBlues[i]; });
-            whites.forEach((original, i) => { laneMap[original] = newWhites[i]; });
-
-        } else if (random === 'shuffle_chaos') {
-            // Shuffle all except Space (4)
-            const lanes = [0, 1, 2, 3, 5, 6, 7, 8];
-            const newLanes = [0, 1, 2, 3, 5, 6, 7, 8];
-            // Fisher-Yates
-            for (let i = newLanes.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [newLanes[i], newLanes[j]] = [newLanes[j], newLanes[i]];
-            }
-
-            lanes.forEach((original, i) => { laneMap[original] = newLanes[i]; });
-        }
-
-        // Apply Shuffle
-        if (random !== 'none') {
-            modified.forEach((n: any) => {
-                if (n.lane !== 4) { // Don't move space usually
-                    n.lane = laneMap[n.lane];
-                }
-            });
-        }
-
-        // 2. Assist
-        if (assist === 'blue_to_white') {
-            // Convert Blue to nearest White
-            // 0(e)->1(d), 2(r)->3(f), 5(u)->6(j), 7(i)->8(k)
-            const map: { [key: number]: number } = { 0: 1, 2: 3, 5: 6, 7: 8 };
-            modified.forEach((n: any) => {
-                if (map[n.lane] !== undefined) {
-                    n.lane = map[n.lane];
-                }
-                if (map[n.lane] !== undefined) {
-                    n.lane = map[n.lane];
-                }
-            });
-        }
-        else if (currentKeyMode === '6key') {
-            // Remap 8key patterns to 6key
-            // 2(r) -> 3(f), 5(u) -> 6(j)
-            // This aligns 8key inner lanes to 6key inner lanes
-            const map: { [key: number]: number } = { 2: 3, 5: 6 };
-            modified.forEach((n: any) => {
-                if (map[n.lane] !== undefined) {
-                    n.lane = map[n.lane];
-                }
-            });
-        }
-
-        else if (assist === 'space_boost') {
-            // Convert random % of non-space notes to space
-            // Let's say 20%? or maybe simplify complex streams?
-            // "Increase space, decrease others"
-            modified.forEach((n: any) => {
-                if (n.lane !== 4) {
-                    if (Math.random() < 0.25) { // 25% chance
-                        n.lane = 4;
-                    }
-                }
-            });
-        }
-
-        return modified;
+        return _applyModifiers(notes, assist as AssistMode, random as RandomMode, currentKeyMode);
     }
 
     function generateAutoChart(bpm: number, durationSec: number): ChartNote[] {

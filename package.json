@@ -1,11 +1,16 @@
 {
   "version": "1.6.1",
   "scripts": {
-    "build": "tsc",
-    "watch": "tsc -w",
-    "dev": "tsc -w"
+    "build": "npm run build:game && npm run build:editor",
+    "build:game": "vite build",
+    "build:editor": "tsc --project tsconfig.editor.json",
+    "dev": "vite build --watch",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
+    "vitest": "^4.0.18"
   }
 }

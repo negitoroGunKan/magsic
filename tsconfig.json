@@ -1,10 +1,14 @@
 {
     "compilerOptions": {
         "target": "es2016",
-        "module": "commonjs",
+        "module": "es2020",
+        "moduleResolution": "bundler",
         "strict": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
-        "forceConsistentCasingInFileNames": true
-    }
+        "forceConsistentCasingInFileNames": true,
+        "noEmit": true
+    },
+    "include": ["magusic.ts", "src/**/*.ts"],
+    "exclude": ["src/**/*.test.ts"]
 }
