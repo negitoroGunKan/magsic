@@ -650,6 +650,14 @@
     if (playerDisplay) playerDisplay.textContent = `Player: ${currentPlayer} ▼`;
     if (playerDisplayInSelect) playerDisplayInSelect.textContent = `Player: ${currentPlayer} ▼`;
     let scrollMode = "beat";
+    let bpmNormalize = true;
+    const bpmNormalizeCheckbox = document.getElementById("bpm-normalize-checkbox");
+    if (bpmNormalizeCheckbox) {
+      bpmNormalizeCheckbox.addEventListener("change", () => {
+        bpmNormalize = bpmNormalizeCheckbox.checked;
+        savePlayerSettings();
+      });
+    }
     function loadPlayerSettings() {
       const key = `magsic_settings_${currentPlayer}`;
       try {
@@ -691,6 +699,10 @@
             scrollMode = settings.scrollMode;
             if (scrollModeSelect) scrollModeSelect.value = scrollMode;
           }
+          if (settings.bpmNormalize !== void 0) {
+            bpmNormalize = !!settings.bpmNormalize;
+            if (bpmNormalizeCheckbox) bpmNormalizeCheckbox.checked = bpmNormalize;
+          }
           resize();
         } else {
           currentNoteSpeed = BASE_NOTE_SPEED * 2.5;
@@ -699,6 +711,8 @@
           globalOffset = 0;
           if (offsetInput) offsetInput.value = "0";
           if (offsetDisplay) offsetDisplay.textContent = "0";
+          bpmNormalize = true;
+          if (bpmNormalizeCheckbox) bpmNormalizeCheckbox.checked = true;
         }
       } catch (e) {
         console.error("Failed to load settings", e);
@@ -717,7 +731,8 @@
           height: laneCoverHeight,
           speed: laneCoverSpeedMult
         },
-        scrollMode: scrollModeSelect ? scrollModeSelect.value : "beat"
+        scrollMode: scrollModeSelect ? scrollModeSelect.value : "beat",
+        bpmNormalize: bpmNormalizeCheckbox ? bpmNormalizeCheckbox.checked : true
       };
       localStorage.setItem(key, JSON.stringify(settings));
     }
@@ -1230,7 +1245,12 @@ Offset Updated.`);
         const currentBeat = getBeatFromTime$1(getAudioTime() * 1e3);
         const distBeats = beat - currentBeat;
         const effectiveSpeed = currentNoteSpeed * (isLaneCoverEnabled ? laneCoverSpeedMult : 1);
-        return HIT_Y - distBeats * 500 * effectiveSpeed;
+        let msPerBeatBaseline = 500;
+        if (bpmNormalize) {
+          const baseBpm = bpmChanges.length > 0 ? bpmChanges[0].bpm : 120;
+          msPerBeatBaseline = 6e4 / baseBpm;
+        }
+        return HIT_Y - distBeats * msPerBeatBaseline * effectiveSpeed;
       } else {
         const currentTimeMs = getAudioTime() * 1e3;
         const speed = currentNoteSpeed * (isLaneCoverEnabled ? laneCoverSpeedMult : 1);

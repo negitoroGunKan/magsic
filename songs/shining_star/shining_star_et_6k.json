@@ -1,262 +1,261 @@
 {
   "mode": "6key",
   "difficulty": "et",
-  "level": 17,
   "bpm": 159,
-  "offset": -62,
+  "offset": 236,
   "notes": [
     {
-      "beat": 1,
+      "beat": 0.003,
       "lane": 1,
       "duration": 0
     },
     {
-      "beat": 1,
+      "beat": 0.003,
       "lane": 8,
       "duration": 0
     },
     {
-      "beat": 2,
+      "beat": 1.003,
       "lane": 1,
       "duration": 0
     },
     {
-      "beat": 2,
+      "beat": 1.003,
       "lane": 8,
       "duration": 0
     },
     {
-      "beat": 3,
+      "beat": 2.003,
       "lane": 9,
       "duration": 0
     },
     {
-      "beat": 3,
+      "beat": 2.003,
       "lane": 10,
       "duration": 0
     },
     {
-      "beat": 4,
+      "beat": 3.003,
       "lane": 1,
       "duration": 0
     },
     {
-      "beat": 4,
+      "beat": 3.003,
       "lane": 8,
       "duration": 0
     },
     {
-      "beat": 4.5,
+      "beat": 3.503,
       "lane": 3,
       "duration": 0
     },
     {
-      "beat": 4.5,
+      "beat": 3.503,
       "lane": 6,
       "duration": 0
     },
     {
-      "beat": 5.5,
+      "beat": 4.503,
       "lane": 1,
       "duration": 0
     },
     {
-      "beat": 5.5,
+      "beat": 4.503,
       "lane": 8,
       "duration": 0
     },
     {
-      "beat": 6,
+      "beat": 5.003,
       "lane": 9,
       "duration": 0
     },
     {
-      "beat": 6,
+      "beat": 5.003,
       "lane": 10,
       "duration": 0
     },
     {
-      "beat": 7,
+      "beat": 6.003,
       "lane": 1,
       "duration": 0
     },
     {
-      "beat": 7,
+      "beat": 6.003,
       "lane": 8,
       "duration": 0
     },
     {
-      "beat": 7.5,
+      "beat": 6.503,
       "lane": 3,
       "duration": 0
     },
     {
-      "beat": 7.75,
+      "beat": 6.753,
       "lane": 6,
       "duration": 0
     },
     {
-      "beat": 8,
+      "beat": 7.003,
       "lane": 1,
       "duration": 0
     },
     {
-      "beat": 8,
+      "beat": 7.003,
       "lane": 3,
       "duration": 0
     },
     {
-      "beat": 8.25,
+      "beat": 7.253,
       "lane": 6,
       "duration": 0
     },
     {
-      "beat": 8.25,
+      "beat": 7.253,
       "lane": 8,
       "duration": 0
     },
     {
-      "beat": 8.5,
+      "beat": 7.503,
       "lane": 1,
       "duration": 0
     },
     {
-      "beat": 8.5,
+      "beat": 7.503,
       "lane": 3,
       "duration": 0
     },
     {
-      "beat": 8.75,
+      "beat": 7.753,
       "lane": 6,
       "duration": 0
     },
     {
-      "beat": 8.75,
+      "beat": 7.753,
       "lane": 8,
       "duration": 0
     },
     {
-      "beat": 9,
+      "beat": 8.006,
       "lane": 9,
       "duration": 0
     },
     {
-      "beat": 9,
+      "beat": 8.006,
       "lane": 10,
       "duration": 0
     },
     {
-      "beat": 9,
+      "beat": 8.006,
       "lane": 4,
       "duration": 0
     },
     {
-      "beat": 9.5,
+      "beat": 9.006,
       "lane": 1,
       "duration": 0
     },
     {
-      "beat": 9.5,
+      "beat": 9.006,
       "lane": 3,
       "duration": 0
     },
     {
-      "beat": 10,
+      "beat": 10.006,
       "lane": 9,
       "duration": 0
     },
     {
-      "beat": 10,
+      "beat": 10.006,
       "lane": 10,
       "duration": 0
     },
     {
-      "beat": 10.5,
+      "beat": 11.006,
       "lane": 3,
       "duration": 0
     },
     {
-      "beat": 10.5,
+      "beat": 11.006,
       "lane": 6,
       "duration": 0
     },
     {
-      "beat": 11,
+      "beat": 12.006,
       "lane": 9,
       "duration": 0
     },
     {
-      "beat": 11,
+      "beat": 12.006,
       "lane": 10,
       "duration": 0
     },
     {
-      "beat": 11.5,
+      "beat": 13.006,
       "lane": 6,
       "duration": 0
     },
     {
-      "beat": 11.5,
+      "beat": 13.006,
       "lane": 8,
       "duration": 0
     },
     {
-      "beat": 12,
+      "beat": 14.006,
       "lane": 9,
       "duration": 0
     },
     {
-      "beat": 12,
+      "beat": 14.006,
       "lane": 10,
       "duration": 0
     },
     {
-      "beat": 12.5,
+      "beat": 15.006,
       "lane": 3,
       "duration": 0
     },
     {
-      "beat": 12.5,
+      "beat": 15.006,
       "lane": 6,
       "duration": 0
     },
     {
-      "beat": 13,
+      "beat": 16.006,
       "lane": 9,
       "duration": 0
     },
     {
-      "beat": 13,
+      "beat": 16.006,
       "lane": 10,
       "duration": 0
     },
     {
-      "beat": 13,
+      "beat": 16.006,
       "lane": 1,
       "duration": 0
     },
     {
-      "beat": 13.5,
+      "beat": 17.006,
       "lane": 3,
       "duration": 0
     },
     {
-      "beat": 14,
+      "beat": 18.006,
       "lane": 6,
       "duration": 0
     },
     {
-      "beat": 14.5,
+      "beat": 19.006,
       "lane": 8,
       "duration": 0
     },
     {
-      "beat": 14.5,
+      "beat": 19.006,
       "lane": 10,
       "duration": 0
     },
     {
-      "beat": 14.5,
+      "beat": 19.006,
       "lane": 9,
       "duration": 0
     }
@@ -264,19 +263,19 @@
   "layoutChanges": [],
   "bpmChanges": [
     {
-      "beat": 0.294,
-      "bpm": 225
-    },
-    {
-      "beat": 1,
+      "beat": 0,
       "bpm": 159
     },
     {
-      "beat": 118.596,
+      "beat": 8,
+      "bpm": 318
+    },
+    {
+      "beat": 228.778,
       "bpm": 280
     },
     {
-      "beat": 121.335,
+      "beat": 231.517,
       "bpm": 260
     }
   ],

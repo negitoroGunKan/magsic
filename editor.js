@@ -1547,11 +1547,20 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 targetPath = `songs/${window.currentEditingFolder}/${window.currentEditingFilename}`;
             }
             if (!targetPath) {
-                alert('Please load a song first.');
-                return;
+                const manualPath = prompt('Please enter the save path relatively to songs/ (e.g., knight_of_nights/new_chart.json):');
+                if (!manualPath)
+                    return;
+                targetPath = `songs/${manualPath}`;
+                const parts = manualPath.split('/');
+                if (parts.length >= 2) {
+                    window.currentEditingFolder = parts[0];
+                    window.currentEditingFilename = parts[parts.length - 1];
+                }
             }
-            if (!confirm(`Save to "${targetPath}"?`))
-                return;
+            else {
+                if (!confirm(`Save to "${targetPath}"?`))
+                    return;
+            }
             try {
                 const res = yield fetch('/save', {
                     method: 'POST',

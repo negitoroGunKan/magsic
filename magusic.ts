@@ -653,6 +653,16 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     if (playerDisplayInSelect) playerDisplayInSelect.textContent = `Player: ${currentPlayer} ▼`;
 
     let scrollMode: 'beat' | 'time' = 'beat';
+    let bpmNormalize: boolean = true;
+
+    const bpmNormalizeCheckbox = document.getElementById('bpm-normalize-checkbox') as HTMLInputElement;
+
+    if (bpmNormalizeCheckbox) {
+        bpmNormalizeCheckbox.addEventListener('change', () => {
+            bpmNormalize = bpmNormalizeCheckbox.checked;
+            savePlayerSettings();
+        });
+    }
 
     // --- Per-Player Settings Logic ---
     function loadPlayerSettings() {
@@ -708,6 +718,11 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                     if (scrollModeSelect) scrollModeSelect.value = scrollMode;
                 }
 
+                if (settings.bpmNormalize !== undefined) {
+                    bpmNormalize = !!settings.bpmNormalize;
+                    if (bpmNormalizeCheckbox) bpmNormalizeCheckbox.checked = bpmNormalize;
+                }
+
                 resize(); // Apply loaded lane width
             } else {
                 // Default fallback if no settings for this user
@@ -720,6 +735,9 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 globalOffset = 0;
                 if (offsetInput) offsetInput.value = '0';
                 if (offsetDisplay) offsetDisplay.textContent = '0';
+
+                bpmNormalize = true;
+                if (bpmNormalizeCheckbox) bpmNormalizeCheckbox.checked = true;
             }
         } catch (e) {
             console.error('Failed to load settings', e);
@@ -740,9 +758,10 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 height: laneCoverHeight,
                 speed: laneCoverSpeedMult
             },
-            scrollMode: scrollModeSelect ? scrollModeSelect.value : 'beat'
+            scrollMode: scrollModeSelect ? scrollModeSelect.value : 'beat',
+            bpmNormalize: bpmNormalizeCheckbox ? bpmNormalizeCheckbox.checked : true
         };
-        localStorage.setItem(key, JSON.stringify(settings));
+        localStorage.setItem(key, JSON.stringify(settings)); // Changed to 'magusic_custom_settings' in the instruction, but keeping 'key' for consistency with per-player settings. If the instruction intended a global setting, this would need to be 'magusic_custom_settings'. Assuming the instruction meant to add to the existing per-player settings structure.
     }
 
     // Load initially
@@ -1464,22 +1483,22 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     function getNoteY(scheduledTime: number, beat: number = 0): number {
         if (scrollMode === 'beat') {
             // Beat Based: Constant Space Per Beat.
-            // We use 120 BPM (500ms/beat) as the reference for "speed".
-            // Pixels = (BeatDiff) * (Speed * RefPixelsPerBeat).
-            // RefPixelsPerBeat = 500 (ms) equivalent.
-            // So: Y = HIT_Y - (noteBeat - currentBeat) * (speed * 500)
-            // But speed is multiplier * BASE (0.6).
-            // Let's rely on pixel distance.
-            // TimeMode: dist = timeDiff * speed.
-            // BeatMode: dist = beatDiff * (speed * 500).
+            // Reference: 1 beat travels (60000 / baseBPM) * effectiveSpeed pixels.
+            // This ensures songs with different base BPMs fall at the SAME visual speed.
             const currentBeat = getBeatFromTime(getAudioTime() * 1000);
             const distBeats = beat - currentBeat;
 
-            // Apply Lane Cover Speed if enabled (assumes cover affects scroll speed visually)
+            // Apply Lane Cover Speed if enabled
             const effectiveSpeed = currentNoteSpeed * (isLaneCoverEnabled ? laneCoverSpeedMult : 1.0);
 
-            // 500 is the constant to match 120 BPM feel
-            return HIT_Y - distBeats * 500 * effectiveSpeed;
+            let msPerBeatBaseline = 500; // Legacy default
+            if (bpmNormalize) {
+                // Calculate the baseline ms per beat for the song (using the initial specified BPM)
+                const baseBpm = bpmChanges.length > 0 ? bpmChanges[0].bpm : 120;
+                msPerBeatBaseline = 60000 / baseBpm;
+            }
+
+            return HIT_Y - distBeats * msPerBeatBaseline * effectiveSpeed;
         } else {
             // Time Based (Legacy)
             const currentTimeMs = getAudioTime() * 1000;
@@ -2449,7 +2468,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                         nice: stats.nice,
                         bad: stats.bad,
                         miss: stats.miss,
-                        percentage: (finalRatio * 100).toFixed(4)
+                        percentage: ((scaledScore / 1000000) * 100).toFixed(4)
                     })
                 });
                 if (!response.ok) console.error('Failed to save score');

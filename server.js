@@ -231,7 +231,7 @@ const server = http.createServer((req, res) => {
                 } else {
                     // If TS file, compile
                     if (target.endsWith('.ts')) {
-                        exec('npx tsc magusic.ts --target es2016 --lib es2016,dom --outFile magusic.js', (error, stdout, stderr) => {
+                        exec('npm run build:game', (error, stdout, stderr) => {
                             let msg = 'Saved & Compiled!';
                             if (error) msg = `Saved but Compile Error:\n${stderr || error.message}`;
                             res.writeHead(200);

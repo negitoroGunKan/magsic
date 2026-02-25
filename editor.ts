@@ -1697,11 +1697,21 @@
             if ((window as any).currentEditingFilename && (window as any).currentEditingFolder) {
                 targetPath = `songs/${(window as any).currentEditingFolder}/${(window as any).currentEditingFilename}`;
             }
+
             if (!targetPath) {
-                alert('Please load a song first.');
-                return;
+                const manualPath = prompt('Please enter the save path relatively to songs/ (e.g., knight_of_nights/new_chart.json):');
+                if (!manualPath) return;
+
+                targetPath = `songs/${manualPath}`;
+
+                const parts = manualPath.split('/');
+                if (parts.length >= 2) {
+                    (window as any).currentEditingFolder = parts[0];
+                    (window as any).currentEditingFilename = parts[parts.length - 1];
+                }
+            } else {
+                if (!confirm(`Save to "${targetPath}"?`)) return;
             }
-            if (!confirm(`Save to "${targetPath}"?`)) return;
             try {
                 const res = await fetch('/save', {
                     method: 'POST',

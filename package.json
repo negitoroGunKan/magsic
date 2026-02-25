@@ -1,5 +1,5 @@
 {
-  "version": "1.6.1",
+  "version": "1.7.1",
   "scripts": {
     "build": "npm run build:game && npm run build:editor",
     "build:game": "vite build",
