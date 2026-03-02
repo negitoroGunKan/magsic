@@ -3,7 +3,7 @@
 
 import { ChartNote, KeyMode } from './types';
 
-export type RandomMode = 'none' | 'shuffle_color' | 'shuffle_chaos';
+export type RandomMode = 'none' | 'mirror' | 'shuffle_color' | 'shuffle_chaos';
 export type AssistMode = 'none' | 'blue_to_white' | 'space_boost' | 'auto_space';
 
 /**
@@ -70,6 +70,10 @@ export function applyModifiers(
     // Shuffle all active (non-space) lanes together
     const newLanes = fisherYatesShuffle([...currentActiveLanes], rng);
     currentActiveLanes.forEach((original, i) => { laneMap[original] = newLanes[i]; });
+  } else if (random === 'mirror') {
+    // Reverse all active (non-space) lanes
+    const reversedLanes = [...currentActiveLanes].reverse();
+    currentActiveLanes.forEach((original, i) => { laneMap[original] = reversedLanes[i]; });
   }
 
   // Apply Shuffle

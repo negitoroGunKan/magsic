@@ -151,6 +151,11 @@
       currentActiveLanes.forEach((original, i) => {
         laneMap[original] = newLanes[i];
       });
+    } else if (random === "mirror") {
+      const reversedLanes = [...currentActiveLanes].reverse();
+      currentActiveLanes.forEach((original, i) => {
+        laneMap[original] = reversedLanes[i];
+      });
     }
     if (random !== "none") {
       modified.forEach((n) => {
@@ -1913,6 +1918,7 @@ AUTO`;
       else if (assistSelect?.value === "auto_space") ;
       if (randomSelect?.value === "shuffle_color") ;
       else if (randomSelect?.value === "shuffle_chaos") ;
+      else if (randomSelect?.value === "mirror") ;
     }
     if (speedInput && speedDisplay) {
       speedInput.addEventListener("input", () => {

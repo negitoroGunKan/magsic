@@ -265,6 +265,131 @@
       "duration": 0
     },
     {
+      "beat": 22,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 22,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 23,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 23,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 23.5,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 23.5,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 24,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 24,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 24.5,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 24.5,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 24.5,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 25,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 25,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 25.5,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 25.5,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 26,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 26,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 26.5,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 26.5,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 26.5,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 27,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 27.5,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 27.5,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 28,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 28.5,
+      "lane": 4,
+      "duration": 2.5
+    },
+    {
       "beat": 32.501,
       "lane": 4,
       "duration": -0.001
@@ -1020,14 +1145,14 @@
       "duration": -0.001
     },
     {
-      "beat": 72.501,
+      "beat": 72,
       "lane": 1,
-      "duration": 0.499
+      "duration": 1
     },
     {
-      "beat": 72.501,
+      "beat": 72,
       "lane": 8,
-      "duration": 0.499
+      "duration": 1
     },
     {
       "beat": 73.001,

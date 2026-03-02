@@ -2447,6 +2447,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         // 3. Random
         if (randomSelect?.value === 'shuffle_color') descriptiveModifiers += "-RANDOM";
         else if (randomSelect?.value === 'shuffle_chaos') descriptiveModifiers += "-CHAOS";
+        else if (randomSelect?.value === 'mirror') descriptiveModifiers += "-MIRROR";
 
         // Send to Server (Skip if AutoPlay)
         if (currentSongData && !isAutoPlay) {
