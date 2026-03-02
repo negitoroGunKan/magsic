@@ -448,22 +448,88 @@
       });
     }
     let selectedModeFilter = "8key";
+    const menuOverlay = document.getElementById("menu-overlay");
+    const menuBtnPlay = document.getElementById("menu-btn-play");
+    const menuBtnDani = document.getElementById("menu-btn-dani");
+    const menuBtnRecords = document.getElementById("menu-btn-records");
+    const menuBtnBack = document.getElementById("menu-btn-back");
+    const menuItems = [menuBtnPlay, menuBtnDani, menuBtnRecords, menuBtnBack];
+    let selectedMenuIndex = 0;
+    function updateMenuSelection() {
+      menuItems.forEach((item, index) => {
+        if (!item) return;
+        if (index === selectedMenuIndex) {
+          item.classList.add("selected");
+        } else {
+          item.classList.remove("selected");
+        }
+      });
+    }
+    function executeMenuAction() {
+      if (!menuOverlay || menuOverlay.style.display === "none") return;
+      playSE("se_select");
+      if (selectedMenuIndex === 0) {
+        menuOverlay.style.display = "none";
+        performImageShutterTransition(() => {
+          openSongSelectForReal();
+        }).then(() => {
+          playBGM("bgm_select");
+        });
+      } else if (selectedMenuIndex === 1) {
+        alert("Coming Soon...");
+      } else if (selectedMenuIndex === 2) {
+        openRecords();
+      } else if (selectedMenuIndex === 3) {
+        menuOverlay.style.display = "none";
+      }
+    }
+    if (menuOverlay) {
+      menuItems.forEach((item, index) => {
+        if (item) {
+          item.addEventListener("mouseenter", () => {
+            selectedMenuIndex = index;
+            updateMenuSelection();
+            playSE("se_select");
+          });
+          item.addEventListener("click", () => {
+            selectedMenuIndex = index;
+            updateMenuSelection();
+            executeMenuAction();
+          });
+        }
+      });
+    }
+    document.addEventListener("keydown", (e) => {
+      if (menuOverlay && menuOverlay.style.display === "flex") {
+        if (e.key === "ArrowLeft") {
+          selectedMenuIndex = (selectedMenuIndex - 1 + menuItems.length) % menuItems.length;
+          updateMenuSelection();
+          playSE("se_select");
+        } else if (e.key === "ArrowRight") {
+          selectedMenuIndex = (selectedMenuIndex + 1) % menuItems.length;
+          updateMenuSelection();
+          playSE("se_select");
+        } else if (e.key === "Enter") {
+          executeMenuAction();
+        } else if (e.key === "Escape") {
+          menuOverlay.style.display = "none";
+          playSE("se_back");
+        }
+      }
+    });
     if (startScreen) {
       startScreen.addEventListener("click", () => {
-        console.log("Start Screen Clicked");
         try {
           initAudio();
-          console.log("Audio Context Initialized");
         } catch (e) {
           console.error("Audio Init Error:", e);
         }
-        performImageShutterTransition(() => {
-          console.log("Shutter Transition Middle Action - Opening Song Select");
-          openSongSelectForReal();
-        }).then(() => {
-          console.log("Shutter Transition Complete - Playing Select BGM");
-          playBGM("bgm_select");
-        });
+        playSE("se_start");
+        selectedMenuIndex = 0;
+        updateMenuSelection();
+        if (menuOverlay) {
+          menuOverlay.style.display = "flex";
+        }
       });
     }
     function openSongSelectForReal() {

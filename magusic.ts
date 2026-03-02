@@ -373,24 +373,98 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     // State
     let selectedModeFilter: '4key' | '6key' | '8key' | '12key' = '8key'; // Default to Legacy
 
-    // Start Screen Click Transition (Press Button)
+    // --- Select Menu State ---
+    const menuOverlay = document.getElementById('menu-overlay') as HTMLDivElement;
+    const menuBtnPlay = document.getElementById('menu-btn-play') as HTMLDivElement;
+    const menuBtnDani = document.getElementById('menu-btn-dani') as HTMLDivElement;
+    const menuBtnRecords = document.getElementById('menu-btn-records') as HTMLDivElement;
+    const menuBtnBack = document.getElementById('menu-btn-back') as HTMLDivElement;
+    const menuItems = [menuBtnPlay, menuBtnDani, menuBtnRecords, menuBtnBack];
+    let selectedMenuIndex = 0;
+
+    function updateMenuSelection() {
+        menuItems.forEach((item, index) => {
+            if (!item) return;
+            if (index === selectedMenuIndex) {
+                item.classList.add('selected');
+            } else {
+                item.classList.remove('selected');
+            }
+        });
+    }
+
+    function executeMenuAction() {
+        if (!menuOverlay || menuOverlay.style.display === 'none') return;
+
+        playSE('se_select');
+
+        if (selectedMenuIndex === 0) { // PLAY
+            menuOverlay.style.display = 'none';
+            performImageShutterTransition(() => {
+                openSongSelectForReal();
+            }).then(() => {
+                playBGM('bgm_select');
+            });
+        } else if (selectedMenuIndex === 1) { // 段位認定
+            alert("Coming Soon...");
+        } else if (selectedMenuIndex === 2) { // 記録
+            openRecords();
+        } else if (selectedMenuIndex === 3) { // 戻る
+            menuOverlay.style.display = 'none';
+        }
+    }
+
+    if (menuOverlay) {
+        menuItems.forEach((item, index) => {
+            if (item) {
+                item.addEventListener('mouseenter', () => {
+                    selectedMenuIndex = index;
+                    updateMenuSelection();
+                    playSE('se_select'); // Optional hover sound
+                });
+                item.addEventListener('click', () => {
+                    selectedMenuIndex = index;
+                    updateMenuSelection();
+                    executeMenuAction();
+                });
+            }
+        });
+    }
+
+    // Global Keyboard Navigation for Select Menu
+    document.addEventListener('keydown', (e) => {
+        if (menuOverlay && menuOverlay.style.display === 'flex') {
+            if (e.key === 'ArrowLeft') {
+                selectedMenuIndex = (selectedMenuIndex - 1 + menuItems.length) % menuItems.length;
+                updateMenuSelection();
+                playSE('se_select');
+            } else if (e.key === 'ArrowRight') {
+                selectedMenuIndex = (selectedMenuIndex + 1) % menuItems.length;
+                updateMenuSelection();
+                playSE('se_select');
+            } else if (e.key === 'Enter') {
+                executeMenuAction();
+            } else if (e.key === 'Escape') {
+                menuOverlay.style.display = 'none';
+                playSE('se_back');
+            }
+        }
+    });
+
+    // Start Screen Click Transition (Press Button) -> Open Menu
     if (startScreen) {
         startScreen.addEventListener('click', () => {
-            console.log('Start Screen Clicked'); // DEBUG
             // 1. Initialize Audio Context (User Gesture)
             try {
                 initAudio();
-                console.log('Audio Context Initialized'); // DEBUG
             } catch (e) { console.error('Audio Init Error:', e); }
 
-            performImageShutterTransition(() => {
-                console.log('Shutter Transition Middle Action - Opening Song Select'); // DEBUG
-                openSongSelectForReal();
-            }).then(() => {
-                console.log('Shutter Transition Complete - Playing Select BGM'); // DEBUG
-                // Play Select BGM AFTER shutter opens
-                playBGM('bgm_select');
-            });
+            playSE('se_start');
+            selectedMenuIndex = 0;
+            updateMenuSelection();
+            if (menuOverlay) {
+                menuOverlay.style.display = 'flex';
+            }
         });
     }
 

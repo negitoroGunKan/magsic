@@ -801,6 +801,11 @@
       "type": "type-a"
     }
   ],
-  "bpmChanges": [],
+  "bpmChanges": [
+    {
+      "beat": 0.25,
+      "bpm": 120
+    }
+  ],
   "level": 15
 }
