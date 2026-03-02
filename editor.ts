@@ -1722,7 +1722,8 @@
                     alert('Saved!');
                     statusDiv.textContent = `Status: Saved to ${targetPath}`;
                 } else {
-                    alert('Save Failed');
+                    const errText = await res.text();
+                    alert(`Save Failed: ${res.status} ${errText}`);
                 }
             } catch (e) { alert('Error: ' + e); }
         });

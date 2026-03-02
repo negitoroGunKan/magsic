@@ -55,15 +55,24 @@ const server = http.createServer((req, res) => {
                     return;
                 }
 
-                fs.writeFile(targetPath, data.content, err => {
+                const dirPath = path.dirname(targetPath);
+                fs.mkdir(dirPath, { recursive: true }, err => {
                     if (err) {
-                        console.error(err);
+                        console.error('Mkdir error:', err);
                         res.writeHead(500);
-                        res.end('Error writing file');
-                    } else {
-                        res.writeHead(200);
-                        res.end('File saved successfully');
+                        res.end('Error creating directory');
+                        return;
                     }
+                    fs.writeFile(targetPath, data.content, err => {
+                        if (err) {
+                            console.error(err);
+                            res.writeHead(500);
+                            res.end('Error writing file: ' + err.message);
+                        } else {
+                            res.writeHead(200);
+                            res.end('File saved successfully');
+                        }
+                    });
                 });
             } catch (e) {
                 console.error(e);
@@ -223,25 +232,33 @@ const server = http.createServer((req, res) => {
         req.on('end', () => {
             const buffer = Buffer.concat(body);
             const filePath = path.join(ROOT, target);
+            const dirPath = path.dirname(filePath);
 
-            fs.writeFile(filePath, buffer, err => {
+            fs.mkdir(dirPath, { recursive: true }, err => {
                 if (err) {
                     res.writeHead(500);
-                    res.end('Error writing file');
-                } else {
-                    // If TS file, compile
-                    if (target.endsWith('.ts')) {
-                        exec('npm run build:game', (error, stdout, stderr) => {
-                            let msg = 'Saved & Compiled!';
-                            if (error) msg = `Saved but Compile Error:\n${stderr || error.message}`;
-                            res.writeHead(200);
-                            res.end(msg);
-                        });
-                    } else {
-                        res.writeHead(200);
-                        res.end('File Saved');
-                    }
+                    res.end('Error creating directory');
+                    return;
                 }
+                fs.writeFile(filePath, buffer, err => {
+                    if (err) {
+                        res.writeHead(500);
+                        res.end('Error writing file: ' + err.message);
+                    } else {
+                        // If TS file, compile
+                        if (target.endsWith('.ts')) {
+                            exec('npm run build:game', (error, stdout, stderr) => {
+                                let msg = 'Saved & Compiled!';
+                                if (error) msg = `Saved but Compile Error:\n${stderr || error.message}`;
+                                res.writeHead(200);
+                                res.end(msg);
+                            });
+                        } else {
+                            res.writeHead(200);
+                            res.end('File Saved');
+                        }
+                    }
+                });
             });
         });
         return;

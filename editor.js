@@ -1572,7 +1572,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     statusDiv.textContent = `Status: Saved to ${targetPath}`;
                 }
                 else {
-                    alert('Save Failed');
+                    const errText = yield res.text();
+                    alert(`Save Failed: ${res.status} ${errText}`);
                 }
             }
             catch (e) {
