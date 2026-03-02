@@ -125,22 +125,30 @@
   }
   function applyModifiers(notes, assist, random, keyMode, rng = Math.random) {
     const modified = JSON.parse(JSON.stringify(notes));
-    const laneMap = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+    const laneMap = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    const ACTIVE_LANES = {
+      "4key": [1, 3, 6, 8],
+      "6key": [9, 1, 3, 6, 8, 10],
+      "8key": [0, 1, 2, 3, 5, 6, 7, 8],
+      "12key": [0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12]
+    };
+    const currentActiveLanes = ACTIVE_LANES[keyMode] || ACTIVE_LANES["8key"];
     if (random === "shuffle_color") {
-      const blues = [0, 2, 5, 7];
-      const whites = [1, 3, 6, 8];
-      const newBlues = fisherYatesShuffle([...blues], rng);
-      const newWhites = fisherYatesShuffle([...whites], rng);
-      blues.forEach((original, i) => {
+      const allBlues = [0, 2, 5, 7, 11, 12];
+      const allWhites = [1, 3, 6, 8, 9, 10];
+      const activeBlues = allBlues.filter((lane) => currentActiveLanes.includes(lane));
+      const activeWhites = allWhites.filter((lane) => currentActiveLanes.includes(lane));
+      const newBlues = fisherYatesShuffle([...activeBlues], rng);
+      const newWhites = fisherYatesShuffle([...activeWhites], rng);
+      activeBlues.forEach((original, i) => {
         laneMap[original] = newBlues[i];
       });
-      whites.forEach((original, i) => {
+      activeWhites.forEach((original, i) => {
         laneMap[original] = newWhites[i];
       });
     } else if (random === "shuffle_chaos") {
-      const lanes = [0, 1, 2, 3, 5, 6, 7, 8];
-      const newLanes = fisherYatesShuffle([...lanes], rng);
-      lanes.forEach((original, i) => {
+      const newLanes = fisherYatesShuffle([...currentActiveLanes], rng);
+      currentActiveLanes.forEach((original, i) => {
         laneMap[original] = newLanes[i];
       });
     }
