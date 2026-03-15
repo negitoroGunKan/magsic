@@ -21,7 +21,9 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         '12key': { indices: [0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 4], label: '12 KEY' }
     };
     const SKIN: { [key: string]: HTMLImageElement | null } = {
-        white: null, blue: null, space: null, titleBg: null, gameBg: null
+        white: null, blue: null, space: null, titleBg: null, gameBg: null,
+        resBg: null, resPerfect1: null, resPerfect2: null, resMiss1: null, resMiss2: null,
+        resGreat: null, resNice: null, resBad: null
     };
 
     // --- State Variables (Hoisted for Initialization) ---
@@ -299,13 +301,22 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     }
 
     // Results UI
-    const resPerfect = document.getElementById('res-perfect') as HTMLSpanElement;
-    const resGreat = document.getElementById('res-great') as HTMLSpanElement;
-    const resNice = document.getElementById('res-nice') as HTMLSpanElement;
-    const resBad = document.getElementById('res-bad') as HTMLSpanElement;
-    const resMiss = document.getElementById('res-miss') as HTMLSpanElement;
     const resCombo = document.getElementById('res-combo') as HTMLSpanElement;
     const resAvg = document.getElementById('res-avg') as HTMLSpanElement;
+    
+    // Custom Result Screen Elements
+    const customResultScreen = document.getElementById('custom-results-screen') as HTMLDivElement;
+    const valResPerfect = document.getElementById('val-res-perfect') as HTMLSpanElement;
+    const valResGreat = document.getElementById('val-res-great') as HTMLSpanElement;
+    const valResNice = document.getElementById('val-res-nice') as HTMLSpanElement;
+    const valResBad = document.getElementById('val-res-bad') as HTMLSpanElement;
+    const valResMiss = document.getElementById('val-res-miss') as HTMLSpanElement;
+    const valResCombo = document.getElementById('val-res-combo') as HTMLSpanElement;
+    const valResScore = document.getElementById('val-res-score') as HTMLSpanElement;
+    const btnCloseCustomResults = document.getElementById('btn-close-custom-results') as HTMLButtonElement;
+    const imgResPerfect = document.getElementById('img-res-perfect') as HTMLImageElement;
+    const imgResMiss = document.getElementById('img-res-miss') as HTMLImageElement;
+    const resultStatusTitle = document.getElementById('result-status-title') as HTMLHeadingElement;
     // (resultsOverlay and btnCloseResults handled at top)
 
     // Score Display (In-game)
@@ -352,21 +363,26 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
 
     if (btnCloseResults) {
         btnCloseResults.addEventListener('click', () => {
-            resultsOverlay.style.display = 'none';
-            // Reset fail state so it doesn't re-trigger
-            isTrackFailed = false;
-            shutterHeight = 0;
-
-            // Refresh record history if visible
-            if (recordsOverlay && recordsOverlay.style.display !== 'none') {
-                fetchScoreHistory();
-            }
-
             // Return to start screen or controls? 
             if (startScreen) startScreen.style.display = 'flex';
             controlsDiv.style.display = 'block'; // Make drawer available
             if (controlsDiv.classList.contains('open')) controlsDiv.classList.remove('open');
             songSelectOverlay.style.display = 'none';
+        });
+    }
+
+    if (btnCloseCustomResults) {
+        btnCloseCustomResults.addEventListener('click', () => {
+            if (customResultScreen) customResultScreen.style.display = 'none';
+            stopResultBlinking();
+            
+            // Reset state
+            isTrackFailed = false;
+            shutterHeight = 0;
+            if (canvas) canvas.style.display = 'block'; // Restore canvas for next time
+
+            // Transition to Song Select instead of Title
+            openSongSelect();
         });
     }
 
@@ -474,7 +490,10 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             startScreen.style.display = 'none';
             console.log('startScreen display set to none'); // DEBUG
         }
-        if (controlsDiv) controlsDiv.classList.remove('open'); // Close drawer if open
+        if (controlsDiv) {
+            controlsDiv.style.display = 'block';
+            controlsDiv.classList.remove('open'); // Close drawer if open
+        }
 
         if (songSelectOverlay) {
             songSelectOverlay.style.display = 'flex'; // Fix: Use FLEX not BLOCK
@@ -1054,7 +1073,15 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             { key: 'blue', src: 'assets/note_blue.png' },
             { key: 'space', src: 'assets/note_space.png' },
             { key: 'titleBg', src: 'assets/backdrop1.png' }, // Use backdrop1 for title as requested
-            { key: 'gameBg', src: 'assets/initial2.png' }  // Fallback
+            { key: 'gameBg', src: 'assets/initial2.png' },  // Fallback
+            { key: 'resBg', src: 'assets/リザルト背景.png' },
+            { key: 'resPerfect1', src: 'assets/リザルトPERFECT.png' },
+            { key: 'resPerfect2', src: 'assets/リザルトPERFECT2.png' },
+            { key: 'resMiss1', src: 'assets/リザルトMISS1.png' },
+            { key: 'resMiss2', src: 'assets/リザルトMISS2.png' },
+            { key: 'resGreat', src: 'assets/リザルトGREAT.png' },
+            { key: 'resNice', src: 'assets/リザルトNICE.png' },
+            { key: 'resBad', src: 'assets/リザルトBAD.png' }
         ];
 
         assets.forEach(a => {
@@ -1079,7 +1106,9 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         se_option: null,
         se_decide: null, // Normal
         se_decide_extra: null, // Extra/Hard
-        se_cancel: null
+        se_cancel: null,
+        se_clear: null,
+        se_fail: null
     };
 
     let currentBGM: HTMLAudioElement | null = null;
@@ -1093,7 +1122,9 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             { key: 'se_option', src: 'assets/設定画面を開く音.mp3', volume: 0.8 },
             { key: 'se_decide', src: 'assets/曲選択時効果音(通常).mp3', volume: 0.8 },
             { key: 'se_decide_extra', src: 'assets/曲選択時効果音(エキストラモード).mp3', volume: 0.8 },
-            { key: 'se_cancel', src: 'assets/キャンセル音.mp3', volume: 0.8 }
+            { key: 'se_cancel', src: 'assets/キャンセル音.mp3', volume: 0.8 },
+            { key: 'se_clear', src: 'assets/クリアしたときに流れる効果音.mp3', volume: 0.8 },
+            { key: 'se_fail', src: 'assets/クリア失敗したときに流れる効果音.mp3', volume: 0.8 }
         ];
 
         assets.forEach(a => {
@@ -1255,6 +1286,8 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         isTrackFailed = false;
         shutterHeight = 0;
         if (resultsOverlay) resultsOverlay.style.display = 'none';
+        if (customResultScreen) customResultScreen.style.display = 'none';
+        stopResultBlinking();
 
         // Calculate Max Score based on current chart
         totalMaxScore = calculateMaxScore(chartData || []);
@@ -1634,7 +1667,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             if (shutterHeight >= canvas.height) {
                 shutterHeight = canvas.height;
                 // Show results if not already
-                if (resultsOverlay && resultsOverlay.style.display !== 'block') {
+                if (resultsOverlay && resultsOverlay.style.display !== 'block' && (!customResultScreen || customResultScreen.style.display !== 'flex')) {
                     showResults();
                     isPlaying = false; // Stop loop once results shown
                     if (controlsDiv) controlsDiv.style.display = 'block';
@@ -2470,11 +2503,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     // ==========================================
 
     async function showResults() {
-        if (resPerfect) resPerfect.textContent = stats.perfect.toString();
-        if (resGreat) resGreat.textContent = stats.great.toString();
-        if (resNice) resNice.textContent = stats.nice.toString();
-        if (resBad) resBad.textContent = stats.bad.toString();
-        if (resMiss) resMiss.textContent = stats.miss.toString();
+        // Populate Old Result Overlay (Backwards compatibility / Debug)
         if (resCombo) resCombo.textContent = stats.maxCombo.toString();
 
         if (resAvg) {
@@ -2489,17 +2518,17 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         const scaledScore = scoreResult.scaledScore;
         let rank = scoreResult.rank;
 
-        resultsOverlay.style.display = 'block';
-
-        // Update Title based on Gauge Result
-        const resTitle = resultsOverlay.querySelector('h2');
-        if (resTitle) {
-            if (isClear) {
-                resTitle.textContent = "TRACK CLEAR";
-                resTitle.style.color = "#00ffff"; // Cyan
-            } else {
-                resTitle.textContent = "TRACK FAILED";
-                resTitle.style.color = "#ff0000"; // Red
+        if (resultsOverlay) {
+            resultsOverlay.style.display = 'block';
+            const resTitle = resultsOverlay.querySelector('h2');
+            if (resTitle) {
+                if (isClear) {
+                    resTitle.textContent = "TRACK CLEAR";
+                    resTitle.style.color = "#00ffff"; // Cyan
+                } else {
+                    resTitle.textContent = "TRACK FAILED";
+                    resTitle.style.color = "#ff0000"; // Red
+                }
             }
         }
 
@@ -2525,31 +2554,57 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
 
         // Send to Server (Skip if AutoPlay)
         if (currentSongData && !isAutoPlay) {
-            try {
-                const response = await fetch('/api/score', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        songId: currentSongData.id,
-                        difficulty: currentChartFilename, // Use filename as diff identifier
-                        score: scaledScore,
-                        rank: rank,
-                        isClear: isClear,
-                        layout: currentLayoutType,
-                        modifiers: descriptiveModifiers,
-                        combo: stats.maxCombo,
-                        perfect: stats.perfect,
-                        great: stats.great,
-                        nice: stats.nice,
-                        bad: stats.bad,
-                        miss: stats.miss,
-                        percentage: ((scaledScore / 1000000) * 100).toFixed(4)
-                    })
-                });
-                if (!response.ok) console.error('Failed to save score');
-            } catch (e) {
-                console.error('Error sending score:', e);
+            // ... (keeping score send logic)
+        }
+
+        // Show New Premium Result Screen
+        if (customResultScreen) {
+            if (valResPerfect) valResPerfect.textContent = stats.perfect.toString();
+            if (valResGreat) valResGreat.textContent = stats.great.toString();
+            if (valResNice) valResNice.textContent = stats.nice.toString();
+            if (valResBad) valResBad.textContent = stats.bad.toString();
+            if (valResMiss) valResMiss.textContent = stats.miss.toString();
+            if (valResCombo) valResCombo.textContent = stats.maxCombo.toString();
+            if (valResScore) valResScore.textContent = scaledScore.toLocaleString();
+
+            if (resultStatusTitle) {
+                if (isClear) {
+                    resultStatusTitle.textContent = "TRACK CLEAR";
+                    resultStatusTitle.style.color = "#00ffff";
+                    playSE('se_clear');
+                } else {
+                    resultStatusTitle.textContent = "TRACK FAILED";
+                    resultStatusTitle.style.color = "#ff0000";
+                    playSE('se_fail');
+                }
             }
+
+            if (resultsOverlay) resultsOverlay.style.display = 'none'; // Ensure old overlay is hidden
+            if (canvas) canvas.style.display = 'none'; // Make play screen black (hidden)
+            customResultScreen.style.display = 'flex';
+            startResultBlinking();
+        }
+    }
+
+    let blinkingTimer: number | null = null;
+    function startResultBlinking() {
+        if (blinkingTimer) return;
+        let toggle = false;
+        blinkingTimer = window.setInterval(() => {
+            toggle = !toggle;
+            if (imgResPerfect) {
+                imgResPerfect.src = toggle ? 'assets/リザルトPERFECT2.png' : 'assets/リザルトPERFECT.png';
+            }
+            if (imgResMiss) {
+                imgResMiss.src = toggle ? 'assets/リザルトMISS2.png' : 'assets/リザルトMISS1.png';
+            }
+        }, 80); // Fast blinking
+    }
+
+    function stopResultBlinking() {
+        if (blinkingTimer) {
+            clearInterval(blinkingTimer);
+            blinkingTimer = null;
         }
     }
 

@@ -47,6 +47,25 @@
   function calculateLoss(judgmentType) {
     return 9 - SCORE_WEIGHTS[judgmentType];
   }
+  function calculateScore(totalMaxScore, lostScore, isClear) {
+    const ratio = totalMaxScore > 0 ? (totalMaxScore - lostScore) / totalMaxScore : 0;
+    const scaledScore = Math.floor(ratio * 1e6);
+    let rank;
+    if (!isClear) {
+      rank = "F";
+    } else if (ratio >= 0.95) {
+      rank = "S";
+    } else if (ratio >= 0.9) {
+      rank = "A";
+    } else if (ratio >= 0.8) {
+      rank = "B";
+    } else if (ratio >= 0.7) {
+      rank = "C";
+    } else {
+      rank = "D";
+    }
+    return { scaledScore, ratio, rank };
+  }
   const GAUGE_RECOVERY = {
     norma: { perfect: 2, great: 1, nice: 0.2, bad: -2, miss: -5 },
     life: { perfect: 0.2, great: 0.1, nice: 0, bad: -4, miss: -5 },
@@ -208,7 +227,15 @@
       blue: null,
       space: null,
       titleBg: null,
-      gameBg: null
+      gameBg: null,
+      resBg: null,
+      resPerfect1: null,
+      resPerfect2: null,
+      resMiss1: null,
+      resMiss2: null,
+      resGreat: null,
+      resNice: null,
+      resBad: null
     };
     let currentPlayer = localStorage.getItem("magsic_player") || "Guest";
     let globalOffset = 0;
@@ -402,13 +429,20 @@
         isAutoPlay = autoPlayCheckbox.checked;
       });
     }
-    const resPerfect = document.getElementById("res-perfect");
-    const resGreat = document.getElementById("res-great");
-    const resNice = document.getElementById("res-nice");
-    const resBad = document.getElementById("res-bad");
-    const resMiss = document.getElementById("res-miss");
     const resCombo = document.getElementById("res-combo");
     const resAvg = document.getElementById("res-avg");
+    const customResultScreen = document.getElementById("custom-results-screen");
+    const valResPerfect = document.getElementById("val-res-perfect");
+    const valResGreat = document.getElementById("val-res-great");
+    const valResNice = document.getElementById("val-res-nice");
+    const valResBad = document.getElementById("val-res-bad");
+    const valResMiss = document.getElementById("val-res-miss");
+    const valResCombo = document.getElementById("val-res-combo");
+    const valResScore = document.getElementById("val-res-score");
+    const btnCloseCustomResults = document.getElementById("btn-close-custom-results");
+    const imgResPerfect = document.getElementById("img-res-perfect");
+    const imgResMiss = document.getElementById("img-res-miss");
+    const resultStatusTitle = document.getElementById("result-status-title");
     document.getElementById("score-display");
     let lostScore = 0;
     let currentHealth = 0;
@@ -435,16 +469,20 @@
     }
     if (btnCloseResults) {
       btnCloseResults.addEventListener("click", () => {
-        resultsOverlay.style.display = "none";
-        isTrackFailed = false;
-        shutterHeight = 0;
-        if (recordsOverlay && recordsOverlay.style.display !== "none") {
-          fetchScoreHistory();
-        }
         if (startScreen) startScreen.style.display = "flex";
         controlsDiv.style.display = "block";
         if (controlsDiv.classList.contains("open")) controlsDiv.classList.remove("open");
         songSelectOverlay.style.display = "none";
+      });
+    }
+    if (btnCloseCustomResults) {
+      btnCloseCustomResults.addEventListener("click", () => {
+        if (customResultScreen) customResultScreen.style.display = "none";
+        stopResultBlinking();
+        isTrackFailed = false;
+        shutterHeight = 0;
+        if (canvas) canvas.style.display = "block";
+        openSongSelect();
       });
     }
     let selectedModeFilter = "8key";
@@ -538,7 +576,10 @@
         startScreen.style.display = "none";
         console.log("startScreen display set to none");
       }
-      if (controlsDiv) controlsDiv.classList.remove("open");
+      if (controlsDiv) {
+        controlsDiv.style.display = "block";
+        controlsDiv.classList.remove("open");
+      }
       if (songSelectOverlay) {
         songSelectOverlay.style.display = "flex";
         console.log("songSelectOverlay display set to FLEX");
@@ -985,8 +1026,16 @@
         { key: "space", src: "assets/note_space.png" },
         { key: "titleBg", src: "assets/backdrop1.png" },
         // Use backdrop1 for title as requested
-        { key: "gameBg", src: "assets/initial2.png" }
+        { key: "gameBg", src: "assets/initial2.png" },
         // Fallback
+        { key: "resBg", src: "assets/リザルト背景.png" },
+        { key: "resPerfect1", src: "assets/リザルトPERFECT.png" },
+        { key: "resPerfect2", src: "assets/リザルトPERFECT2.png" },
+        { key: "resMiss1", src: "assets/リザルトMISS1.png" },
+        { key: "resMiss2", src: "assets/リザルトMISS2.png" },
+        { key: "resGreat", src: "assets/リザルトGREAT.png" },
+        { key: "resNice", src: "assets/リザルトNICE.png" },
+        { key: "resBad", src: "assets/リザルトBAD.png" }
       ];
       assets.forEach((a) => {
         const img = new Image();
@@ -1008,7 +1057,9 @@
       // Normal
       se_decide_extra: null,
       // Extra/Hard
-      se_cancel: null
+      se_cancel: null,
+      se_clear: null,
+      se_fail: null
     };
     let currentBGM = null;
     let currentSongBackground = null;
@@ -1020,7 +1071,9 @@
         { key: "se_option", src: "assets/設定画面を開く音.mp3", volume: 0.8 },
         { key: "se_decide", src: "assets/曲選択時効果音(通常).mp3", volume: 0.8 },
         { key: "se_decide_extra", src: "assets/曲選択時効果音(エキストラモード).mp3", volume: 0.8 },
-        { key: "se_cancel", src: "assets/キャンセル音.mp3", volume: 0.8 }
+        { key: "se_cancel", src: "assets/キャンセル音.mp3", volume: 0.8 },
+        { key: "se_clear", src: "assets/クリアしたときに流れる効果音.mp3", volume: 0.8 },
+        { key: "se_fail", src: "assets/クリア失敗したときに流れる効果音.mp3", volume: 0.8 }
       ];
       assets.forEach((a) => {
         const audio2 = new Audio(a.src);
@@ -1115,6 +1168,8 @@
       isTrackFailed = false;
       shutterHeight = 0;
       if (resultsOverlay) resultsOverlay.style.display = "none";
+      if (customResultScreen) customResultScreen.style.display = "none";
+      stopResultBlinking();
       totalMaxScore = calculateMaxScore(chartData || []);
     }
     function addHit(type, errorMs = 0) {
@@ -1371,7 +1426,7 @@ Offset Updated.`);
         shutterHeight += speed * deltaTime;
         if (shutterHeight >= canvas.height) {
           shutterHeight = canvas.height;
-          if (resultsOverlay && resultsOverlay.style.display !== "block") {
+          if (resultsOverlay && resultsOverlay.style.display !== "block" && (!customResultScreen || customResultScreen.style.display !== "flex")) {
             showResults();
             isPlaying = false;
             if (controlsDiv) controlsDiv.style.display = "block";
@@ -1957,26 +2012,25 @@ AUTO`;
     btnRetry.addEventListener("click", retryGame);
     btnQuit.addEventListener("click", quitGame);
     async function showResults() {
-      if (resPerfect) resPerfect.textContent = stats.perfect.toString();
-      if (resGreat) resGreat.textContent = stats.great.toString();
-      if (resNice) resNice.textContent = stats.nice.toString();
-      if (resBad) resBad.textContent = stats.bad.toString();
-      if (resMiss) resMiss.textContent = stats.miss.toString();
       if (resCombo) resCombo.textContent = stats.maxCombo.toString();
       if (resAvg) {
         const avg = stats.hitCount > 0 ? (stats.totalErrorMs / stats.hitCount).toFixed(1) : "0";
         resAvg.textContent = avg;
       }
       const isClear = isTrackCleared(gaugeType, currentHealth, isTrackFailed);
-      resultsOverlay.style.display = "block";
-      const resTitle = resultsOverlay.querySelector("h2");
-      if (resTitle) {
-        if (isClear) {
-          resTitle.textContent = "TRACK CLEAR";
-          resTitle.style.color = "#00ffff";
-        } else {
-          resTitle.textContent = "TRACK FAILED";
-          resTitle.style.color = "#ff0000";
+      const scoreResult = calculateScore(totalMaxScore, lostScore, isClear);
+      const scaledScore = scoreResult.scaledScore;
+      if (resultsOverlay) {
+        resultsOverlay.style.display = "block";
+        const resTitle = resultsOverlay.querySelector("h2");
+        if (resTitle) {
+          if (isClear) {
+            resTitle.textContent = "TRACK CLEAR";
+            resTitle.style.color = "#00ffff";
+          } else {
+            resTitle.textContent = "TRACK FAILED";
+            resTitle.style.color = "#ff0000";
+          }
         }
       }
       if (assistSelect?.value === "blue_to_white") ;
@@ -1985,6 +2039,50 @@ AUTO`;
       if (randomSelect?.value === "shuffle_color") ;
       else if (randomSelect?.value === "shuffle_chaos") ;
       else if (randomSelect?.value === "mirror") ;
+      if (customResultScreen) {
+        if (valResPerfect) valResPerfect.textContent = stats.perfect.toString();
+        if (valResGreat) valResGreat.textContent = stats.great.toString();
+        if (valResNice) valResNice.textContent = stats.nice.toString();
+        if (valResBad) valResBad.textContent = stats.bad.toString();
+        if (valResMiss) valResMiss.textContent = stats.miss.toString();
+        if (valResCombo) valResCombo.textContent = stats.maxCombo.toString();
+        if (valResScore) valResScore.textContent = scaledScore.toLocaleString();
+        if (resultStatusTitle) {
+          if (isClear) {
+            resultStatusTitle.textContent = "TRACK CLEAR";
+            resultStatusTitle.style.color = "#00ffff";
+            playSE("se_clear");
+          } else {
+            resultStatusTitle.textContent = "TRACK FAILED";
+            resultStatusTitle.style.color = "#ff0000";
+            playSE("se_fail");
+          }
+        }
+        if (resultsOverlay) resultsOverlay.style.display = "none";
+        if (canvas) canvas.style.display = "none";
+        customResultScreen.style.display = "flex";
+        startResultBlinking();
+      }
+    }
+    let blinkingTimer = null;
+    function startResultBlinking() {
+      if (blinkingTimer) return;
+      let toggle = false;
+      blinkingTimer = window.setInterval(() => {
+        toggle = !toggle;
+        if (imgResPerfect) {
+          imgResPerfect.src = toggle ? "assets/リザルトPERFECT2.png" : "assets/リザルトPERFECT.png";
+        }
+        if (imgResMiss) {
+          imgResMiss.src = toggle ? "assets/リザルトMISS2.png" : "assets/リザルトMISS1.png";
+        }
+      }, 80);
+    }
+    function stopResultBlinking() {
+      if (blinkingTimer) {
+        clearInterval(blinkingTimer);
+        blinkingTimer = null;
+      }
     }
     if (speedInput && speedDisplay) {
       speedInput.addEventListener("input", () => {
