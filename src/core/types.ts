@@ -14,6 +14,7 @@ export interface ChartNote {
   hit: boolean;
   beat: number;
   visualY?: number;
+  type?: 'normal' | 'sinking' | 'death';
 }
 
 export type JudgmentType = 'perfect' | 'great' | 'nice' | 'bad' | 'miss';
@@ -21,3 +22,9 @@ export type JudgmentType = 'perfect' | 'great' | 'nice' | 'bad' | 'miss';
 export type GaugeType = 'norma' | 'life' | 'life_hard';
 
 export type KeyMode = '4key' | '6key' | '8key' | '12key';
+
+export interface TextEvent {
+  beat: number;
+  text: string;
+  time: number;
+}

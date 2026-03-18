@@ -4,10 +4,12 @@ echo Starting Magsic Server...
 echo ---------------------------------------------------
 echo Game URL:   http://localhost:8080/
 echo Editor URL: http://localhost:8080/editor.html
+echo Editor V2 URL: http://localhost:8080/editor2.html
 echo iPad URL:   http://192.168.1.7:8080/
 echo ---------------------------------------------------
 echo.
 start "" "http://localhost:8080"
 start "" "http://localhost:8080/editor.html"
+start "" "http://localhost:8080/editor2.html"
 node server.js
 pause

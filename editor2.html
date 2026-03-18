@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magusic Chart Editor V2</title>
+    <style>
+        :root {
+            --bg-dark: #121212;
+            --bg-panel: #1e1e1e;
+            --bg-card: #2d2d2d;
+            --text-main: #ffffff;
+            --text-muted: #b3b3b3;
+            --accent: #00bcd4;
+            --accent-hover: #008ba3;
+            --danger: #d32f2f;
+            --success: #4caf50;
+            --border: #333333;
+            --font-main: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: var(--font-main);
+            margin: 0;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 220px 1fr 200px;
+            gap: 8px;
+            height: 100vh;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        .panel {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            overflow-y: auto;
+        }
+
+        #debug-overlay {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #0f0;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            border: 1px solid #0f0;
+            border-radius: 4px;
+            z-index: 9999;
+            pointer-events: none;
+            display: grid;
+            grid-template-columns: auto auto;
+            gap: 5px 15px;
+        }
+
+        .panel-title {
+            margin: 0 0 10px 0;
+            font-size: 0.9rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 5px;
+            color: var(--accent);
+        }
+
+        .control-group {
+            background: var(--bg-card);
+            padding: 12px;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        label {
+            font-size: 0.8em;
+            color: var(--text-muted);
+            min-width: 80px;
+        }
+
+        input[type="number"],
+        input[type="text"],
+        select {
+            background: #111;
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            padding: 5px 8px;
+            border-radius: 4px;
+            width: 100%;
+        }
+
+        button {
+            background: var(--border);
+            color: var(--text-main);
+            border: 1px solid #444;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.85em;
+        }
+
+        button:hover {
+            background: #444;
+            border-color: #555;
+        }
+
+        button.primary {
+            background: var(--accent);
+            color: #000;
+            border-color: var(--accent);
+        }
+
+        button.primary:hover {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+
+        button.danger {
+            background: transparent;
+            color: var(--danger);
+            border: 1px solid var(--danger);
+        }
+        
+        button.danger:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+
+        #song-list-container {
+            height: 200px;
+            overflow-y: auto;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85em;
+        }
+
+        th, td {
+            padding: 6px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: var(--bg-card);
+            position: sticky;
+            top: 0;
+            color: var(--accent);
+        }
+
+        tr:hover {
+            background: #333;
+            cursor: pointer;
+        }
+
+        /* Middle Area - Piano Roll */
+        #editor-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            position: relative;
+            height: 100%;
+            overflow: hidden;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        #visual-editor-container {
+            position: relative;
+            background: #222;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #playhead-line {
+            position: absolute;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: red;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        /* Status and Status effects */
+        #status {
+            padding: 10px;
+            border-radius: 4px;
+            background: rgba(0, 188, 212, 0.1);
+            color: var(--accent);
+            font-size: 0.9em;
+            text-align: center;
+        }
+
+        #status.recording {
+            color: #ff5252;
+            background: rgba(255, 82, 82, 0.1);
+            animation: pulse 1s infinite alternate;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        #countdown-overlay {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 120px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 4px 10px rgba(0,0,0,0.8);
+            z-index: 100;
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="countdown-overlay">3</div>
+
+    <!-- Left Panel: Setup & Meta -->
+    <div class="panel">
+        <h2 class="panel-title">1. Setup</h2>
+        
+        <div class="control-group">
+            <label>Load Chart from Server:</label>
+            <div id="song-list-container">
+                <table id="song-table">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Diff</th>
+                            <th>Mode</th>
+                        </tr>
+                    </thead>
+                    <tbody id="song-table-body">
+                        <tr><td colspan="3">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>Load Local Audio:</label>
+            <input type="file" id="audio-input" accept="audio/*">
+        </div>
+
+        <div class="control-group">
+            <div class="row">
+                <label>BPM:</label>
+                <input type="number" id="bpm" value="120" step="0.01" style="width: 80px;">
+                <button id="btn-tap-bpm">TAP</button>
+            </div>
+            <div class="row">
+                <button id="btn-bpm-minus" style="flex:1;">-1</button>
+                <button id="btn-bpm-plus" style="flex:1;">+1</button>
+            </div>
+            <div class="row">
+                <label>Offset (ms):</label>
+                <input type="number" id="offset" value="0" style="width: 80px;">
+            </div>
+            <div class="row">
+                <label>Level:</label>
+                <select id="level-select" style="width: 80px;"></select>
+            </div>
+            <label style="display:flex; align-items:center; gap:5px; margin-top:5px; padding: 5px; background: rgba(255,255,255,0.05); border-radius: 4px;">
+                <input type="checkbox" id="chk-metronome"> Metronome Audio
+            </label>
+        </div>
+
+        <div class="control-group" style="border: 1px dashed var(--success); background: rgba(76, 175, 80, 0.05);">
+            <div class="row">
+                <label style="color: var(--success); font-weight: bold;">Offset Sync Tool</label>
+                <span id="sync-tap-count" style="margin-left: auto;">0 taps</span>
+            </div>
+            <div class="row" style="margin-top: 5px;">
+                <button id="btn-apply-sync" class="primary" style="font-size: 0.8em; flex: 2;">Apply Sync</button>
+                <button id="btn-reset-sync" style="font-size: 0.8em; flex: 1;">Clear</button>
+            </div>
+            <label style="margin-top: 5px;"><input type="checkbox" id="chk-sync-shift-notes" checked> Shift existing notes</label>
+            <small style="color: var(--text-muted); margin-top: 5px;">Tap any key during playback. Press Shift+Enter to sync.</small>
+        </div>
+        
+    </div>
+
+    <!-- Center Panel: Editor Canvas -->
+    <div id="editor-wrapper">
+        <div id="visual-editor-container">
+            <canvas id="editor-canvas" width="400" height="900"></canvas>
+            <div id="playhead-line"></div>
+        </div>
+    </div>
+
+    <!-- Right Panel: Tools and IO -->
+    <div class="panel">
+        
+        <div id="status">Status: Ready</div>
+
+        <h2 class="panel-title" style="margin-top: 10px;">2. Play & Record</h2>
+        <div class="control-group">
+            <button id="btn-play" class="primary" style="font-size: 0.9em; padding: 8px; font-weight: bold; text-transform: uppercase;">Play / Pause (Space)</button>
+            <label style="margin-top: 5px; font-size: 0.9em; display:flex; align-items:center; gap:5px; cursor: pointer;">
+                <input type="checkbox" id="chk-record" style="transform: scale(1.5);"> Record Key Presses
+            </label>
+            <small class="key-guide" style="color: var(--text-muted); margin-top: 5px;">
+                <strong style="color: var(--text-main)">Controls:</strong> E, D, R, F, Space, U, J, I, K ... (1-6: Note Type)
+            </small>
+        </div>
+
+        <h2 class="panel-title">3. Editor Tools</h2>
+        <div class="control-group">
+            <div class="row">
+                <label style="width: auto;">Mode:</label>
+                <select id="editor-mode-select">
+                    <option value="4key">4 KEY</option>
+                    <option value="6key">6 KEY</option>
+                    <option value="8key" selected>8 KEY</option>
+                </select>
+            </div>
+            <div id="editor-12key-toggle-group" style="display: none; margin-top: 5px; flex-direction: column; gap: 5px; background: rgba(0, 188, 212, 0.1); padding: 5px; border-radius: 4px;">
+                <label style="color: var(--accent); font-weight: bold; margin-bottom: 2px;">12KEY Editing Set:</label>
+                <div class="row" style="gap: 5px;">
+                    <button id="btn-12key-white" class="primary" style="flex: 1; font-size: 0.8em; padding: 4px;">WHITE (s d f j k l)</button>
+                    <button id="btn-12key-blue" style="flex: 1; font-size: 0.8em; padding: 4px;">BLUE (w e r u i o)</button>
+                </div>
+            </div>
+            <div class="row">
+                <label style="width: auto;">Snap:</label>
+                <select id="snap-select">
+                    <option value="4">1/4</option>
+                    <option value="8">1/8</option>
+                    <option value="12">1/3 (12th)</option>
+                    <option value="16" selected>1/16</option>
+                    <option value="24">1/6 (24th)</option>
+                    <option value="32">1/32</option>
+                    <option value="48">1/12 (48th)</option>
+                    <option value="64">1/64</option>
+                </select>
+            </div>
+            <div class="row">
+                <label style="width: auto;">Zoom:</label>
+                <input type="range" id="zoom-range" min="0.5" max="5.0" step="0.1" value="1.0" style="width: 100%;">
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label style="margin-bottom: 5px; color: var(--accent);">Note Type (Click):</label>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; font-size: 0.8em;">
+                <label style="display:flex; align-items:center; gap:5px;"><input type="radio" name="note-type" value="tap" checked> Tap</label>
+                <label style="display:flex; align-items:center; gap:5px;"><input type="radio" name="note-type" value="hold"> Hold</label>
+                <label style="display:flex; align-items:center; gap:5px; color: #e040fb;"><input type="radio" name="note-type" value="layout-a"> Layout A</label>
+                <label style="display:flex; align-items:center; gap:5px; color: #e040fb;"><input type="radio" name="note-type" value="layout-b"> Layout B</label>
+                <label style="display:flex; align-items:center; gap:5px; color: #ff0000;"><input type="radio" name="note-type" value="sinking"> Sinking</label>
+                <label style="display:flex; align-items:center; gap:5px; color: #880000;"><input type="radio" name="note-type" value="death"> Death</label>
+            </div>
+            
+            <hr style="border: none; border-top: 1px solid var(--border); margin: 5px 0;">
+
+            <div class="row" style="margin-top: 5px;">
+                <label style="display:flex; align-items:center; gap:5px; color: #ffeb3b;"><input type="radio" name="note-type" value="bpm-change"> Add BPM Change:</label>
+                <input type="number" id="bpm-change-value" value="120" style="width: 60px;">
+            </div>
+        </div>
+
+        <h2 class="panel-title">4. Import / Export</h2>
+        <div class="control-group">
+            <div class="row">
+                <input type="file" id="import-input" style="display: none;">
+                <button id="btn-import" onclick="document.getElementById('import-input').click()" style="flex:1;">Import JSON</button>
+                <button id="btn-export" style="flex:1;">Update JSON</button>
+            </div>
+            <div class="row">
+                <button id="btn-download" class="primary" style="flex:1;">Download JSON</button>
+                <button id="btn-save-disk" style="flex:1; background: #ff9800; color: #000; border-color: #ff9800;">Save to Server</button>
+            </div>
+            <textarea id="output" style="height: 120px; background: #111; color: #0f0; border: 1px solid var(--border); font-family: 'Consolas', monospace; padding: 8px; font-size: 11px; resize: none; margin-top: 5px;" readonly placeholder="{ JSON Output will appear here }"></textarea>
+            <button onclick="navigator.clipboard.writeText(document.getElementById('output').value)" style="margin-top: -3px; border-top-left-radius: 0; border-top-right-radius: 0;">Copy to Clipboard</button>
+        </div>
+
+        <div class="control-group" style="margin-top: auto;">
+            <button id="btn-reset" class="danger" style="width: 100%; padding: 12px; font-weight: bold;">RESET ALL NOTES</button>
+        </div>
+    </div>
+
+    <!-- Attach the new TS script -->
+    <script src="editor2.js?v=2"></script>
+    <div id="debug-overlay">
+        <div>ScrollTime:</div><div id="debug-scroll">0.00</div>
+        <div>AudioPos:</div><div id="debug-audio">0.00</div>
+        <div>Seeking:</div><div id="debug-seeking">false</div>
+        <div>Ready:</div><div id="debug-ready">0</div>
+        <div>IsPlaying:</div><div id="debug-playing">false</div>
+    </div>
+</body>
+
+</html>

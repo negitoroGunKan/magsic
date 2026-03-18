@@ -1,0 +1,137 @@
+{
+  "mode": "6key",
+  "difficulty": "ad",
+  "bpm": 135,
+  "offset": 0,
+  "notes": [
+    {
+      "beat": 0,
+      "lane": 1,
+      "duration": 0,
+      "type": "sinking"
+    },
+    {
+      "beat": 0.25,
+      "lane": 3,
+      "duration": 0,
+      "type": "sinking"
+    },
+    {
+      "beat": 0.5,
+      "lane": 6,
+      "duration": 0,
+      "type": "sinking"
+    },
+    {
+      "beat": 0.75,
+      "lane": 8,
+      "duration": 0,
+      "type": "sinking"
+    },
+    {
+      "beat": 1,
+      "lane": 6,
+      "duration": 0,
+      "type": "sinking"
+    },
+    {
+      "beat": 1.25,
+      "lane": 3,
+      "duration": 0,
+      "type": "sinking"
+    },
+    {
+      "beat": 1.5,
+      "lane": 1,
+      "duration": 0,
+      "type": "sinking"
+    },
+    {
+      "beat": 1.75,
+      "lane": 3,
+      "duration": 0,
+      "type": "sinking"
+    },
+    {
+      "beat": 2,
+      "lane": 6,
+      "duration": 0,
+      "type": "sinking"
+    },
+    {
+      "beat": 2.25,
+      "lane": 8,
+      "duration": 0,
+      "type": "sinking"
+    },
+    {
+      "beat": 2.5,
+      "lane": 6,
+      "duration": 0,
+      "type": "sinking"
+    },
+    {
+      "beat": 2.75,
+      "lane": 3,
+      "duration": 0,
+      "type": "sinking"
+    },
+    {
+      "beat": 3,
+      "lane": 1,
+      "duration": 0,
+      "type": "sinking"
+    },
+    {
+      "beat": 4,
+      "lane": 1,
+      "duration": 0,
+      "type": "death"
+    },
+    {
+      "beat": 4,
+      "lane": 8,
+      "duration": 0,
+      "type": "death"
+    },
+    {
+      "beat": 4.25,
+      "lane": 6,
+      "duration": 0,
+      "type": "death"
+    },
+    {
+      "beat": 4.25,
+      "lane": 3,
+      "duration": 0,
+      "type": "death"
+    },
+    {
+      "beat": 4.5,
+      "lane": 3,
+      "duration": 0,
+      "type": "death"
+    },
+    {
+      "beat": 4.5,
+      "lane": 6,
+      "duration": 0,
+      "type": "death"
+    },
+    {
+      "beat": 4.5,
+      "lane": 1,
+      "duration": 0,
+      "type": "death"
+    },
+    {
+      "beat": 4.5,
+      "lane": 8,
+      "duration": 0,
+      "type": "death"
+    }
+  ],
+  "layoutChanges": [],
+  "bpmChanges": [],
+  "level": 1
+}

@@ -1,0 +1,32 @@
+[
+    {
+        "id": "1kyu",
+        "title": "一皿",
+        "songs": [
+            { "id": "shining_star", "title": "Shining Star", "folder": "shining_star", "chart": "shining_star_no_6k.json", "audio": "シャイニングスター.wav", "mode": "6key" },
+            { "id": "50jing", "title": "ジングル50", "folder": "ジングル50", "chart": "50jingchart.json", "audio": "50jingaudio.mp3", "mode": "8key" },
+            { "id": "skairan", "title": "寒鰤", "folder": "skairan", "chart": "skairan_no.json", "audio": "寒鰤Skairan.m4a", "mode": "8key" },
+            { "id": "isaribi", "title": "漁火", "folder": "isaribi", "chart": "chart.json", "audio": "isaribi.m4a", "mode": "6key" }
+        ]
+    },
+    {
+        "id": "2kyu",
+        "title": "二皿",
+        "songs": [
+            { "id": "kyuukurarin", "title": "きゅうくらりん", "folder": "kyuukurarin", "chart": "kyuukurarin_et_6k.json", "audio": "きゅうくらりん.mp3", "mode": "6key" },
+            { "id": "poison_and_or_affection", "title": "Poison AND÷OR Affection", "folder": "poison_and_or_affection", "chart": "poison_and_or_affection_et_6k.json", "audio": "Poison AND_OR Affection.wav", "mode": "6key" },
+            { "id": "chromania", "title": "CHromania", "folder": "chromania", "chart": "chromania_et_6k.json", "audio": "Chronomia.wav", "mode": "6key" },
+            { "id": "isaribi", "title": "漁火", "folder": "isaribi", "chart": "isaribi_et_6k.json", "audio": "isaribi.m4a", "mode": "6key" }
+        ]
+    },
+    {
+        "id": "8dan",
+        "title": "八皿",
+        "songs": [
+            { "id": "isaribi", "title": "漁火 (Stage 1)", "folder": "isaribi", "chart": "isaribi_et_6k.json", "audio": "isaribi.m4a", "mode": "6key" },
+            { "id": "isaribi", "title": "漁火 (Stage 2)", "folder": "isaribi", "chart": "isaribi_et_6k.json", "audio": "isaribi.m4a", "mode": "6key" },
+            { "id": "isaribi", "title": "漁火 (Stage 3)", "folder": "isaribi", "chart": "isaribi_et_6k.json", "audio": "isaribi.m4a", "mode": "6key" },
+            { "id": "isaribi", "title": "漁火 (Stage 4)", "folder": "isaribi", "chart": "isaribi_et_6k.json", "audio": "isaribi.m4a", "mode": "6key" }
+        ]
+    }
+]

@@ -1,7 +1,8 @@
 (function() {
   "use strict";
   function getTimeFromBeat(beat, bpmChanges) {
-    if (bpmChanges.length === 0) return 0;
+    if (bpmChanges.length === 0)
+      return 0;
     let lastBp = bpmChanges[0];
     for (let i = 1; i < bpmChanges.length; i++) {
       if (bpmChanges[i].beat <= beat) {
@@ -14,7 +15,8 @@
     return lastBp.time + (beat - lastBp.beat) * msPerBeat;
   }
   function getBeatFromTime(time, bpmChanges) {
-    if (bpmChanges.length === 0) return 0;
+    if (bpmChanges.length === 0)
+      return 0;
     let lastBp = bpmChanges[0];
     for (let i = 1; i < bpmChanges.length; i++) {
       if (bpmChanges[i].time <= time) {
@@ -41,7 +43,8 @@
     miss: 0
   };
   function calculateMaxScore(notes) {
-    if (notes.length === 0) return 1;
+    if (notes.length === 0)
+      return 1;
     return notes.reduce((acc, n) => acc + (n.duration > 0 ? 18 : 9), 0);
   }
   function calculateLoss(judgmentType) {
@@ -81,8 +84,10 @@
     return gaugeType === "life" || gaugeType === "life_hard" ? 100 : 0;
   }
   function isTrackCleared(gaugeType, finalHealth, isDead) {
-    if (isDead) return false;
-    if (gaugeType === "norma") return finalHealth >= 70;
+    if (isDead)
+      return false;
+    if (gaugeType === "norma")
+      return finalHealth >= 70;
     return true;
   }
   function parseChart(json) {
@@ -121,7 +126,8 @@
       duration: n.duration ? getTimeFromBeat(n.beat + n.duration, bpmChanges) - getTimeFromBeat(n.beat, bpmChanges) : 0,
       isLong: n.duration > 0,
       hit: false,
-      beat: n.beat
+      beat: n.beat,
+      type: n.type || "normal"
     })).sort((a, b) => a.time - b.time);
     const layoutChanges = [];
     if (Array.isArray(json.layoutChanges)) {
@@ -245,6 +251,21 @@
     let laneCoverSpeedMult = 1;
     let gaugeType = "norma";
     let isAutoPlay = false;
+    let isMVLayout = false;
+    let laneOpacity = 1;
+    let isDaniMode = false;
+    let daniCourses = [];
+    let currentDaniCourse = null;
+    let daniSongIndex = 0;
+    let daniHealth = 100;
+    const DANI_PENALTIES = {
+      miss: 6,
+      bad: 6,
+      nice: 2,
+      great: 0,
+      perfect: -0.5
+      // Recovery amount (negative penalty)
+    };
     let currentLayoutType = "default";
     let targetLayoutType = "type-a";
     let LERP_SPEED = 0.15;
@@ -258,9 +279,13 @@
     const pauseOverlay = document.getElementById("pause-overlay");
     const loadingOverlay = document.getElementById("loading-overlay");
     const shutterOverlay = document.getElementById("shutter-overlay");
+    const debugLog = document.getElementById("debug-log");
+    const daniSelectOverlay = document.getElementById("dani-select-overlay");
+    const daniListDiv = document.getElementById("dani-list");
+    const btnCloseDani = document.getElementById("btn-close-dani");
     const canvas = document.getElementById("game-canvas");
     const ctx = canvas ? canvas.getContext("2d") : null;
-    const titleCanvas = document.getElementById("title-rain-canvas");
+    const titleBgVideo = document.getElementById("title-bg-video");
     const logo = document.getElementById("title-logo");
     let HIT_Y = 0;
     const NOTE_HEIGHT = 15;
@@ -281,6 +306,8 @@
     const randomSelect = document.getElementById("random-select");
     const audioInput = document.getElementById("audio-input");
     const chartInput = document.getElementById("chart-input");
+    const laneOpacityInput = document.getElementById("lane-opacity-input");
+    const laneOpacityDisplay = document.getElementById("lane-opacity-display");
     const btnCalibrate = document.getElementById("btn-calibrate");
     const btnCancelCalibration = document.getElementById("btn-cancel-calibration");
     const btnSelectSong = document.getElementById("btn-select-song");
@@ -312,110 +339,41 @@
     } else {
       console.log("btn-calibrate found!");
     }
-    function initTitleAnimation() {
-      if (!titleCanvas || !logo || !startScreen) {
-        console.error("Title Animation Init Failed: Missing Elements", { titleCanvas, logo, startScreen });
-        return;
-      }
-      const titleCtx = titleCanvas.getContext("2d");
-      if (!titleCtx) {
-        console.error("Title Animation Init Failed: No Context");
-        return;
-      }
-      console.log("Title Animation Initialized Successfully", {
-        canvasW: titleCanvas.width,
-        canvasH: titleCanvas.height,
-        screenWidth: startScreen.offsetWidth,
-        screenHeight: startScreen.offsetHeight
-      });
-      const resizeAnim = () => {
-        if (startScreen.style.display !== "none") {
-          titleCanvas.width = startScreen.offsetWidth;
-          titleCanvas.height = startScreen.offsetHeight;
-        }
-      };
-      window.addEventListener("resize", resizeAnim);
-      resizeAnim();
-      const sprites = [];
-      const loadSprite = (src, prob) => {
-        const img = new Image();
-        img.onload = () => console.log(`Sprite loaded: ${src}`, { w: img.naturalWidth, h: img.naturalHeight });
-        img.onerror = () => console.error(`Sprite load FAILED: ${src}`);
-        img.src = src;
-        sprites.push({ img, prob });
-      };
-      loadSprite("assets/sprite1.svg", 0.94);
-      loadSprite("assets/sprite3.svg", 0.03);
-      loadSprite("assets/sprite5.svg", 0.03);
-      const particles = [];
-      const SPAWN_RATE = 2;
+    let titleAnimRequestId = null;
+    function startTitleLoop() {
+      if (!logo || !startScreen || !titleBgVideo) return;
+      if (titleAnimRequestId) return;
       let startTime = performance.now();
-      let frameCount = 0;
       function animLoop(time) {
-        frameCount++;
-        if (frameCount % 180 === 0) {
-          console.log("AnimLoop Running...", {
-            display: startScreen.style.display,
-            particles: particles.length,
-            canvas: `${titleCanvas.width}x${titleCanvas.height}`,
-            sprites: sprites.map((s) => ({ src: s.img.src.split("/").pop(), complete: s.img.complete, nw: s.img.naturalWidth }))
-          });
-        }
         if (startScreen.style.display === "none") {
-          requestAnimationFrame(animLoop);
+          titleBgVideo.pause();
+          titleAnimRequestId = null;
           return;
+        }
+        if (titleBgVideo.paused) {
+          titleBgVideo.play().catch((e) => console.log("Video play deferred:", e));
         }
         const elapsed = (time - startTime) / 1e3;
         const scaleFactor = 1 + 0.03 * Math.sin(elapsed * 2);
         logo.style.transform = `scale(${scaleFactor})`;
-        titleCtx.clearRect(0, 0, titleCanvas.width, titleCanvas.height);
-        for (let i = 0; i < SPAWN_RATE; i++) {
-          const r = Math.random();
-          let selectedImg = sprites[0]?.img;
-          if (r > 0.97) selectedImg = sprites[2]?.img;
-          else if (r > 0.94) selectedImg = sprites[1]?.img;
-          else selectedImg = sprites[0]?.img;
-          if (selectedImg && selectedImg.complete && selectedImg.naturalWidth > 0) {
-            const size = 20 + Math.random() * 30;
-            const speed = 2 + Math.random() * 3;
-            let startX, startY;
-            if (Math.random() < 0.5) {
-              startX = Math.random() * titleCanvas.width * 1.5;
-              startY = -50;
-            } else {
-              startX = titleCanvas.width + 50;
-              startY = Math.random() * titleCanvas.height;
-            }
-            particles.push({
-              x: startX,
-              y: startY,
-              speed,
-              img: selectedImg,
-              size
-            });
-          }
-        }
-        const vx = -0.707;
-        const vy = 0.707;
-        for (let i = particles.length - 1; i >= 0; i--) {
-          const p = particles[i];
-          p.x += p.speed * vx * 3;
-          p.y += p.speed * vy * 3;
-          if (p.img.complete && p.img.naturalWidth > 0) {
-            titleCtx.drawImage(p.img, p.x, p.y, p.size, p.size);
-          }
-          if (p.y > titleCanvas.height + 50 || p.x < -50) {
-            particles.splice(i, 1);
-          }
-        }
-        requestAnimationFrame(animLoop);
+        titleAnimRequestId = requestAnimationFrame(animLoop);
       }
-      requestAnimationFrame(animLoop);
+      titleAnimRequestId = requestAnimationFrame(animLoop);
+    }
+    function showStartScreen(show) {
+      if (!startScreen) return;
+      if (show) {
+        startScreen.style.display = "flex";
+        startTitleLoop();
+      } else {
+        startScreen.style.display = "none";
+        if (titleBgVideo) titleBgVideo.pause();
+      }
     }
     if (document.readyState === "complete" || document.readyState === "interactive") {
-      initTitleAnimation();
+      showStartScreen(true);
     } else {
-      window.addEventListener("load", initTitleAnimation);
+      window.addEventListener("load", () => showStartScreen(true));
     }
     let lastNPressTime = 0;
     let isNHolding = false;
@@ -469,7 +427,7 @@
     }
     if (btnCloseResults) {
       btnCloseResults.addEventListener("click", () => {
-        if (startScreen) startScreen.style.display = "flex";
+        showStartScreen(true);
         controlsDiv.style.display = "block";
         if (controlsDiv.classList.contains("open")) controlsDiv.classList.remove("open");
         songSelectOverlay.style.display = "none";
@@ -482,6 +440,18 @@
         isTrackFailed = false;
         shutterHeight = 0;
         if (canvas) canvas.style.display = "block";
+        if (isDaniMode && currentDaniCourse) {
+          daniSongIndex++;
+          if (daniSongIndex < 4) {
+            const nextSong = currentDaniCourse.songs[daniSongIndex];
+            loadSong(nextSong.folder, nextSong.chart, nextSong.audio);
+            return;
+          } else {
+            alert(`Congratulations! You passed ${currentDaniCourse.title}!`);
+            isDaniMode = false;
+            currentDaniCourse = null;
+          }
+        }
         openSongSelect();
       });
     }
@@ -514,7 +484,14 @@
           playBGM("bgm_select");
         });
       } else if (selectedMenuIndex === 1) {
-        alert("Coming Soon...");
+        menuOverlay.style.display = "none";
+        performImageShutterTransition(() => {
+          showStartScreen(false);
+          if (daniSelectOverlay) daniSelectOverlay.style.display = "flex";
+          loadDaniCourses();
+        }).then(() => {
+          playBGM("bgm_select");
+        });
       } else if (selectedMenuIndex === 2) {
         openRecords();
       } else if (selectedMenuIndex === 3) {
@@ -572,10 +549,7 @@
     }
     function openSongSelectForReal() {
       console.log("openSongSelectForReal called");
-      if (startScreen) {
-        startScreen.style.display = "none";
-        console.log("startScreen display set to none");
-      }
+      showStartScreen(false);
       if (controlsDiv) {
         controlsDiv.style.display = "block";
         controlsDiv.classList.remove("open");
@@ -649,10 +623,62 @@
       });
       songSelectOverlay.insertBefore(container, songListDiv);
     }
+    async function loadDaniCourses() {
+      try {
+        const res = await fetch("songs/courses.json");
+        daniCourses = await res.json();
+        initDaniSelect();
+      } catch (e) {
+        console.error("Failed to load dani courses", e);
+      }
+    }
+    function initDaniSelect() {
+      if (!daniListDiv) return;
+      daniListDiv.innerHTML = "";
+      daniCourses.forEach((course) => {
+        const btn = document.createElement("div");
+        btn.className = "dani-course-card";
+        btn.style.width = "200px";
+        btn.style.padding = "20px";
+        btn.style.background = "#222";
+        btn.style.border = "2px solid #ff0000";
+        btn.style.borderRadius = "10px";
+        btn.style.cursor = "pointer";
+        btn.style.textAlign = "center";
+        btn.style.transition = "transform 0.2s";
+        btn.innerHTML = `
+                <div style="font-size: 1.5em; color: #ff0000; font-family: 'Sawarabi Mincho', serif; margin-bottom: 10px;">${course.title}</div>
+                <div style="font-size: 0.8em; color: #aaa;">4 SONGS SURVIVAL</div>
+            `;
+        btn.onmouseenter = () => {
+          btn.style.transform = "scale(1.05)";
+          btn.style.boxShadow = "0 0 15px rgba(255, 0, 0, 0.5)";
+        };
+        btn.onmouseleave = () => {
+          btn.style.transform = "scale(1)";
+          btn.style.boxShadow = "none";
+        };
+        btn.onclick = () => {
+          playSE("se_decide");
+          startDaniCourse(course);
+        };
+        daniListDiv.appendChild(btn);
+      });
+    }
+    function startDaniCourse(course) {
+      isDaniMode = true;
+      currentDaniCourse = course;
+      daniSongIndex = 0;
+      daniHealth = 100;
+      if (daniSelectOverlay) daniSelectOverlay.style.display = "none";
+      if (controlsDiv) controlsDiv.style.display = "none";
+      const song = course.songs[0];
+      loadSong(song.folder, song.chart, song.audio);
+    }
     const recordsBody = document.getElementById("records-body");
     const btnCloseRecords = document.getElementById("btn-close-records");
     async function openRecords() {
-      if (startScreen) startScreen.style.display = "none";
+      showStartScreen(false);
       if (recordsOverlay) recordsOverlay.style.display = "flex";
       await fetchScoreHistory();
     }
@@ -823,6 +849,11 @@
             bpmNormalize = !!settings.bpmNormalize;
             if (bpmNormalizeCheckbox) bpmNormalizeCheckbox.checked = bpmNormalize;
           }
+          if (settings.laneOpacity !== void 0) {
+            laneOpacity = parseFloat(settings.laneOpacity);
+            if (laneOpacityInput) laneOpacityInput.value = (laneOpacity * 100).toString();
+            if (laneOpacityDisplay) laneOpacityDisplay.textContent = (laneOpacity * 100).toString();
+          }
           resize();
         } else {
           currentNoteSpeed = BASE_NOTE_SPEED * 2.5;
@@ -852,7 +883,8 @@
           speed: laneCoverSpeedMult
         },
         scrollMode: scrollModeSelect ? scrollModeSelect.value : "beat",
-        bpmNormalize: bpmNormalizeCheckbox ? bpmNormalizeCheckbox.checked : true
+        bpmNormalize: bpmNormalizeCheckbox ? bpmNormalizeCheckbox.checked : true,
+        laneOpacity
       };
       localStorage.setItem(key, JSON.stringify(settings));
     }
@@ -929,7 +961,15 @@
       btnCloseSelect.addEventListener("click", () => {
         playSE("se_cancel");
         songSelectOverlay.style.display = "none";
-        if (startScreen) startScreen.style.display = "flex";
+        showStartScreen(true);
+        playBGM("bgm_title");
+      });
+    }
+    if (btnCloseDani) {
+      btnCloseDani.addEventListener("click", () => {
+        playSE("se_cancel");
+        if (daniSelectOverlay) daniSelectOverlay.style.display = "none";
+        showStartScreen(true);
         playBGM("bgm_title");
       });
     }
@@ -1164,13 +1204,23 @@
         totalErrorMs: 0
       };
       lostScore = 0;
-      currentHealth = getInitialHealth(gaugeType);
+      if (isDaniMode) {
+        if (daniSongIndex === 0) {
+          daniHealth = 100;
+        }
+        currentHealth = daniHealth;
+      } else {
+        currentHealth = getInitialHealth(gaugeType);
+      }
       isTrackFailed = false;
       shutterHeight = 0;
       if (resultsOverlay) resultsOverlay.style.display = "none";
       if (customResultScreen) customResultScreen.style.display = "none";
       stopResultBlinking();
       totalMaxScore = calculateMaxScore(chartData || []);
+      if (debugLog) {
+        debugLog.innerHTML = "<div>Debug Log Started</div>";
+      }
     }
     function addHit(type, errorMs = 0) {
       stats[type]++;
@@ -1189,10 +1239,29 @@
       if (!isAutoPlay) {
         const loss = calculateLoss(type);
         lostScore += loss;
-        const gaugeResult = applyGaugeHit(currentHealth, type, gaugeType);
-        currentHealth = gaugeResult.health;
-        if (gaugeResult.isDead) {
-          console.log("LIFE DEPLETED - GAME OVER");
+        if (isDaniMode) {
+          applyDaniHit(type);
+        } else {
+          const gaugeResult = applyGaugeHit(currentHealth, type, gaugeType);
+          currentHealth = gaugeResult.health;
+          if (gaugeResult.isDead) {
+            console.log("LIFE DEPLETED - GAME OVER");
+            failGame();
+          }
+        }
+      }
+    }
+    function applyDaniHit(type) {
+      const penalty = DANI_PENALTIES[type];
+      if (penalty !== 0) {
+        daniHealth -= penalty;
+        if (daniHealth > 100) daniHealth = 100;
+        if (daniHealth < 0) daniHealth = 0;
+        currentHealth = daniHealth;
+        if (daniHealth <= 0) {
+          daniHealth = 0;
+          currentHealth = 0;
+          console.log("DANI LIFE DEPLETED - GAME OVER");
           failGame();
         }
       }
@@ -1277,6 +1346,16 @@ Offset Updated.`);
     let audioBuffer = null;
     let audioSource = null;
     let audioStartTime = 0;
+    function logDebug(msg) {
+      if (!debugLog) return;
+      const div = document.createElement("div");
+      div.textContent = `[${getAudioTime().toFixed(3)}s] ${msg}`;
+      debugLog.appendChild(div);
+      debugLog.scrollTop = debugLog.scrollHeight;
+      if (debugLog.childNodes.length > 50) {
+        debugLog.removeChild(debugLog.firstChild);
+      }
+    }
     const notes = [];
     let lastTime = 0;
     let currentMode = "random";
@@ -1408,7 +1487,7 @@ Offset Updated.`);
         shutterOverlay.style.setProperty("--shutter-scale", "2.8");
       }
     }
-    function spawnNote(laneIndex, scheduledTime, isLong, duration, beat) {
+    function spawnNote(laneIndex, scheduledTime, isLong, duration, beat, noteType) {
       notes.push({
         laneIndex,
         scheduledTime,
@@ -1417,7 +1496,8 @@ Offset Updated.`);
         duration,
         processed: false,
         beingHeld: false,
-        beat
+        beat,
+        type: noteType
       });
     }
     function update(deltaTime) {
@@ -1461,14 +1541,14 @@ Offset Updated.`);
           if (bpmChanges.length > 0) {
             noteBeat = getBeatFromTime$1(noteTime);
           }
-          spawnNote(lane, noteTime, Math.random() < 0.2, Math.random() * 500, noteBeat);
+          spawnNote(lane, noteTime, Math.random() < 0.2, Math.random() * 500, noteBeat, "normal");
         }
       } else {
         const spawnAheadTime = getSpawnAheadTime();
         while (nextNoteIndex < chartData.length) {
           const noteData = chartData[nextNoteIndex];
           if (noteData.time <= currentTimeMs + spawnAheadTime) {
-            spawnNote(noteData.lane, noteData.time, noteData.duration > 0, noteData.duration, noteData.beat);
+            spawnNote(noteData.lane, noteData.time, noteData.duration > 0, noteData.duration, noteData.beat, noteData.type);
             nextNoteIndex++;
           } else {
             break;
@@ -1524,11 +1604,20 @@ AUTO`;
           const msPassed = currentTimeMs - note.scheduledTime;
           if (msPassed > MISS_BOUNDARY && note.active) {
             note.active = false;
-            judgementText = `MISS`;
-            judgementColor = "#ff0000";
-            judgementTimer = 1e3;
-            addHit("miss");
-            if (note.isLong) addHit("miss");
+            if (note.type === "death") {
+              logDebug(`DEATH NOTE IGNORED (Time): lane=${note.laneIndex} target=${(note.scheduledTime / 1e3).toFixed(3)}s`);
+            } else {
+              judgementText = `MISS`;
+              judgementColor = "#ff0000";
+              judgementTimer = 1e3;
+              addHit("miss");
+              if (note.isLong) addHit("miss");
+              logDebug(`MISS (Time): lane=${note.laneIndex} target=${(note.scheduledTime / 1e3).toFixed(3)}s passed=${Math.floor(msPassed)}ms`);
+              if (note.type === "sinking") {
+                console.log("SINKING NOTE MISSED - FAIL");
+                failGame();
+              }
+            }
           }
         } else {
           const tailTime = note.scheduledTime + note.duration;
@@ -1540,14 +1629,28 @@ AUTO`;
         const tailTime = note.scheduledTime + note.duration;
         const tailBeat = getBeatFromTime$1(tailTime);
         const tailY = getNoteY(tailTime, tailBeat);
-        if (tailY > canvas.height + 100) {
+        if (tailY > canvas.height + 1e3) {
           if (note.active) {
-            note.active = false;
-            judgementText = `MISS`;
-            judgementColor = "#ff0000";
-            judgementTimer = 1e3;
-            addHit("miss");
-            if (note.isLong) addHit("miss");
+            const currentTimeMs2 = getAudioTime() * 1e3;
+            if (currentTimeMs2 > note.scheduledTime + MISS_BOUNDARY) {
+              note.active = false;
+              if (note.type === "death") {
+                logDebug(`DEATH NOTE IGNORED (Spatial): lane=${note.laneIndex} target=${(note.scheduledTime / 1e3).toFixed(3)}s`);
+              } else {
+                judgementText = `MISS`;
+                judgementColor = "#ff0000";
+                judgementTimer = 1e3;
+                addHit("miss");
+                if (note.isLong) addHit("miss");
+                logDebug(`MISS (Spatial): lane=${note.laneIndex} target=${(note.scheduledTime / 1e3).toFixed(3)}s tailY=${Math.floor(tailY)}`);
+                if (note.type === "sinking") {
+                  console.log("SINKING NOTE MISSED - FAIL");
+                  failGame();
+                }
+              }
+            } else {
+              logDebug(`CULL (Safe): lane=${note.laneIndex} target=${(note.scheduledTime / 1e3).toFixed(3)}s tailY=${Math.floor(tailY)}`);
+            }
           }
           notes.splice(i, 1);
         } else if (!note.active) {
@@ -1575,14 +1678,16 @@ AUTO`;
         } else if (SKIN.gameBg) {
           ctx.drawImage(SKIN.gameBg, 0, 0, canvas.width, canvas.height);
         }
-        ctx.fillStyle = "rgba(0,0,0,0.5)";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        if (!isMVLayout || isDaniMode) {
+          ctx.fillStyle = "rgba(0,0,0,0.5)";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
       } else {
         ctx.fillStyle = "#222";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
       VISUAL_LANES.forEach((lane) => {
-        ctx.fillStyle = "#111";
+        ctx.fillStyle = `rgba(17, 17, 17, ${laneOpacity})`;
         ctx.fillRect(lane.x, 0, lane.width, canvas.height);
         ctx.strokeStyle = "#555";
         ctx.lineWidth = 2;
@@ -1752,7 +1857,12 @@ AUTO`;
         ctx.strokeRect(barX, barY, barW, barH);
         const fillH = currentHealth / 100 * barH;
         const fillY = barY + (barH - fillH);
-        if (gaugeType === "norma") {
+        if (isDaniMode) {
+          const grad = ctx.createLinearGradient(barX, barY, barX, barY + barH);
+          grad.addColorStop(0, "#ff0000");
+          grad.addColorStop(1, "#000000");
+          ctx.fillStyle = grad;
+        } else if (gaugeType === "norma") {
           if (currentHealth >= 70) ctx.fillStyle = "#ff0055";
           else if (currentHealth >= 40) ctx.fillStyle = "#00ffff";
           else ctx.fillStyle = "#ffff00";
@@ -1763,9 +1873,18 @@ AUTO`;
         }
         ctx.fillRect(barX, fillY, barW, fillH);
         ctx.fillStyle = "#fff";
-        ctx.font = "10px Arial";
+        ctx.font = "bold 12px Arial";
         ctx.textAlign = "center";
         ctx.fillText(`${Math.floor(currentHealth)}%`, barX + barW / 2, barY + barH + 15);
+        if (isDaniMode && currentDaniCourse) {
+          ctx.fillStyle = "#ff0000";
+          ctx.font = 'bold 16px "Sawarabi Mincho", serif';
+          ctx.textAlign = "left";
+          ctx.fillText(currentDaniCourse.title, 20, 40);
+          ctx.fillStyle = "#fff";
+          ctx.font = "14px Arial";
+          ctx.fillText(`STAGE ${daniSongIndex + 1} / 4`, 20, 65);
+        }
       }
       function drawNotesForLane(targetLaneIdx) {
         notes.forEach((note) => {
@@ -1797,25 +1916,51 @@ AUTO`;
             const tailY = getNoteY(note.scheduledTime + note.duration, tailBeat);
             const originalAlpha = ctx.globalAlpha;
             ctx.globalAlpha = 0.5;
-            ctx.fillStyle = bodyColor;
+            if (note.type === "death") {
+              ctx.fillStyle = "#330000";
+            } else {
+              ctx.fillStyle = bodyColor;
+            }
             ctx.fillRect(x + H_GAP, tailY, w - H_GAP * 2, headY - tailY);
             ctx.globalAlpha = originalAlpha;
-            if (skinImg) {
+            const isSpecial = note.type === "sinking" || note.type === "death";
+            if (skinImg && !isSpecial) {
               ctx.drawImage(skinImg, x + H_GAP, headY - drawHeight / 2, w - H_GAP * 2, drawHeight);
             } else {
               if (config.label === "SPACE" && assistSelect.value === "auto_space") ctx.fillStyle = "#00ff00";
               else ctx.fillStyle = config.color;
+              if (note.type === "sinking") {
+                const blink = Math.floor(Date.now() / 100) % 2 === 0;
+                ctx.fillStyle = blink ? "#ff0000" : "#ffaaaa";
+              } else if (note.type === "death") {
+                const blink = Math.floor(Date.now() / 100) % 2 === 0;
+                ctx.fillStyle = blink ? "#ff0000" : "#000000";
+              }
               ctx.fillRect(x + H_GAP, headY - drawHeight / 2, w - H_GAP * 2, drawHeight);
             }
           } else {
             const noteY = getNoteY(note.scheduledTime, note.beat);
             if (noteY > canvas.height + 100) return;
-            if (skinImg) {
+            const isSpecial = note.type === "sinking" || note.type === "death";
+            if (skinImg && !isSpecial) {
               ctx.drawImage(skinImg, x + H_GAP, noteY - drawHeight / 2, w - H_GAP * 2, drawHeight);
             } else {
               if (config.label === "SPACE" && assistSelect.value === "auto_space") ctx.fillStyle = "#00ff00";
               else ctx.fillStyle = config.color;
+              if (note.type === "sinking") {
+                const blink = Math.floor(Date.now() / 100) % 10 < 5;
+                ctx.fillStyle = blink ? "#ff3333" : "#ff8888";
+              } else if (note.type === "death") {
+                const blink = Math.floor(Date.now() / 100) % 10 < 5;
+                ctx.fillStyle = blink ? "#ff0000" : "#330000";
+              }
               ctx.fillRect(x + H_GAP, noteY - drawHeight / 2, w - H_GAP * 2, drawHeight);
+            }
+            if (isSpecial) {
+              ctx.fillStyle = "#fff";
+              ctx.font = `bold ${Math.floor(drawHeight * 1.2)}px Arial`;
+              ctx.textAlign = "center";
+              ctx.fillText(note.type === "sinking" ? "!" : "X", x + config.width / 2, noteY + drawHeight / 3);
             }
           }
         });
@@ -2004,7 +2149,7 @@ AUTO`;
       stopAudio();
       if (bgVideo) bgVideo.pause();
       pauseOverlay.style.display = "none";
-      if (startScreen) startScreen.style.display = "flex";
+      showStartScreen(true);
       controlsDiv.style.display = "block";
       if (btnPauseUI) btnPauseUI.style.display = "none";
     }
@@ -2097,6 +2242,13 @@ AUTO`;
         currentLaneWidth = parseInt(laneWidthInput.value);
         laneWidthDisplay.textContent = currentLaneWidth.toString();
         resize();
+        savePlayerSettings();
+      });
+    }
+    if (laneOpacityInput && laneOpacityDisplay) {
+      laneOpacityInput.addEventListener("input", () => {
+        laneOpacity = parseInt(laneOpacityInput.value) / 100;
+        laneOpacityDisplay.textContent = laneOpacityInput.value;
         savePlayerSettings();
       });
     }
@@ -2367,12 +2519,8 @@ AUTO`;
         banner.style.border = "2px solid transparent";
         banner.style.transformOrigin = "center";
         banner.style.cursor = "pointer";
-        if (song.id === "knight_of_nights") {
-          banner.style.backgroundImage = `url('assets/選曲ロゴ-ナイトオブナイツ.png')`;
-        } else if (song.id === "shining_star") {
-          banner.style.backgroundImage = `url('assets/選曲ロゴ-シャイニングスター.png')`;
-        } else if (song.id === "seimeisei_syndrome") {
-          banner.style.backgroundImage = `url('assets/選曲ロゴ-生命性シンドロウム.png')`;
+        if (song.icon) {
+          banner.style.backgroundImage = `url('${song.icon}')`;
         } else {
           banner.style.backgroundColor = "#333";
           banner.textContent = song.title;
@@ -2435,10 +2583,21 @@ AUTO`;
       const song = availableSongs[selectedSongIndex];
       const allScores = window.currentAllScores || {};
       if (song && song.charts) {
+        if (song.icon) {
+          const iconImg = document.createElement("img");
+          iconImg.src = song.icon;
+          iconImg.style.width = "250px";
+          iconImg.style.height = "250px";
+          iconImg.style.objectFit = "cover";
+          iconImg.style.borderRadius = "8px";
+          iconImg.style.marginBottom = "10px";
+          iconImg.style.boxShadow = "0 0 15px rgba(224, 64, 251, 0.3)";
+          rightCol.appendChild(iconImg);
+        }
         const title = document.createElement("h2");
         title.textContent = song.title;
         title.style.color = "white";
-        title.style.marginBottom = "30px";
+        title.style.margin = "0 0 30px 0";
         title.style.textShadow = "0 0 10px #e040fb";
         rightCol.appendChild(title);
         const buttonOrder = ["no", "st", "ad", "pr", "et"];
@@ -2548,6 +2707,7 @@ AUTO`;
         currentChartFilename = chartFilename;
         currentSongAudio = audioFilename;
         currentSongBackground = null;
+        isMVLayout = false;
         if (loadingOverlay) {
           loadingOverlay.style.display = "flex";
           if (loadingText) loadingText.textContent = `LOADING...`;
@@ -2561,6 +2721,7 @@ AUTO`;
         try {
           const song = availableSongs.find((s) => s.folder === songFolder);
           if (song && song.video) {
+            isMVLayout = true;
             if (bgVideo) {
               bgVideo.pause();
               bgVideo.src = "";
@@ -2765,30 +2926,29 @@ AUTO`;
           });
           lConfigs[4] = { x: sx, width: totalPlayWidth, color: "#e040fb", label: "SPACE" };
         } else if (currentKeyMode === "12key") {
-          const tempWidth2 = currentLaneWidth * 0.8;
-          const totalPlayWidth = tempWidth2 * 12;
+          const tempWidth2 = currentLaneWidth * 1.5;
+          const totalPlayWidth = tempWidth2 * 6;
           const sx = (canvas.width - totalPlayWidth) / 2;
           laneStartX = sx;
-          const indices = [9, 11, 1, 0, 3, 2, 5, 6, 7, 8, 12, 10];
-          const labels = ["S", "W", "D", "E", "F", "R", "U", "J", "I", "K", "O", "L"];
-          const colors = [
-            "#ffffff",
-            "#7CA4FF",
-            "#ffffff",
-            "#7CA4FF",
-            "#ffffff",
-            "#7CA4FF",
-            "#7CA4FF",
-            "#ffffff",
-            "#7CA4FF",
-            "#ffffff",
-            "#7CA4FF",
-            "#ffffff"
+          const pairs = [
+            { white: 9, blue: 11, label: "S/W" },
+            // Lane 0
+            { white: 1, blue: 0, label: "D/E" },
+            // Lane 1
+            { white: 3, blue: 2, label: "F/R" },
+            // Lane 2
+            { white: 6, blue: 5, label: "J/U" },
+            // Lane 3
+            { white: 8, blue: 7, label: "K/I" },
+            // Lane 4
+            { white: 10, blue: 12, label: "L/O" }
+            // Lane 5
           ];
-          indices.forEach((kIdx, i) => {
+          pairs.forEach((pair, i) => {
             const x = sx + i * tempWidth2;
             vLanes.push({ x, width: tempWidth2 });
-            lConfigs[kIdx] = { x, width: tempWidth2, color: colors[i], label: labels[i] };
+            lConfigs[pair.white] = { x, width: tempWidth2, color: "#ffffff", label: pair.label };
+            lConfigs[pair.blue] = { x, width: tempWidth2, color: "#7CA4FF", label: "" };
           });
         }
         return { vLanes, lConfigs };
@@ -2887,16 +3047,35 @@ AUTO`;
       }
       if (keyIndex !== -1 && !pressedKeys[keyIndex]) {
         pressedKeys[keyIndex] = true;
+        const currentTimeMs = getAudioTime() * 1e3;
+        const forbiddenNote = notes.find(
+          (n) => n.laneIndex === keyIndex && n.isLong && n.type === "death" && currentTimeMs >= n.scheduledTime && currentTimeMs <= n.scheduledTime + n.duration
+        );
+        if (forbiddenNote) {
+          console.log("DEATH LONG NOTE HIT - FAIL");
+          failGame();
+          return;
+        }
         const targetNotes = notes.filter(
           (n) => n.active && n.laneIndex === keyIndex && !n.processed
         ).sort((a, b) => a.scheduledTime - b.scheduledTime);
         if (targetNotes.length > 0) {
-          const note = targetNotes[0];
-          const currentTimeMs = getAudioTime() * 1e3;
-          const msErrorRaw = currentTimeMs - note.scheduledTime;
-          const msError = msErrorRaw - globalOffset;
-          const absError = Math.abs(msError);
-          if (absError < MISS_BOUNDARY) {
+          const currentTimeMs2 = getAudioTime() * 1e3;
+          const candidates = targetNotes.filter((n) => {
+            const absError = Math.abs(currentTimeMs2 - n.scheduledTime - globalOffset);
+            return absError < MISS_BOUNDARY;
+          });
+          if (candidates.length > 0) {
+            const priorityNote = candidates.find((n) => n.type !== "death");
+            const note = priorityNote || candidates[0];
+            const msErrorRaw = currentTimeMs2 - note.scheduledTime;
+            const msError = msErrorRaw - globalOffset;
+            const absError = Math.abs(msError);
+            if (note.type === "death") {
+              console.log("DEATH NOTE HIT - FAIL");
+              failGame();
+              return;
+            }
             const sign = msError > 0 ? "+" : "";
             let msDisplay = `
 ${sign}${Math.floor(msError)}ms`;
@@ -2935,7 +3114,14 @@ ${sign}${Math.floor(msError)}ms`;
             } else {
               note.active = false;
             }
+            logDebug(`HIT: lane=${keyIndex} error=${Math.floor(msError)}ms target=${(note.scheduledTime / 1e3).toFixed(3)}s judge=${judgementText.split("\n")[0]}`);
+          } else {
+            const note = targetNotes[0];
+            const msError = currentTimeMs2 - note.scheduledTime - globalOffset;
+            logDebug(`OUTSIDE: lane=${keyIndex} error=${Math.floor(msError)}ms target=${(note.scheduledTime / 1e3).toFixed(3)}s`);
           }
+        } else {
+          logDebug(`EMPTY: lane=${keyIndex}`);
         }
       }
     });

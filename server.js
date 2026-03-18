@@ -18,6 +18,8 @@ const mimeTypes = {
     '.txt': 'text/plain',
     '.ico': 'image/x-icon',
     '.mp4': 'video/mp4',
+    '.m4a': 'audio/mp4',
+    '.m4v': 'video/mp4',
     '.webm': 'video/webm',
     '.ogv': 'video/ogg',
     '.svg': 'image/svg+xml',
@@ -275,18 +277,48 @@ const server = http.createServer((req, res) => {
     console.log(`Requested: ${pathname} -> Decoded: ${safePath}`);
     console.log(`Attempting to read: ${fsPath}`);
 
-    fs.readFile(fsPath, (err, data) => {
-        if (err) {
-            console.error(`Error reading ${fsPath}:`, err.code);
+    fs.stat(fsPath, (err, stats) => {
+        if (err || !stats.isFile()) {
+            console.error(`Error reading ${fsPath}:`, err?.code);
             res.writeHead(404);
             res.end('Not Found');
-        } else {
-            const contentType = mimeTypes[ext] || 'application/octet-stream';
-            res.writeHead(200, {
-                'Content-Type': contentType,
-                'Cache-Control': 'no-cache, no-store, must-revalidate'
+            return;
+        }
+
+        const range = req.headers.range;
+        const totalSize = stats.size;
+        const contentType = mimeTypes[ext] || 'application/octet-stream';
+
+        if (range) {
+            console.log(`[DEBUG] Range requested: ${range} for ${safePath}`);
+            const parts = range.replace(/bytes=/, "").split("-");
+            const start = parseInt(parts[0], 10);
+            const end = (parts[1] && parts[1].trim() !== "") ? parseInt(parts[1], 10) : totalSize - 1;
+
+            if (isNaN(start) || start >= totalSize || (end !== undefined && end >= totalSize)) {
+                console.error(`[DEBUG] Invalid Range: ${start}-${end}/${totalSize}`);
+                res.writeHead(416, { 'Content-Range': `bytes */${totalSize}` });
+                return res.end();
+            }
+
+            const chunksize = (end - start) + 1;
+            res.writeHead(206, {
+                'Content-Range': `bytes ${start}-${end}/${totalSize}`,
+                'Accept-Ranges': 'bytes',
+                'Content-Length': chunksize,
+                'Content-Type': contentType
             });
-            res.end(data);
+
+            const stream = fs.createReadStream(fsPath, { start, end });
+            stream.pipe(res);
+        } else {
+            console.log(`[DEBUG] Full file request: ${safePath}`);
+            res.writeHead(200, {
+                'Content-Length': totalSize,
+                'Content-Type': contentType,
+                'Accept-Ranges': 'bytes'
+            });
+            fs.createReadStream(fsPath).pipe(res);
         }
     });
 });

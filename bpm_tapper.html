@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <title>BPM Tapper</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background: #222;
+            color: #fff;
+            text-align: center;
+            padding: 50px;
+        }
+
+        #tap-btn {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: #e040fb;
+            color: white;
+            border: none;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(224, 64, 251, 0.5);
+            transition: transform 0.1s;
+        }
+
+        #tap-btn:active {
+            transform: scale(0.95);
+            background: #b000cc;
+        }
+
+        .info {
+            margin-top: 20px;
+            font-size: 20px;
+        }
+
+        .bpm {
+            font-size: 48px;
+            color: #00ffff;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>BPM Tapper</h1>
+    <p>曲に合わせて下のボタン（またはスペースキー）をタップしてください</p>
+
+    <button id="tap-btn">TAP (Space)</button>
+
+    <div class="bpm" id="bpm-display">--- BPM</div>
+    <div class="info" id="count-display">Taps: 0</div>
+
+    <button onclick="reset()" style="margin-top: 20px;">Reset</button>
+
+    <script>
+        let taps = [];
+        const bpmDisplay = document.getElementById('bpm-display');
+        const countDisplay = document.getElementById('count-display');
+        const tapBtn = document.getElementById('tap-btn');
+
+        function tap() {
+            const now = performance.now();
+
+            // もし最後にタップしてから2秒以上経っていたらリセット
+            if (taps.length > 0 && now - taps[taps.length - 1] > 2000) {
+                taps = [];
+            }
+
+            taps.push(now);
+            countDisplay.innerText = `Taps: ${taps.length}`;
+
+            if (taps.length >= 2) {
+                // タップ間隔の平均を計算
+                let totalInterval = 0;
+                for (let i = 1; i < taps.length; i++) {
+                    totalInterval += (taps[i] - taps[i - 1]);
+                }
+                const averageInterval = totalInterval / (taps.length - 1);
+
+                // ミリ秒の間隔からBPMに変換 (1分 = 60000ミリ秒)
+                const bpm = 60000 / averageInterval;
+                bpmDisplay.innerText = `${bpm.toFixed(2)} BPM`;
+            }
+        }
+
+        function reset() {
+            taps = [];
+            bpmDisplay.innerText = '--- BPM';
+            countDisplay.innerText = 'Taps: 0';
+        }
+
+        tapBtn.addEventListener('click', tap);
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                // ボタンの見た目もへこませる
+                tapBtn.style.transform = 'scale(0.95)';
+                tapBtn.style.background = '#b000cc';
+                tap();
+            }
+        });
+        document.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                tapBtn.style.transform = 'scale(1)';
+                tapBtn.style.background = '#e040fb';
+            }
+        });
+    </script>
+</body>
+
+</html>

@@ -706,7 +706,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     }
     if (zoomRange) {
         zoomRange.addEventListener('input', () => {
+            const oldValue = zoomLevel;
             zoomLevel = parseFloat(zoomRange.value);
+            if (statusDiv)
+                statusDiv.textContent = `[Zoom] ${oldValue}->${zoomLevel}. scroll: ${Math.round(scrollTime)} / tar: ${Math.round(targetScrollTime)}`;
         });
     }
     // Note Type Logic
@@ -723,30 +726,29 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             });
         });
     }
-    // Edit Layer Logic
-    const editLayerRadios = document.getElementsByName('edit-layer');
-    const layerSelectorContainer = document.getElementById('layer-selector-container');
+    // 12Key Layer Toggle (New)
     let currentEditLayer = 'white';
-    if (editLayerRadios) {
-        editLayerRadios.forEach(radio => {
-            radio.addEventListener('change', () => {
-                if (radio.checked) {
-                    currentEditLayer = radio.value;
-                    pendingHold = null;
-                }
-            });
-        });
+    const btn12kWhite = document.getElementById('btn-12key-white');
+    const btn12kBlue = document.getElementById('btn-12key-blue');
+    if (btn12kWhite && btn12kBlue) {
+        btn12kWhite.onclick = () => {
+            currentEditLayer = 'white';
+            btn12kWhite.classList.add('active-white');
+            btn12kBlue.classList.remove('active-blue');
+            pendingHold = null;
+        };
+        btn12kBlue.onclick = () => {
+            currentEditLayer = 'blue';
+            btn12kBlue.classList.add('active-blue');
+            btn12kWhite.classList.remove('active-white');
+            pendingHold = null;
+        };
     }
     // Editor Mode Logic
     const editorModeSelect = document.getElementById('editor-mode-select');
     let editorMode = '9key';
     const visualEditorContainer = document.getElementById('visual-editor-container');
-    // Default width per lane
-    const LANE_WIDTH_4K = 50;
-    const LANE_WIDTH_6K = 40;
-    const LANE_WIDTH_8K = 40;
-    const LANE_WIDTH_9K = 80; // Original
-    const LANE_WIDTH_12K = 35;
+    const layerSelectorContainer = document.getElementById('layer-selector-container');
     if (editorModeSelect) {
         editorModeSelect.addEventListener('change', () => {
             editorMode = editorModeSelect.value;
@@ -762,15 +764,19 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             else if (editorMode === '9key')
                 newWidth = 800;
             else if (editorMode === '12key')
-                newWidth = 500;
+                newWidth = 400; // 6 lanes
             if (visualEditorContainer)
                 visualEditorContainer.style.width = `${newWidth}px`;
             editorCanvas.width = newWidth;
             calculateLaneLayout(editorCanvas.width);
-            // Hide Layer Selector completely?
-            // User requested it be visible in all modes
-            if (layerSelectorContainer)
-                layerSelectorContainer.style.display = 'block';
+            if (editorMode === '12key') {
+                if (layerSelectorContainer)
+                    layerSelectorContainer.style.display = 'block';
+            }
+            else {
+                if (layerSelectorContainer)
+                    layerSelectorContainer.style.display = 'none';
+            }
         });
         // Init logic
         editorModeSelect.dispatchEvent(new Event('change'));
@@ -804,7 +810,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         // DeltaY * (1/Zoom) * SpeedFactor
         const deltaMs = e.deltaY * sensitivity * (1 / zoomLevel) * 5;
         // Update Target
-        targetScrollTime = Math.max(0, Math.min((audio.duration || 100) * 1000, targetScrollTime + deltaMs));
+        const maxScroll = (audio.duration && !isNaN(audio.duration) && audio.duration > 0) ? audio.duration * 1000 : 600000;
+        targetScrollTime = Math.max(0, Math.min(maxScroll, targetScrollTime + deltaMs));
     }, { passive: false });
     let LANE_DEFS = [];
     function calculateLaneLayout(canvasW) {
@@ -850,7 +857,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             if (editorMode === '8key')
                 totalLanes = 9; // 8key + Space = 9 inputs
             if (editorMode === '12key')
-                totalLanes = 13; // 12 + Space
+                totalLanes = 6; // Grouped: 6 pairs (no Space)
             const w = Math.floor(canvasW / totalLanes);
             for (let i = 0; i < totalLanes; i++) {
                 LANE_DEFS[i] = { x: i * w, width: w };
@@ -948,8 +955,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             targetKeyIndex = mapping[clickedLane];
         }
         else if (editorMode === '12key') {
-            const mapping = [9, 11, 1, 0, 3, 2, 4, 5, 6, 7, 8, 12, 10];
-            targetKeyIndex = mapping[clickedLane];
+            // Lane mapping for 12key (6 grouped lanes)
+            const whiteMapping = [9, 1, 3, 6, 8, 10];
+            const blueMapping = [11, 0, 2, 5, 7, 12];
+            if (currentEditLayer === 'blue') {
+                targetKeyIndex = blueMapping[clickedLane];
+            }
+            else {
+                targetKeyIndex = whiteMapping[clickedLane];
+            }
         }
         if (targetKeyIndex === -1)
             return;
@@ -1053,7 +1067,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 targetScrollTime -= scrollSpeed;
             }
             // Clamp
-            targetScrollTime = Math.max(0, Math.min((audio.duration || 600) * 1000, targetScrollTime));
+            const maxScroll = (audio.duration && !isNaN(audio.duration) && audio.duration > 0) ? audio.duration * 1000 : 600000;
+            const oldTarget = targetScrollTime;
+            targetScrollTime = Math.max(0, Math.min(maxScroll, targetScrollTime));
+            if (oldTarget !== targetScrollTime) {
+                if (statusDiv)
+                    statusDiv.textContent = `[Scroll Override] Clamped ${Math.round(oldTarget)} to ${Math.round(targetScrollTime)}`;
+            }
         }
         else {
             // Metronome logic
@@ -1081,206 +1101,272 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     function updateVisuals() {
         if (!ctx)
             return;
-        // Clear
-        ctx.fillStyle = '#111';
-        ctx.fillRect(0, 0, editorCanvas.width, editorCanvas.height);
-        const initialBpm = parseFloat(bpmInput.value) || 110;
-        const offset = parseFloat(offsetInput.value) || 0;
-        const pxPerMs = BASE_PX_PER_MS * zoomLevel;
-        if (isPlaying) {
-            scrollTime = audio.currentTime * 1000;
-            targetScrollTime = scrollTime;
-        }
-        else {
-            const diff = targetScrollTime - scrollTime;
-            if (Math.abs(diff) < 0.5) {
-                scrollTime = targetScrollTime;
+        try {
+            // Clear
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, editorCanvas.width, editorCanvas.height);
+            const initialBpm = parseFloat(bpmInput.value) || 110;
+            const offset = parseFloat(offsetInput.value) || 0;
+            const pxPerMs = BASE_PX_PER_MS * zoomLevel;
+            if (isPlaying) {
+                scrollTime = audio.currentTime * 1000;
+                targetScrollTime = scrollTime;
             }
             else {
-                scrollTime += diff * 0.2;
-            }
-            if (Math.abs(audio.currentTime * 1000 - scrollTime) > 100 && audio.readyState >= 2) {
-                audio.currentTime = scrollTime / 1000;
-            }
-        }
-        const currentTime = scrollTime;
-        // Draw Beat Grid (Variable BPM)
-        const viewHeightMs = editorCanvas.height / pxPerMs;
-        const visibleStartTime = currentTime - ((editorCanvas.height - PLAYHEAD_Y) / pxPerMs);
-        const visibleEndTime = currentTime + (PLAYHEAD_Y / pxPerMs);
-        // 1. Prepare Anchors (Segments with calculated Base Beat)
-        // This ensures grid is continuous (aligned to beat 0 at offset)
-        const sortedChanges = bpmChanges.map(c => (Object.assign({}, c))).sort((a, b) => a.time - b.time);
-        const anchors = [];
-        // Initial Segment: From -Infinity to First Change
-        // Reference: Offset is Beat 0.
-        // If first change is at Time T > Offset: 
-        // Segment 0 covers [-Inf, T]. BaseTime=Offset, BaseBeat=0.
-        // If first change is at Time T < Offset:
-        // Segment 0 covers [-Inf, T]. Still BaseTime=Offset, BaseBeat=0? 
-        // Actually, if we have changes before offset, we should respect them.
-        // But for simplicity/robustness, let's assume "Initial BPM" governs everything before the first explicit change.
-        // And we pin "Beat 0" to "Offset".
-        let t = offset;
-        let b = 0;
-        let cBpm = initialBpm;
-        // We need to advance t/b/bpm through changes to build anchors
-        // But the first anchor is special (pre-changes).
-        const firstChangeTime = sortedChanges.length > 0 ? sortedChanges[0].time : 999999999;
-        anchors.push({
-            startTime: -999999999,
-            endTime: firstChangeTime,
-            bpm: initialBpm,
-            baseTime: offset,
-            baseBeat: 0
-        });
-        // Calculate subsequent anchors
-        // We start tracking from 'offset' generally, but if changes are before offset, 
-        // we might strictly need to back-calculate. 
-        // Let's assume sortedChanges are processed correctly from simplified "t=0" view? 
-        // Actually, let's just trace from the first change found.
-        // We need to know the beat of the FIRST change.
-        // If first change is at T=1000, and Offset=0, BPM=120 (0.5s/beat).
-        // Beat at T=1000 is 2.
-        // So Anchor 1 starts at T=1000, Beat=2.
-        // Logic:
-        // 1. Find beat of sortedChanges[0] using InitialBPM and Offset.
-        // 2. Iterate.
-        if (sortedChanges.length > 0) {
-            // Check if first change is before offset?
-            // If change is at -1000, offset 0.
-            // Beat = (-1000 - 0) / 500 = -2.
-            // Correct.
-            // Re-use logic:
-            let currTime = offset;
-            let currBeat = 0;
-            let currBpm = initialBpm;
-            // We need to bridge from 'currTime' to 'change.time'
-            // Actually, simply iterate changes and push anchors.
-            // But we need to link them.
-            // The "Initial Anchor" above handles up to firstChangeTime.
-            // So we just need to calculate the state AT firstChangeTime to start the loop?
-            // Or just iterate changes, calculating delta from previous state.
-            // We start state at Offset/0/Initial.
-            // We process changes in order.
-            // Warning: if changes are somehow before each other? Sorted handles that.
-            for (let i = 0; i < sortedChanges.length; i++) {
-                const change = sortedChanges[i];
-                // Calculate beats passed since last state
-                const msPerBeat = 60000 / currBpm;
-                const deltaMs = change.time - currTime;
-                const deltaBeats = deltaMs / msPerBeat;
-                currBeat += deltaBeats;
-                currTime = change.time;
-                currBpm = change.bpm;
-                const nextTime = (i + 1 < sortedChanges.length) ? sortedChanges[i + 1].time : 999999999;
-                anchors.push({
-                    startTime: change.time,
-                    endTime: nextTime,
-                    bpm: change.bpm,
-                    baseTime: change.time,
-                    baseBeat: currBeat
-                });
-            }
-        }
-        // Draw Loop
-        anchors.forEach(anchor => {
-            const segStart = Math.max(visibleStartTime, anchor.startTime);
-            const segEnd = Math.min(visibleEndTime, anchor.endTime);
-            if (segStart < segEnd) {
-                const msPerBeat = 60000 / anchor.bpm;
-                const snapBeat = 4 / snapDenominator;
-                // Calculate start beat in this segment
-                const elapsedSinceBase = segStart - anchor.baseTime;
-                const beatsSinceBase = elapsedSinceBase / msPerBeat;
-                const globalBeatStart = anchor.baseBeat + beatsSinceBase;
-                // Snap to grid
-                // We want b >= globalBeatStart such that b is multiple of snapBeat
-                const startGridBeat = Math.ceil(globalBeatStart / snapBeat) * snapBeat;
-                // We iterate until time > segEnd
-                // Safety: Limit iterations to avoid freeze if snap is tiny or bug
-                let safety = 0;
-                for (let b = startGridBeat; safety < 1000; b += snapBeat) {
-                    safety++;
-                    const time = anchor.baseTime + (b - anchor.baseBeat) * msPerBeat;
-                    if (time > segEnd + 1)
-                        break;
-                    const y = PLAYHEAD_Y - (time - currentTime) * pxPerMs;
-                    // Measure Check (Global Beat % 4)
-                    // Use epsilon for float comparison
-                    const isMeasure = Math.abs(b % 4) < 0.001 || Math.abs((b % 4) - 4) < 0.001;
-                    if (isMeasure) {
-                        ctx.strokeStyle = '#666';
-                        ctx.lineWidth = 2; // Thicker for measure
-                    }
-                    else {
-                        // Beat Check (Global Beat % 1)
-                        const isBeat = Math.abs(b % 1) < 0.001 || Math.abs((b % 1) - 1) < 0.001;
-                        if (isBeat) {
-                            ctx.strokeStyle = '#444';
-                            ctx.lineWidth = 1;
-                        }
-                        else {
-                            ctx.strokeStyle = '#222'; // Subdivision
-                            ctx.lineWidth = 1;
-                        }
-                    }
-                    ctx.beginPath();
-                    ctx.moveTo(0, y);
-                    ctx.lineTo(editorCanvas.width, y);
-                    ctx.stroke();
+                const diff = targetScrollTime - scrollTime;
+                if (Math.abs(diff) < 0.5) {
+                    scrollTime = targetScrollTime;
+                }
+                else {
+                    scrollTime += diff * 0.2;
+                }
+                if (Math.abs(audio.currentTime * 1000 - scrollTime) > 100 && audio.readyState >= 2) {
+                    audio.currentTime = scrollTime / 1000;
                 }
             }
-        });
-        // Draw Layout Changes
-        layoutChanges.forEach(lc => {
-            const y = PLAYHEAD_Y - (lc.time - currentTime) * pxPerMs;
-            if (y < 0 || y > editorCanvas.height)
-                return;
-            ctx.strokeStyle = '#e040fb';
-            ctx.lineWidth = 3;
-            ctx.setLineDash([10, 5]);
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(editorCanvas.width, y);
-            ctx.stroke();
-            ctx.setLineDash([]);
-            ctx.fillStyle = '#e040fb';
-            ctx.font = '12px Arial';
-            ctx.fillText(lc.type.toUpperCase(), editorCanvas.width - 10, y - 5);
-        });
-        // Draw BPM Changes
-        bpmChanges.forEach(bc => {
-            const y = PLAYHEAD_Y - (bc.time - currentTime) * pxPerMs;
-            if (y < 0 || y > editorCanvas.height)
-                return;
-            ctx.strokeStyle = '#ffeb3b'; // Yellow
-            ctx.lineWidth = 3;
-            ctx.setLineDash([5, 5]); // Dotted
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(editorCanvas.width, y);
-            ctx.stroke();
-            ctx.setLineDash([]);
-            ctx.fillStyle = '#ffeb3b';
-            ctx.font = 'bold 12px Arial';
-            ctx.fillText(`BPM ${bc.bpm}`, editorCanvas.width - 10, y - 5);
-        });
-        if (!LANE_DEFS.length)
-            calculateLaneLayout(editorCanvas.width);
-        // Draw Lanes (Vertical Dividers)
-        ctx.strokeStyle = '#444';
-        LANE_DEFS.forEach(def => {
-            ctx.strokeRect(def.x, 0, def.width, editorCanvas.height);
-        });
-        // Draw Active Holds (Visual feedback while holding)
-        if (isRecording) {
-            for (const laneStr in activeHolds) {
-                const lane = parseInt(laneStr);
-                const startTime = activeHolds[lane];
+            const currentTime = scrollTime;
+            // Draw Beat Grid (Variable BPM)
+            const viewHeightMs = editorCanvas.height / pxPerMs;
+            const visibleStartTime = currentTime - ((editorCanvas.height - PLAYHEAD_Y) / pxPerMs);
+            const visibleEndTime = currentTime + (PLAYHEAD_Y / pxPerMs);
+            // 1. Prepare Anchors (Segments with calculated Base Beat)
+            // This ensures grid is continuous (aligned to beat 0 at offset)
+            const sortedChanges = bpmChanges.map(c => (Object.assign({}, c))).sort((a, b) => a.time - b.time);
+            const anchors = [];
+            // Initial Segment: From -Infinity to First Change
+            // Reference: Offset is Beat 0.
+            // If first change is at Time T > Offset: 
+            // Segment 0 covers [-Inf, T]. BaseTime=Offset, BaseBeat=0.
+            // If first change is at Time T < Offset:
+            // Segment 0 covers [-Inf, T]. Still BaseTime=Offset, BaseBeat=0? 
+            // Actually, if we have changes before offset, we should respect them.
+            // But for simplicity/robustness, let's assume "Initial BPM" governs everything before the first explicit change.
+            // And we pin "Beat 0" to "Offset".
+            let t = offset;
+            let b = 0;
+            let cBpm = initialBpm;
+            // We need to advance t/b/bpm through changes to build anchors
+            // But the first anchor is special (pre-changes).
+            const firstChangeTime = sortedChanges.length > 0 ? sortedChanges[0].time : 999999999;
+            anchors.push({
+                startTime: -999999999,
+                endTime: firstChangeTime,
+                bpm: initialBpm,
+                baseTime: offset,
+                baseBeat: 0
+            });
+            // Calculate subsequent anchors
+            // We start tracking from 'offset' generally, but if changes are before offset, 
+            // we might strictly need to back-calculate. 
+            // Let's assume sortedChanges are processed correctly from simplified "t=0" view? 
+            // Actually, let's just trace from the first change found.
+            // We need to know the beat of the FIRST change.
+            // If first change is at T=1000, and Offset=0, BPM=120 (0.5s/beat).
+            // Beat at T=1000 is 2.
+            // So Anchor 1 starts at T=1000, Beat=2.
+            // Logic:
+            // 1. Find beat of sortedChanges[0] using InitialBPM and Offset.
+            // 2. Iterate.
+            if (sortedChanges.length > 0) {
+                // Check if first change is before offset?
+                // If change is at -1000, offset 0.
+                // Beat = (-1000 - 0) / 500 = -2.
+                // Correct.
+                // Re-use logic:
+                let currTime = offset;
+                let currBeat = 0;
+                let currBpm = initialBpm;
+                // We need to bridge from 'currTime' to 'change.time'
+                // Actually, simply iterate changes and push anchors.
+                // But we need to link them.
+                // The "Initial Anchor" above handles up to firstChangeTime.
+                // So we just need to calculate the state AT firstChangeTime to start the loop?
+                // Or just iterate changes, calculating delta from previous state.
+                // We start state at Offset/0/Initial.
+                // We process changes in order.
+                // Warning: if changes are somehow before each other? Sorted handles that.
+                for (let i = 0; i < sortedChanges.length; i++) {
+                    const change = sortedChanges[i];
+                    // Calculate beats passed since last state
+                    const msPerBeat = 60000 / currBpm;
+                    const deltaMs = change.time - currTime;
+                    const deltaBeats = deltaMs / msPerBeat;
+                    currBeat += deltaBeats;
+                    currTime = change.time;
+                    currBpm = change.bpm;
+                    const nextTime = (i + 1 < sortedChanges.length) ? sortedChanges[i + 1].time : 999999999;
+                    anchors.push({
+                        startTime: change.time,
+                        endTime: nextTime,
+                        bpm: change.bpm,
+                        baseTime: change.time,
+                        baseBeat: currBeat
+                    });
+                }
+            }
+            // Draw Loop
+            anchors.forEach(anchor => {
+                const segStart = Math.max(visibleStartTime, anchor.startTime);
+                const segEnd = Math.min(visibleEndTime, anchor.endTime);
+                if (segStart < segEnd) {
+                    const msPerBeat = 60000 / anchor.bpm;
+                    const snapBeat = 4 / snapDenominator;
+                    if (isNaN(msPerBeat) || msPerBeat <= 0 || isNaN(snapBeat) || snapBeat <= 0)
+                        return;
+                    // Calculate start beat in this segment
+                    const elapsedSinceBase = segStart - anchor.baseTime;
+                    const beatsSinceBase = elapsedSinceBase / msPerBeat;
+                    const globalBeatStart = anchor.baseBeat + beatsSinceBase;
+                    // Snap to grid
+                    // We want b >= globalBeatStart such that b is multiple of snapBeat
+                    const startGridBeat = Math.ceil(globalBeatStart / snapBeat) * snapBeat;
+                    // We iterate until time > segEnd
+                    // Safety: Limit iterations to avoid freeze if snap is tiny or bug
+                    let safety = 0;
+                    for (let b = startGridBeat; safety < 5000; b += snapBeat) {
+                        safety++;
+                        const time = anchor.baseTime + (b - anchor.baseBeat) * msPerBeat;
+                        if (time > segEnd + 1)
+                            break;
+                        const y = PLAYHEAD_Y - (time - currentTime) * pxPerMs;
+                        // Measure Check (Global Beat % 4)
+                        // Use epsilon for float comparison
+                        const isMeasure = Math.abs(b % 4) < 0.001 || Math.abs((b % 4) - 4) < 0.001;
+                        if (isMeasure) {
+                            ctx.strokeStyle = '#666';
+                            ctx.lineWidth = 2; // Thicker for measure
+                        }
+                        else {
+                            // Beat Check (Global Beat % 1)
+                            const isBeat = Math.abs(b % 1) < 0.001 || Math.abs((b % 1) - 1) < 0.001;
+                            if (isBeat) {
+                                ctx.strokeStyle = '#444';
+                                ctx.lineWidth = 1;
+                            }
+                            else {
+                                ctx.strokeStyle = '#222'; // Subdivision
+                                ctx.lineWidth = 1;
+                            }
+                        }
+                        ctx.beginPath();
+                        ctx.moveTo(0, y);
+                        ctx.lineTo(editorCanvas.width, y);
+                        ctx.stroke();
+                    }
+                }
+            });
+            // Draw Layout Changes
+            layoutChanges.forEach(lc => {
+                const y = PLAYHEAD_Y - (lc.time - currentTime) * pxPerMs;
+                if (y < 0 || y > editorCanvas.height)
+                    return;
+                ctx.strokeStyle = '#e040fb';
+                ctx.lineWidth = 3;
+                ctx.setLineDash([10, 5]);
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(editorCanvas.width, y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#e040fb';
+                ctx.font = '12px Arial';
+                ctx.fillText(lc.type.toUpperCase(), editorCanvas.width - 10, y - 5);
+            });
+            // Layer Indicator (New)
+            if (editorMode === '12key') {
+                ctx.fillStyle = currentEditLayer === 'white' ? '#ffffff' : '#00bcd4';
+                ctx.font = 'bold 16px Arial';
+                ctx.textAlign = 'left';
+                ctx.fillText(`LAYER: ${currentEditLayer.toUpperCase()}`, 10, 25);
+            }
+            // Draw BPM Changes
+            bpmChanges.forEach(bc => {
+                const y = PLAYHEAD_Y - (bc.time - currentTime) * pxPerMs;
+                if (y < 0 || y > editorCanvas.height)
+                    return;
+                ctx.strokeStyle = '#ffeb3b'; // Yellow
+                ctx.lineWidth = 3;
+                ctx.setLineDash([5, 5]); // Dotted
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(editorCanvas.width, y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#ffeb3b';
+                ctx.font = 'bold 12px Arial';
+                ctx.fillText(`BPM ${bc.bpm}`, editorCanvas.width - 10, y - 5);
+            });
+            if (!LANE_DEFS.length)
+                calculateLaneLayout(editorCanvas.width);
+            // Draw Lanes (Vertical Dividers)
+            ctx.strokeStyle = '#444';
+            LANE_DEFS.forEach(def => {
+                ctx.strokeRect(def.x, 0, def.width, editorCanvas.height);
+            });
+            // Draw Active Holds (Visual feedback while holding)
+            if (isRecording) {
+                for (const laneStr in activeHolds) {
+                    const lane = parseInt(laneStr);
+                    const startTime = activeHolds[lane];
+                    let visualLane = -1;
+                    if (editorMode === '9key') {
+                        visualLane = lane;
+                    }
+                    else {
+                        let mapping = [];
+                        if (editorMode === '4key')
+                            mapping = [1, 3, 4, 6, 8];
+                        else if (editorMode === '6key')
+                            mapping = [9, 1, 3, 4, 6, 8, 10];
+                        else if (editorMode === '8key')
+                            mapping = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+                        else if (editorMode === '12key')
+                            mapping = [9, 11, 1, 0, 3, 2, 4, 5, 6, 7, 8, 12, 10];
+                        const idx = mapping.indexOf(lane);
+                        if (idx !== -1)
+                            visualLane = idx;
+                    }
+                    if (visualLane === -1 || !LANE_DEFS[visualLane])
+                        continue;
+                    const ld = LANE_DEFS[visualLane];
+                    const yHeadPos = PLAYHEAD_Y - (startTime - currentTime) * pxPerMs;
+                    const yTailPos = PLAYHEAD_Y; // Current time
+                    ctx.fillStyle = (lane === 4) ? 'rgba(224, 64, 251, 0.3)' : 'rgba(255, 255, 255, 0.3)';
+                    ctx.fillRect(ld.x + 2, yTailPos, ld.width - 4, yHeadPos - yTailPos);
+                }
+            }
+            // Helper to draw a single note (Moved inside or kept global? It was inside updateVisuals in original)
+            // In the original file (Step 506 line 1253), drawNote was inside updateVisuals.
+            function drawNote(lane, time, duration, isGhost = false, noteType) {
+                if (!ctx)
+                    return;
+                const y = PLAYHEAD_Y - (time - currentTime) * pxPerMs;
+                // Simple bounds check
+                if (y > editorCanvas.height + 100 && duration === 0)
+                    return;
+                // If hold, check tail
+                if (duration > 0) {
+                    const tailY = y - duration * pxPerMs;
+                    if (tailY > editorCanvas.height && y > editorCanvas.height)
+                        return;
+                    if (y < -100 && tailY < -100)
+                        return;
+                }
                 let visualLane = -1;
+                let color = '#ffffff';
+                let isSpace = false;
                 if (editorMode === '9key') {
                     visualLane = lane;
+                    const whiteIndices = [1, 3, 6, 8];
+                    const blueIndices = [0, 2, 5, 7];
+                    if (whiteIndices.includes(lane))
+                        color = '#ffffff';
+                    else if (blueIndices.includes(lane))
+                        color = '#7CA4FF';
+                    else if (lane === 4) {
+                        color = '#e040fb';
+                        isSpace = true;
+                    }
                 }
                 else {
                     let mapping = [];
@@ -1293,153 +1379,123 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     else if (editorMode === '12key')
                         mapping = [9, 11, 1, 0, 3, 2, 4, 5, 6, 7, 8, 12, 10];
                     const idx = mapping.indexOf(lane);
-                    if (idx !== -1)
+                    if (idx !== -1) {
                         visualLane = idx;
-                }
-                if (visualLane === -1 || !LANE_DEFS[visualLane])
-                    continue;
-                const ld = LANE_DEFS[visualLane];
-                const yHeadPos = PLAYHEAD_Y - (startTime - currentTime) * pxPerMs;
-                const yTailPos = PLAYHEAD_Y; // Current time
-                ctx.fillStyle = (lane === 4) ? 'rgba(224, 64, 251, 0.3)' : 'rgba(255, 255, 255, 0.3)';
-                ctx.fillRect(ld.x + 2, yTailPos, ld.width - 4, yHeadPos - yTailPos);
-            }
-        }
-        // Helper to draw a single note (Moved inside or kept global? It was inside updateVisuals in original)
-        // In the original file (Step 506 line 1253), drawNote was inside updateVisuals.
-        function drawNote(lane, time, duration, isGhost = false) {
-            if (!ctx)
-                return;
-            const y = PLAYHEAD_Y - (time - currentTime) * pxPerMs;
-            // Simple bounds check
-            if (y > editorCanvas.height + 100 && duration === 0)
-                return;
-            // If hold, check tail
-            if (duration > 0) {
-                const tailY = y - duration * pxPerMs;
-                if (tailY > editorCanvas.height && y > editorCanvas.height)
-                    return;
-                if (y < -100 && tailY < -100)
-                    return;
-            }
-            let visualLane = -1;
-            let color = '#ffffff';
-            let isSpace = false;
-            if (editorMode === '9key') {
-                visualLane = lane;
-                const whiteIndices = [1, 3, 6, 8];
-                const blueIndices = [0, 2, 5, 7];
-                if (whiteIndices.includes(lane))
-                    color = '#ffffff';
-                else if (blueIndices.includes(lane))
-                    color = '#7CA4FF';
-                else if (lane === 4) {
-                    color = '#e040fb';
-                    isSpace = true;
-                }
-            }
-            else {
-                let mapping = [];
-                if (editorMode === '4key')
-                    mapping = [1, 3, 4, 6, 8];
-                else if (editorMode === '6key')
-                    mapping = [9, 1, 3, 4, 6, 8, 10];
-                else if (editorMode === '8key')
-                    mapping = [0, 1, 2, 3, 4, 5, 6, 7, 8];
-                else if (editorMode === '12key')
-                    mapping = [9, 11, 1, 0, 3, 2, 4, 5, 6, 7, 8, 12, 10];
-                const idx = mapping.indexOf(lane);
-                if (idx !== -1) {
-                    visualLane = idx;
-                    if (lane === 4) {
-                        color = '#e040fb';
-                        isSpace = true;
-                    }
-                    else if (editorMode === '8key') {
-                        color = (idx % 2 === 0) ? '#7CA4FF' : '#ffffff';
-                    }
-                    else if (editorMode === '12key') {
-                        const whiteKeys = [9, 1, 3, 6, 8, 10];
-                        if (whiteKeys.includes(lane))
+                        if (lane === 4) {
+                            color = '#e040fb';
+                            isSpace = true;
+                        }
+                        else if (editorMode === '8key') {
+                            color = (idx % 2 === 0) ? '#7CA4FF' : '#ffffff';
+                        }
+                        else if (editorMode === '12key') {
+                            const whiteKeys = [9, 1, 3, 6, 8, 10];
+                            const blueKeys = [11, 0, 2, 5, 7, 12];
+                            const spaceKey = 4;
+                            if (lane === spaceKey) {
+                                // Space not visible in 6-lane layout, but just in case
+                                visualLane = -1;
+                            }
+                            else {
+                                const whiteIdx = whiteKeys.indexOf(lane);
+                                const blueIdx = blueKeys.indexOf(lane);
+                                if (whiteIdx !== -1) {
+                                    visualLane = whiteIdx;
+                                    color = '#ffffff';
+                                }
+                                else if (blueIdx !== -1) {
+                                    visualLane = blueIdx;
+                                    color = '#00bcd4'; // Brighter Blue (Cyan/Teal)
+                                }
+                            }
+                        }
+                        else {
                             color = '#ffffff';
-                        else
-                            color = '#7CA4FF';
-                    }
-                    else {
-                        color = '#ffffff';
+                        }
                     }
                 }
-            }
-            if (visualLane === -1 && !isSpace)
-                return;
-            if (isGhost) {
-                ctx.globalAlpha = 0.5;
+                if (visualLane === -1 && !isSpace)
+                    return;
+                if (isGhost) {
+                    ctx.globalAlpha = 0.5;
+                    if (isSpace && editorMode === '9key') {
+                        ctx.fillStyle = 'rgba(224, 64, 251, 0.5)';
+                        ctx.fillRect(0, y - 5, editorCanvas.width, 10);
+                    }
+                    else if (visualLane !== -1) {
+                        const ld = LANE_DEFS[visualLane];
+                        if (ld) {
+                            ctx.fillStyle = 'rgba(255, 255, 0, 0.5)';
+                            ctx.fillRect(ld.x + 2, y - 5, ld.width - 4, 10);
+                            ctx.strokeStyle = '#ffff00';
+                            ctx.lineWidth = 2;
+                            ctx.strokeRect(ld.x + 2, y - 5, ld.width - 4, 10);
+                        }
+                    }
+                    ctx.globalAlpha = 1.0;
+                    return;
+                }
+                if (noteType === 'sinking') {
+                    color = '#ff0000'; // Bright Red for Sinking
+                }
+                else if (noteType === 'death') {
+                    color = '#880000'; // Dark Red/Black-ish for Death
+                }
+                ctx.fillStyle = color;
                 if (isSpace && editorMode === '9key') {
-                    ctx.fillStyle = 'rgba(224, 64, 251, 0.5)';
-                    ctx.fillRect(0, y - 5, editorCanvas.width, 10);
+                    const drawH = 15;
+                    ctx.globalAlpha = 0.5;
+                    if (duration > 0) {
+                        const tailHeight = duration * pxPerMs;
+                        ctx.fillRect(0, y - tailHeight, editorCanvas.width, tailHeight);
+                    }
+                    ctx.fillRect(0, y - drawH / 2, editorCanvas.width, drawH);
+                    ctx.globalAlpha = 1.0;
                 }
                 else if (visualLane !== -1) {
                     const ld = LANE_DEFS[visualLane];
-                    if (ld) {
-                        ctx.fillStyle = 'rgba(255, 255, 0, 0.5)';
-                        ctx.fillRect(ld.x + 2, y - 5, ld.width - 4, 10);
-                        ctx.strokeStyle = '#ffff00';
-                        ctx.lineWidth = 2;
-                        ctx.strokeRect(ld.x + 2, y - 5, ld.width - 4, 10);
+                    if (!ld)
+                        return;
+                    const drawX = ld.x + 5;
+                    const drawW = ld.width - 10;
+                    if (duration > 0) {
+                        const tailHeight = duration * pxPerMs;
+                        ctx.globalAlpha = 0.5;
+                        ctx.fillRect(drawX + 2, y - tailHeight, drawW - 4, tailHeight);
+                        ctx.globalAlpha = 1.0;
                     }
+                    const noteH = 15;
+                    ctx.fillRect(drawX, y - noteH / 2, drawW, noteH);
                 }
-                ctx.globalAlpha = 1.0;
-                return;
             }
-            ctx.fillStyle = color;
-            if (isSpace && editorMode === '9key') {
-                const drawH = 15;
-                ctx.globalAlpha = 0.5;
-                if (duration > 0) {
-                    const tailHeight = duration * pxPerMs;
-                    ctx.fillRect(0, y - tailHeight, editorCanvas.width, tailHeight);
-                }
-                ctx.fillRect(0, y - drawH / 2, editorCanvas.width, drawH);
-                ctx.globalAlpha = 1.0;
+            // Draw Notes
+            if (pendingHold && pendingHold.lane === 4) {
+                drawNote(pendingHold.lane, pendingHold.time, 0, true);
             }
-            else if (visualLane !== -1) {
-                const ld = LANE_DEFS[visualLane];
-                if (!ld)
-                    return;
-                const drawX = ld.x + 5;
-                const drawW = ld.width - 10;
-                if (duration > 0) {
-                    const tailHeight = duration * pxPerMs;
-                    ctx.globalAlpha = 0.5;
-                    ctx.fillRect(drawX + 2, y - tailHeight, drawW - 4, tailHeight);
-                    ctx.globalAlpha = 1.0;
-                }
-                const noteH = 15;
-                ctx.fillRect(drawX, y - noteH / 2, drawW, noteH);
+            recordedNotes.forEach(note => {
+                if (note.lane === 4)
+                    drawNote(note.lane, note.time, note.duration, false);
+            });
+            if (pendingHold && pendingHold.lane !== 4) {
+                drawNote(pendingHold.lane, pendingHold.time, 0, true);
             }
+            recordedNotes.forEach(note => {
+                if (note.lane !== 4)
+                    drawNote(note.lane, note.time, note.duration, false);
+            });
+            // Draw Playhead
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, PLAYHEAD_Y);
+            ctx.lineTo(editorCanvas.width, PLAYHEAD_Y);
+            ctx.stroke();
         }
-        // Draw Notes
-        if (pendingHold && pendingHold.lane === 4) {
-            drawNote(pendingHold.lane, pendingHold.time, 0, true);
+        catch (err) {
+            console.error("Crash during updateVisuals:", err);
+            if (statusDiv)
+                statusDiv.textContent = "[Crash] " + err.message;
         }
-        recordedNotes.forEach(note => {
-            if (note.lane === 4)
-                drawNote(note.lane, note.time, note.duration);
-        });
-        if (pendingHold && pendingHold.lane !== 4) {
-            drawNote(pendingHold.lane, pendingHold.time, 0, true);
-        }
-        recordedNotes.forEach(note => {
-            if (note.lane !== 4)
-                drawNote(note.lane, note.time, note.duration);
-        });
-        // Draw Playhead
-        ctx.strokeStyle = '#ff0000';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(0, PLAYHEAD_Y);
-        ctx.lineTo(editorCanvas.width, PLAYHEAD_Y);
-        ctx.stroke();
     }
     function getChartJSONString() {
         const initialBpm = parseFloat(bpmInput.value) || 120;
@@ -1484,7 +1540,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             const beat = Math.round(getBeatFromTime(note.time) * 1000) / 1000;
             const endBeat = getBeatFromTime(note.time + note.duration);
             const durBeat = Math.round((endBeat - beat) * 1000) / 1000;
-            return { beat, lane: note.lane, duration: durBeat };
+            const out = { beat, lane: note.lane, duration: durBeat };
+            return out;
         }).sort((a, b) => a.beat - b.beat);
         // 4. Layout
         const layoutChangesOut = layoutChanges.map(lc => ({

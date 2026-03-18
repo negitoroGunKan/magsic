@@ -157,10 +157,40 @@
             box-shadow: 0 0 20px rgba(224, 64, 251, 0.4);
             z-index: 10;
         }
+
+        /* Debug Log */
+        #debug-log {
+            position: fixed;
+            top: 80px;
+            left: 10px;
+            width: 300px;
+            height: calc(100% - 100px);
+            background: rgba(0, 0, 0, 0.6);
+            color: #00ff00;
+            font-family: monospace;
+            font-size: 12px;
+            padding: 10px;
+            overflow-y: auto;
+            pointer-events: none;
+            /* Allow clicks through to game */
+            z-index: 2000;
+            border-radius: 5px;
+            border: 2px solid #00ff00;
+            display: none;
+            pointer-events: none;
+        }
+
+        #debug-log div {
+            margin-bottom: 4px;
+            border-bottom: 1px solid rgba(0, 255, 0, 0.1);
+            padding-bottom: 2px;
+        }
     </style>
 </head>
 
 <body>
+    <!-- Debug Log -->
+    <div id="debug-log"></div>
     <!-- Loading Overlay -->
     <div id="loading-overlay"
         style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:200; flex-direction:column; justify-content:center; align-items:center;">
@@ -197,9 +227,11 @@
 
     <!-- Start Screen -->
     <div id="start-screen"
-        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: url('assets/backdrop1.png') no-repeat center center; background-size: cover; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10;">
-        <canvas id="title-rain-canvas"
-            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none;"></canvas>
+        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; background: black;">
+        <video id="title-bg-video" autoplay loop muted playsinline
+            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1;">
+            <source src="assets/スタート画面の背景.mp4" type="video/mp4">
+        </video>
         <img id="title-logo" src="assets/initial2.png" alt="MagsicBeat"
             style="max-width: 900px; width: 80%; margin-bottom: 20px; z-index: 2; position: relative;">
         <p
@@ -226,7 +258,7 @@
         <style>
             @keyframes marquee {
                 0% {
-                    transform: translateX(100%);
+                    transform: translateX(100vw);
                 }
 
                 100% {
@@ -238,7 +270,7 @@
             style="position: absolute; bottom: 0; left: 0; width: 100%; height: 40px; background-color: rgba(0, 0, 0, 0.8); z-index: 5; display: flex; align-items: center; overflow: hidden;">
             <div
                 style="white-space: nowrap; color: #ffeb3b; font-size: 1.5em; font-weight: bold; animation: marquee 15s linear infinite;">
-                【告知】MagsicBEAT 1 TunalityRED 指導
+                MagsicBEAT 新曲 『漁火』 追加！！
             </div>
         </div>
     </div>
@@ -366,6 +398,10 @@
         <label>
             Lane Width: <span id="lane-width-display">100</span>px
             <input type="range" id="lane-width-input" min="50" max="200" step="5" value="100" style="width: 200px;">
+        </label>
+        <label>
+            Lane Opacity: <span id="lane-opacity-display">100</span>%
+            <input type="range" id="lane-opacity-input" min="0" max="100" step="5" value="100" style="width: 200px;">
         </label>
         <br><br>
         <div style="border: 1px solid #555; padding: 10px; border-radius: 5px; background: rgba(255,255,255,0.05);">
@@ -497,6 +533,17 @@
         </style>
     </div>
 
+    <!-- Ranked Mode (Dani Nintei) Overlay -->
+    <div id="dani-select-overlay"
+        style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 100; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; padding: 40px;">
+        <h1 style="color: #ff0000; font-size: 3em; margin: 0 0 20px 0; text-shadow: 0 0 10px #ff0000; font-family: 'Sawarabi Mincho', serif;">段位認定</h1>
+        <div id="dani-list" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; max-width: 1000px; padding: 20px; overflow-y: auto; max-height: 70vh;">
+            <!-- Ranks will be populated here -->
+        </div>
+        <button id="btn-close-dani"
+            style="margin-top: 30px; padding: 10px 40px; background: none; border: 2px solid #ff0000; color: #ff0000; font-size: 1.2em; cursor: pointer; transition: all 0.3s;">BACK TO TITLE</button>
+    </div>
+
     <!-- Song Select Overlay -->
     <div id="song-select-overlay"
         style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 20; flex-direction: column; padding: 20px; box-sizing: border-box;">
@@ -542,7 +589,7 @@
         </div>
     </div>
 
-    <script src="magusic.js?v=5"></script>
+    <script src="magusic.js?v=6"></script>
 </body>
 
 </html>

@@ -70,6 +70,7 @@ export function parseChart(json: any): ParsedChart {
     isLong: n.duration > 0,
     hit: false,
     beat: n.beat,
+    type: n.type || 'normal',
   })).sort((a: ChartNote, b: ChartNote) => a.time - b.time);
 
   // 4. Parse Layout Changes
