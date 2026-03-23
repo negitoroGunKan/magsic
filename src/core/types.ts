@@ -17,7 +17,7 @@ export interface ChartNote {
   type?: 'normal' | 'sinking' | 'death';
 }
 
-export type JudgmentType = 'perfect' | 'great' | 'nice' | 'bad' | 'miss';
+export type JudgmentType = 'critical' | 'great' | 'good' | 'fail' | 'miss';
 
 export type GaugeType = 'norma' | 'life' | 'life_hard';
 

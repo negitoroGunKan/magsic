@@ -4,18 +4,18 @@
 import { JudgmentType, GaugeType } from './types';
 
 export interface GaugeRecoveryTable {
-  perfect: number;
+  critical: number;
   great: number;
-  nice: number;
-  bad: number;
+  good: number;
+  fail: number;
   miss: number;
 }
 
 /** Recovery values per gauge type and judgment */
 export const GAUGE_RECOVERY: Record<GaugeType, GaugeRecoveryTable> = {
-  norma:     { perfect:  2.0, great:  1.0, nice: 0.2, bad: -2.0, miss:  -5.0 },
-  life:      { perfect:  0.2, great:  0.1, nice: 0.0, bad: -4.0, miss:  -5.0 },
-  life_hard: { perfect:  0.2, great:  0.1, nice: 0.0, bad: -5.0, miss: -10.0 },
+  norma:     { critical:  2.0, great:  1.0, good: 0.2, fail: -2.0, miss:  -5.0 },
+  life:      { critical:  0.2, great:  0.1, good: 0.0, fail: -4.0, miss:  -5.0 },
+  life_hard: { critical:  0.2, great:  0.1, good: 0.0, fail: -5.0, miss: -10.0 },
 };
 
 export interface GaugeState {

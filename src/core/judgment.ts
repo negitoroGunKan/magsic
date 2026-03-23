@@ -5,10 +5,10 @@ import { JudgmentType } from './types';
 
 /** Timing thresholds in milliseconds (absolute error) */
 export const JUDGMENT_THRESHOLDS = {
-  perfect: 40,
+  critical: 40,
   great: 80,
-  nice: 133,
-  bad: 150,
+  good: 133,
+  fail: 150,
   miss: 180,
 } as const;
 
@@ -32,14 +32,14 @@ export function evaluateJudgment(msError: number): JudgmentResult | null {
   if (absError >= JUDGMENT_THRESHOLDS.miss) return null;
 
   let type: JudgmentType;
-  if (absError < JUDGMENT_THRESHOLDS.perfect) {
-    type = 'perfect';
+  if (absError < JUDGMENT_THRESHOLDS.critical) {
+    type = 'critical';
   } else if (absError < JUDGMENT_THRESHOLDS.great) {
     type = 'great';
-  } else if (absError < JUDGMENT_THRESHOLDS.nice) {
-    type = 'nice';
-  } else if (absError < JUDGMENT_THRESHOLDS.bad) {
-    type = 'bad';
+  } else if (absError < JUDGMENT_THRESHOLDS.good) {
+    type = 'good';
+  } else if (absError < JUDGMENT_THRESHOLDS.fail) {
+    type = 'fail';
   } else {
     type = 'miss';
   }

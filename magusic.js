@@ -1,8 +1,7 @@
 (function() {
   "use strict";
   function getTimeFromBeat(beat, bpmChanges) {
-    if (bpmChanges.length === 0)
-      return 0;
+    if (bpmChanges.length === 0) return 0;
     let lastBp = bpmChanges[0];
     for (let i = 1; i < bpmChanges.length; i++) {
       if (bpmChanges[i].beat <= beat) {
@@ -15,8 +14,7 @@
     return lastBp.time + (beat - lastBp.beat) * msPerBeat;
   }
   function getBeatFromTime(time, bpmChanges) {
-    if (bpmChanges.length === 0)
-      return 0;
+    if (bpmChanges.length === 0) return 0;
     let lastBp = bpmChanges[0];
     for (let i = 1; i < bpmChanges.length; i++) {
       if (bpmChanges[i].time <= time) {
@@ -29,23 +27,23 @@
     return lastBp.beat + (time - lastBp.time) / msPerBeat;
   }
   const JUDGMENT_THRESHOLDS = {
-    perfect: 40,
+    critical: 40,
     great: 80,
-    nice: 133,
-    bad: 150,
+    good: 133,
+    fail: 150,
     miss: 180
   };
   const SCORE_WEIGHTS = {
-    perfect: 9,
+    critical: 9,
     great: 8,
-    nice: 2,
-    bad: 1,
+    good: 2,
+    fail: 1,
     miss: 0
   };
   function calculateMaxScore(notes) {
-    if (notes.length === 0)
-      return 1;
-    return notes.reduce((acc, n) => acc + (n.duration > 0 ? 18 : 9), 0);
+    if (notes.length === 0) return 1;
+    const maxWeight = SCORE_WEIGHTS.critical;
+    return notes.reduce((acc, n) => acc + (n.duration > 0 ? maxWeight * 2 : maxWeight), 0);
   }
   function calculateLoss(judgmentType) {
     return 9 - SCORE_WEIGHTS[judgmentType];
@@ -70,9 +68,9 @@
     return { scaledScore, ratio, rank };
   }
   const GAUGE_RECOVERY = {
-    norma: { perfect: 2, great: 1, nice: 0.2, bad: -2, miss: -5 },
-    life: { perfect: 0.2, great: 0.1, nice: 0, bad: -4, miss: -5 },
-    life_hard: { perfect: 0.2, great: 0.1, nice: 0, bad: -5, miss: -10 }
+    norma: { critical: 2, great: 1, good: 0.2, fail: -2, miss: -5 },
+    life: { critical: 0.2, great: 0.1, good: 0, fail: -4, miss: -5 },
+    life_hard: { critical: 0.2, great: 0.1, good: 0, fail: -5, miss: -10 }
   };
   function applyGaugeHit(currentHealth, judgmentType, gaugeType) {
     const recovery = GAUGE_RECOVERY[gaugeType][judgmentType];
@@ -84,10 +82,8 @@
     return gaugeType === "life" || gaugeType === "life_hard" ? 100 : 0;
   }
   function isTrackCleared(gaugeType, finalHealth, isDead) {
-    if (isDead)
-      return false;
-    if (gaugeType === "norma")
-      return finalHealth >= 70;
+    if (isDead) return false;
+    if (gaugeType === "norma") return finalHealth >= 70;
     return true;
   }
   function parseChart(json) {
@@ -235,13 +231,22 @@
       titleBg: null,
       gameBg: null,
       resBg: null,
-      resPerfect1: null,
-      resPerfect2: null,
+      // In-game Judgements (PlayRoom)
+      judgeCritical1: null,
+      judgeCritical2: null,
+      judgeGreat1: null,
+      judgeGood1: null,
+      judgeFail1: null,
+      judgeMiss1: null,
+      judgeMiss2: null,
+      // Result Screen Judgements
+      resCritical1: null,
+      resCritical2: null,
+      resGreat1: null,
+      resGood1: null,
+      resFail1: null,
       resMiss1: null,
-      resMiss2: null,
-      resGreat: null,
-      resNice: null,
-      resBad: null
+      resMiss2: null
     };
     let currentPlayer = localStorage.getItem("magsic_player") || "Guest";
     let globalOffset = 0;
@@ -260,11 +265,10 @@
     let daniHealth = 100;
     const DANI_PENALTIES = {
       miss: 6,
-      bad: 6,
-      nice: 2,
+      fail: 6,
+      good: 2,
       great: 0,
-      perfect: -0.5
-      // Recovery amount (negative penalty)
+      critical: -0.5
     };
     let currentLayoutType = "default";
     let targetLayoutType = "type-a";
@@ -288,12 +292,15 @@
     const titleBgVideo = document.getElementById("title-bg-video");
     const logo = document.getElementById("title-logo");
     let HIT_Y = 0;
+    let judgementHeightOffset = 200;
     const NOTE_HEIGHT = 15;
     let currentKeyMode = "8key";
     const speedInput = document.getElementById("speed-input");
     const speedDisplay = document.getElementById("speed-display");
     const offsetInput = document.getElementById("offset-input");
     const offsetDisplay = document.getElementById("offset-display");
+    const judgementHeightInput = document.getElementById("judgement-height-input");
+    const judgementHeightDisplay = document.getElementById("judgement-height-display");
     const laneWidthInput = document.getElementById("lane-width-input");
     const laneWidthDisplay = document.getElementById("lane-width-display");
     const laneCoverCheckbox = document.getElementById("lane-cover-checkbox");
@@ -370,6 +377,7 @@
         if (titleBgVideo) titleBgVideo.pause();
       }
     }
+    loadSkin();
     if (document.readyState === "complete" || document.readyState === "interactive") {
       showStartScreen(true);
     } else {
@@ -390,15 +398,18 @@
     const resCombo = document.getElementById("res-combo");
     const resAvg = document.getElementById("res-avg");
     const customResultScreen = document.getElementById("custom-results-screen");
-    const valResPerfect = document.getElementById("val-res-perfect");
+    const valResCritical = document.getElementById("val-res-critical");
     const valResGreat = document.getElementById("val-res-great");
-    const valResNice = document.getElementById("val-res-nice");
-    const valResBad = document.getElementById("val-res-bad");
+    const valResGood = document.getElementById("val-res-good");
+    const valResFail = document.getElementById("val-res-fail");
     const valResMiss = document.getElementById("val-res-miss");
     const valResCombo = document.getElementById("val-res-combo");
     const valResScore = document.getElementById("val-res-score");
     const btnCloseCustomResults = document.getElementById("btn-close-custom-results");
-    const imgResPerfect = document.getElementById("img-res-perfect");
+    const imgResCritical = document.getElementById("img-res-critical");
+    const imgResGreat = document.getElementById("img-res-great");
+    const imgResGood = document.getElementById("img-res-good");
+    const imgResFail = document.getElementById("img-res-fail");
     const imgResMiss = document.getElementById("img-res-miss");
     const resultStatusTitle = document.getElementById("result-status-title");
     document.getElementById("score-display");
@@ -407,7 +418,6 @@
     let totalMaxScore = 1;
     let isTrackFailed = false;
     let shutterHeight = 0;
-    const scrollModeSelect = document.getElementById("scroll-mode-select");
     const layoutRadios = document.getElementsByName("layout-type");
     layoutRadios.forEach((radio) => {
       radio.addEventListener("change", (e) => {
@@ -795,15 +805,6 @@
     currentPlayer = localStorage.getItem("magsic_player") || "Guest";
     if (playerDisplay) playerDisplay.textContent = `Player: ${currentPlayer} ▼`;
     if (playerDisplayInSelect) playerDisplayInSelect.textContent = `Player: ${currentPlayer} ▼`;
-    let scrollMode = "beat";
-    let bpmNormalize = true;
-    const bpmNormalizeCheckbox = document.getElementById("bpm-normalize-checkbox");
-    if (bpmNormalizeCheckbox) {
-      bpmNormalizeCheckbox.addEventListener("change", () => {
-        bpmNormalize = bpmNormalizeCheckbox.checked;
-        savePlayerSettings();
-      });
-    }
     function loadPlayerSettings() {
       const key = `magsic_settings_${currentPlayer}`;
       try {
@@ -841,18 +842,15 @@
             if (laneCoverSpeedInput) laneCoverSpeedInput.value = laneCoverSpeedMult.toString();
             if (laneCoverSpeedDisplay) laneCoverSpeedDisplay.textContent = laneCoverSpeedMult.toFixed(1);
           }
-          if (settings.scrollMode) {
-            scrollMode = settings.scrollMode;
-            if (scrollModeSelect) scrollModeSelect.value = scrollMode;
-          }
-          if (settings.bpmNormalize !== void 0) {
-            bpmNormalize = !!settings.bpmNormalize;
-            if (bpmNormalizeCheckbox) bpmNormalizeCheckbox.checked = bpmNormalize;
-          }
           if (settings.laneOpacity !== void 0) {
             laneOpacity = parseFloat(settings.laneOpacity);
             if (laneOpacityInput) laneOpacityInput.value = (laneOpacity * 100).toString();
             if (laneOpacityDisplay) laneOpacityDisplay.textContent = (laneOpacity * 100).toString();
+          }
+          if (settings.judgementHeight !== void 0) {
+            judgementHeightOffset = parseInt(settings.judgementHeight);
+            if (judgementHeightInput) judgementHeightInput.value = judgementHeightOffset.toString();
+            if (judgementHeightDisplay) judgementHeightDisplay.textContent = judgementHeightOffset.toString();
           }
           resize();
         } else {
@@ -862,8 +860,6 @@
           globalOffset = 0;
           if (offsetInput) offsetInput.value = "0";
           if (offsetDisplay) offsetDisplay.textContent = "0";
-          bpmNormalize = true;
-          if (bpmNormalizeCheckbox) bpmNormalizeCheckbox.checked = true;
         }
       } catch (e) {
         console.error("Failed to load settings", e);
@@ -882,9 +878,8 @@
           height: laneCoverHeight,
           speed: laneCoverSpeedMult
         },
-        scrollMode: scrollModeSelect ? scrollModeSelect.value : "beat",
-        bpmNormalize: bpmNormalizeCheckbox ? bpmNormalizeCheckbox.checked : true,
-        laneOpacity
+        laneOpacity,
+        judgementHeight: judgementHeightOffset
       };
       localStorage.setItem(key, JSON.stringify(settings));
     }
@@ -1015,16 +1010,18 @@
         savePlayerSettings();
       });
     }
+    if (judgementHeightInput && judgementHeightDisplay) {
+      judgementHeightInput.addEventListener("input", () => {
+        judgementHeightOffset = parseInt(judgementHeightInput.value);
+        judgementHeightDisplay.textContent = judgementHeightOffset.toString();
+        savePlayerSettings();
+      });
+    }
     if (laneWidthInput && laneWidthDisplay) {
       laneWidthInput.addEventListener("input", () => {
         currentLaneWidth = parseInt(laneWidthInput.value);
         laneWidthDisplay.textContent = currentLaneWidth.toString();
         resize();
-        savePlayerSettings();
-      });
-    }
-    if (scrollModeSelect) {
-      scrollModeSelect.addEventListener("change", () => {
         savePlayerSettings();
       });
     }
@@ -1064,18 +1061,26 @@
         { key: "white", src: "assets/note_white.png" },
         { key: "blue", src: "assets/note_blue.png" },
         { key: "space", src: "assets/note_space.png" },
-        { key: "titleBg", src: "assets/backdrop1.png" },
-        // Use backdrop1 for title as requested
+        { key: "titleBg", src: "assets/initial2.png" },
+        // Fallback, will be overridden by video if possible
         { key: "gameBg", src: "assets/initial2.png" },
-        // Fallback
         { key: "resBg", src: "assets/リザルト背景.png" },
-        { key: "resPerfect1", src: "assets/リザルトPERFECT.png" },
-        { key: "resPerfect2", src: "assets/リザルトPERFECT2.png" },
-        { key: "resMiss1", src: "assets/リザルトMISS1.png" },
-        { key: "resMiss2", src: "assets/リザルトMISS2.png" },
-        { key: "resGreat", src: "assets/リザルトGREAT.png" },
-        { key: "resNice", src: "assets/リザルトNICE.png" },
-        { key: "resBad", src: "assets/リザルトBAD.png" }
+        // In-game Judgements
+        { key: "judgeCritical1", src: "assets/プレイ中判定文字/CRITICAL判定1.png" },
+        { key: "judgeCritical2", src: "assets/プレイ中判定文字/CRITICAL判定2.png" },
+        { key: "judgeGreat1", src: "assets/プレイ中判定文字/GREAT判定1.png" },
+        { key: "judgeGood1", src: "assets/プレイ中判定文字/GOOD判定1.png" },
+        { key: "judgeFail1", src: "assets/プレイ中判定文字/FAIL判定1.png" },
+        { key: "judgeMiss1", src: "assets/プレイ中判定文字/MISS判定1.png" },
+        { key: "judgeMiss2", src: "assets/プレイ中判定文字/MISS判定2.png" },
+        // Result Judgements
+        { key: "resCritical1", src: "assets/リザルト文字/CRITICAL1.png" },
+        { key: "resCritical2", src: "assets/リザルト文字/CRITICAL2.png" },
+        { key: "resGreat1", src: "assets/リザルト文字/GREAT1.png" },
+        { key: "resGood1", src: "assets/リザルト文字/GOOD1.png" },
+        { key: "resFail1", src: "assets/リザルト文字/FAIL1.png" },
+        { key: "resMiss1", src: "assets/リザルト文字/MISS1.png" },
+        { key: "resMiss2", src: "assets/リザルト文字/MISS2.png" }
       ];
       assets.forEach((a) => {
         const img = new Image();
@@ -1105,8 +1110,8 @@
     let currentSongBackground = null;
     function loadAudioAssets() {
       const assets = [
-        { key: "bgm_title", src: "assets/タイトル画面でループして流れる曲.wav", loop: true, volume: 0.5 },
-        { key: "bgm_select", src: "assets/選曲画面でループして流れる曲.wav", loop: true, volume: 0.5 },
+        { key: "bgm_title", src: "assets/タイトル画面/タイトル画面でループして流れる曲.wav", loop: true, volume: 0.5 },
+        { key: "bgm_select", src: "assets/選曲画面/選曲画面でループして流れる曲.wav", loop: true, volume: 0.5 },
         { key: "se_start", src: "assets/ゲームスタートボタンを押す.mp3", volume: 0.8 },
         { key: "se_option", src: "assets/設定画面を開く音.mp3", volume: 0.8 },
         { key: "se_decide", src: "assets/曲選択時効果音(通常).mp3", volume: 0.8 },
@@ -1166,11 +1171,12 @@
     }, { once: true });
     let LANE_CONFIGS = [];
     let laneStartX = 0;
-    const THRESHOLD_PERFECT = JUDGMENT_THRESHOLDS.perfect;
-    const THRESHOLD_GREAT = JUDGMENT_THRESHOLDS.great;
-    const THRESHOLD_NICE = JUDGMENT_THRESHOLDS.nice;
-    const THRESHOLD_BAD = JUDGMENT_THRESHOLDS.bad;
-    const MISS_BOUNDARY = JUDGMENT_THRESHOLDS.miss;
+    let laneEndX = 0;
+    const THRESHOLD_CRITICAL = JUDGMENT_THRESHOLDS && JUDGMENT_THRESHOLDS.critical || 40;
+    const THRESHOLD_GREAT = JUDGMENT_THRESHOLDS && JUDGMENT_THRESHOLDS.great || 80;
+    const THRESHOLD_GOOD = JUDGMENT_THRESHOLDS && JUDGMENT_THRESHOLDS.good || 133;
+    const THRESHOLD_FAIL = JUDGMENT_THRESHOLDS && JUDGMENT_THRESHOLDS.fail || 150;
+    const MISS_BOUNDARY = JUDGMENT_THRESHOLDS && JUDGMENT_THRESHOLDS.miss || 180;
     new Audio();
     let bgVideo = null;
     let isVideoReady = false;
@@ -1179,10 +1185,10 @@
       return getBeatFromTime(time, bpmChanges);
     }
     let stats = {
-      perfect: 0,
+      critical: 0,
       great: 0,
-      nice: 0,
-      bad: 0,
+      good: 0,
+      fail: 0,
       miss: 0,
       combo: 0,
       maxCombo: 0,
@@ -1192,10 +1198,10 @@
     };
     function resetStats() {
       stats = {
-        perfect: 0,
+        critical: 0,
         great: 0,
-        nice: 0,
-        bad: 0,
+        good: 0,
+        fail: 0,
         miss: 0,
         combo: 0,
         maxCombo: 0,
@@ -1228,7 +1234,7 @@
         stats.totalErrorMs += errorMs;
         stats.hitCount++;
       }
-      if (type === "miss" || type === "bad") {
+      if (type === "miss" || type === "fail") {
         stats.combo = 0;
       } else {
         stats.combo++;
@@ -1453,22 +1459,14 @@ Offset Updated.`);
       if (isCountdown) return pausedOffset;
       return Math.max(0, audioContext.currentTime - audioStartTime);
     }
-    function getNoteY(scheduledTime, beat = 0) {
-      if (scrollMode === "beat") {
-        const currentBeat = getBeatFromTime$1(getAudioTime() * 1e3);
-        const distBeats = beat - currentBeat;
-        const effectiveSpeed = currentNoteSpeed * (isLaneCoverEnabled ? laneCoverSpeedMult : 1);
-        let msPerBeatBaseline = 500;
-        if (bpmNormalize) {
-          const baseBpm = bpmChanges.length > 0 ? bpmChanges[0].bpm : 120;
-          msPerBeatBaseline = 6e4 / baseBpm;
-        }
-        return HIT_Y - distBeats * msPerBeatBaseline * effectiveSpeed;
-      } else {
-        const currentTimeMs = getAudioTime() * 1e3;
-        const speed = currentNoteSpeed * (isLaneCoverEnabled ? laneCoverSpeedMult : 1);
-        return HIT_Y - (scheduledTime - currentTimeMs) * speed;
-      }
+    function getNoteY(scheduledTime, beat = 0, currentTimeMs = -1) {
+      const timeMs = currentTimeMs === -1 ? getAudioTime() * 1e3 : currentTimeMs;
+      const effectiveSpeed = currentNoteSpeed * (isLaneCoverEnabled ? laneCoverSpeedMult : 1);
+      const currentBeat = getBeatFromTime$1(timeMs);
+      const distBeats = beat - currentBeat;
+      const baseBpm = bpmChanges.length > 0 ? bpmChanges[0].bpm : 120;
+      const msPerBeatBaseline = 6e4 / baseBpm;
+      return HIT_Y - distBeats * msPerBeatBaseline * effectiveSpeed;
     }
     function getSpawnAheadTime() {
       const speed = currentNoteSpeed * (isLaneCoverEnabled ? laneCoverSpeedMult : 1);
@@ -1570,7 +1568,7 @@ Offset Updated.`);
             note.active = false;
             judgementColor = "#00ffff";
             judgementTimer = 1e3;
-            addHit("perfect");
+            addHit("critical");
             spawnHitEffect(note.laneIndex, "#00ffff");
             if (isAutoPlay || assistSelect.value === "auto_space" && note.laneIndex === 4) {
               pressedKeys[note.laneIndex] = false;
@@ -1579,11 +1577,11 @@ Offset Updated.`);
           }
         } else if ((isAutoPlay || assistSelect.value === "auto_space" && note.laneIndex === 4) && !note.isLong && !note.processed && currentTimeMs >= note.scheduledTime) {
           note.active = false;
-          judgementText = `PERFECT
+          judgementText = `CRITICAL
 AUTO`;
           judgementColor = "#00ffff";
           judgementTimer = 1e3;
-          addHit("perfect");
+          addHit("critical");
           spawnHitEffect(note.laneIndex, "#00ffff");
           pressedKeys[note.laneIndex] = true;
           setTimeout(() => pressedKeys[note.laneIndex] = false, 50);
@@ -1591,11 +1589,11 @@ AUTO`;
           note.processed = true;
           note.beingHeld = true;
           heldNotes[note.laneIndex] = note;
-          judgementText = `PERFECT
+          judgementText = `CRITICAL
 AUTO`;
           judgementColor = "#00ffff";
           judgementTimer = 1e3;
-          addHit("perfect");
+          addHit("critical");
           spawnHitEffect(note.laneIndex, "#00ffff");
           pressedKeys[note.laneIndex] = true;
         } else if ((isAutoPlay || assistSelect.value === "auto_space" && note.laneIndex === 4) && note.isLong && note.beingHeld && currentTimeMs >= note.scheduledTime + note.duration) {
@@ -1628,11 +1626,10 @@ AUTO`;
         const note = notes[i];
         const tailTime = note.scheduledTime + note.duration;
         const tailBeat = getBeatFromTime$1(tailTime);
-        const tailY = getNoteY(tailTime, tailBeat);
+        const tailY = getNoteY(tailTime, tailBeat, currentTimeMs);
         if (tailY > canvas.height + 1e3) {
           if (note.active) {
-            const currentTimeMs2 = getAudioTime() * 1e3;
-            if (currentTimeMs2 > note.scheduledTime + MISS_BOUNDARY) {
+            if (currentTimeMs > note.scheduledTime + MISS_BOUNDARY) {
               note.active = false;
               if (note.type === "death") {
                 logDebug(`DEATH NOTE IGNORED (Spatial): lane=${note.laneIndex} target=${(note.scheduledTime / 1e3).toFixed(3)}s`);
@@ -1668,6 +1665,8 @@ AUTO`;
     }
     function draw() {
       if (!ctx) return;
+      const currentTime = getAudioTime();
+      const currentTimeMs = currentTime * 1e3;
       if (!isPlaying && SKIN.titleBg) {
         ctx.drawImage(SKIN.titleBg, 0, 0, canvas.width, canvas.height);
       } else if (isPlaying) {
@@ -1704,8 +1703,6 @@ AUTO`;
         }
       });
       if (bpmChanges.length > 0) {
-        const currentTime = getAudioTime();
-        const currentTimeMs = currentTime * 1e3;
         const speed = currentNoteSpeed * (isLaneCoverEnabled ? laneCoverSpeedMult : 1);
         const maxVisibleTime = currentTimeMs + HIT_Y / speed + 2e3;
         const minVisibleTime = currentTimeMs - (canvas.height - HIT_Y) / speed - 1e3;
@@ -1726,7 +1723,7 @@ AUTO`;
               const beatTime = change.time + (g - change.beat) * msPerBeat;
               if (beatTime > segEnd + 1) break;
               const isMeasure = g % 4 === 0;
-              const y = HIT_Y - (beatTime - currentTimeMs) * speed;
+              const y = getNoteY(beatTime, g, currentTimeMs);
               if (isMeasure) {
                 ctx.strokeStyle = "#888";
                 ctx.lineWidth = 2;
@@ -1792,11 +1789,11 @@ AUTO`;
       ctx.font = "20px monospace";
       const statsStartY = 150;
       const statsLineH = 30;
-      ctx.fillText(`PERFECT: ${stats.perfect}`, 20, statsStartY);
-      ctx.fillText(`GREAT:   ${stats.great}`, 20, statsStartY + statsLineH);
-      ctx.fillText(`NICE:    ${stats.nice}`, 20, statsStartY + statsLineH * 2);
-      ctx.fillText(`BAD:     ${stats.bad}`, 20, statsStartY + statsLineH * 3);
-      ctx.fillText(`MISS:    ${stats.miss}`, 20, statsStartY + statsLineH * 4);
+      ctx.fillText(`CRITICAL: ${stats.critical}`, 20, statsStartY);
+      ctx.fillText(`GREAT:    ${stats.great}`, 20, statsStartY + statsLineH);
+      ctx.fillText(`GOOD:     ${stats.good}`, 20, statsStartY + statsLineH * 2);
+      ctx.fillText(`FAIL:     ${stats.fail}`, 20, statsStartY + statsLineH * 3);
+      ctx.fillText(`MISS:     ${stats.miss}`, 20, statsStartY + statsLineH * 4);
       const avgVal = stats.hitCount > 0 ? (stats.totalErrorMs / stats.hitCount).toFixed(1) : "0";
       ctx.fillText(`AVG:     ${avgVal}ms`, 20, statsStartY + statsLineH * 5);
       ctx.fillStyle = "#fff";
@@ -1819,7 +1816,10 @@ AUTO`;
       if (isAutoPlay) {
         ctx.fillText("AUTO PLAY", canvas.width / 2, canvas.height / 2 + 50);
       } else {
-        let pct = (totalMaxScore - lostScore) / totalMaxScore * 100;
+        let pct = 0;
+        if (totalMaxScore > 0) {
+          pct = (totalMaxScore - lostScore) / totalMaxScore * 100;
+        }
         if (pct < 0) pct = 0;
         const scoreText = pct.toFixed(4) + "%";
         ctx.fillText(scoreText, canvas.width / 2, canvas.height / 2 + 50);
@@ -1832,13 +1832,13 @@ AUTO`;
         ctx.textAlign = "right";
         ctx.font = "bold 24px Arial";
         ctx.fillStyle = "#00ffff";
-        ctx.fillText(`PERFECT: ${stats.perfect}`, statsX, statsStartTime);
+        ctx.fillText(`CRITICAL: ${stats.critical}`, statsX, statsStartTime);
         ctx.fillStyle = "#ffeb3b";
         ctx.fillText(`GREAT: ${stats.great}`, statsX, statsStartTime + lineHeight);
         ctx.fillStyle = "#00ff00";
-        ctx.fillText(`NICE: ${stats.nice}`, statsX, statsStartTime + lineHeight * 2);
+        ctx.fillText(`GOOD: ${stats.good}`, statsX, statsStartTime + lineHeight * 2);
         ctx.fillStyle = "#ffae00";
-        ctx.fillText(`BAD: ${stats.bad}`, statsX, statsStartTime + lineHeight * 3);
+        ctx.fillText(`FAIL: ${stats.fail}`, statsX, statsStartTime + lineHeight * 3);
         ctx.fillStyle = "#ff0000";
         ctx.fillText(`MISS: ${stats.miss}`, statsX, statsStartTime + lineHeight * 4);
         ctx.fillStyle = "#ffffff";
@@ -1911,9 +1911,9 @@ AUTO`;
           } else if (config.color === "#7CA4FF") skinImg = SKIN.blue;
           else skinImg = SKIN.white;
           if (note.isLong) {
-            const headY = getNoteY(note.scheduledTime, note.beat);
+            const headY = getNoteY(note.scheduledTime, note.beat, currentTimeMs);
             const tailBeat = getBeatFromTime$1(note.scheduledTime + note.duration);
-            const tailY = getNoteY(note.scheduledTime + note.duration, tailBeat);
+            const tailY = getNoteY(note.scheduledTime + note.duration, tailBeat, currentTimeMs);
             const originalAlpha = ctx.globalAlpha;
             ctx.globalAlpha = 0.5;
             if (note.type === "death") {
@@ -1939,7 +1939,7 @@ AUTO`;
               ctx.fillRect(x + H_GAP, headY - drawHeight / 2, w - H_GAP * 2, drawHeight);
             }
           } else {
-            const noteY = getNoteY(note.scheduledTime, note.beat);
+            const noteY = getNoteY(note.scheduledTime, note.beat, currentTimeMs);
             if (noteY > canvas.height + 100) return;
             const isSpecial = note.type === "sinking" || note.type === "death";
             if (skinImg && !isSpecial) {
@@ -1998,13 +1998,14 @@ AUTO`;
         ctx.lineTo(maxX, laneCoverHeight);
         ctx.stroke();
       }
-      if (judgementTimer > 0) {
+      if (judgementTimer > 0 && ctx) {
+        const centerLaneX = (laneStartX + laneEndX) / 2;
         ctx.fillStyle = judgementColor;
         ctx.font = "bold 40px Arial";
         ctx.textAlign = "center";
         const lines = judgementText.split("\n");
         lines.forEach((line, i) => {
-          ctx.fillText(line, canvas.width / 2, HIT_Y - 50 + i * 40);
+          ctx.fillText(line, centerLaneX, HIT_Y - judgementHeightOffset / 2 + i * 40);
         });
       }
       if (isTrackFailed || shutterHeight > 0) {
@@ -2185,10 +2186,10 @@ AUTO`;
       else if (randomSelect?.value === "shuffle_chaos") ;
       else if (randomSelect?.value === "mirror") ;
       if (customResultScreen) {
-        if (valResPerfect) valResPerfect.textContent = stats.perfect.toString();
+        if (valResCritical) valResCritical.textContent = stats.critical.toString();
         if (valResGreat) valResGreat.textContent = stats.great.toString();
-        if (valResNice) valResNice.textContent = stats.nice.toString();
-        if (valResBad) valResBad.textContent = stats.bad.toString();
+        if (valResGood) valResGood.textContent = stats.good.toString();
+        if (valResFail) valResFail.textContent = stats.fail.toString();
         if (valResMiss) valResMiss.textContent = stats.miss.toString();
         if (valResCombo) valResCombo.textContent = stats.maxCombo.toString();
         if (valResScore) valResScore.textContent = scaledScore.toLocaleString();
@@ -2215,12 +2216,11 @@ AUTO`;
       let toggle = false;
       blinkingTimer = window.setInterval(() => {
         toggle = !toggle;
-        if (imgResPerfect) {
-          imgResPerfect.src = toggle ? "assets/リザルトPERFECT2.png" : "assets/リザルトPERFECT.png";
-        }
-        if (imgResMiss) {
-          imgResMiss.src = toggle ? "assets/リザルトMISS2.png" : "assets/リザルトMISS1.png";
-        }
+        if (imgResCritical) imgResCritical.src = toggle ? SKIN.resCritical2.src : SKIN.resCritical1.src;
+        if (imgResGreat) imgResGreat.src = SKIN.resGreat1.src;
+        if (imgResGood) imgResGood.src = SKIN.resGood1.src;
+        if (imgResFail) imgResFail.src = SKIN.resFail1.src;
+        if (imgResMiss) imgResMiss.src = toggle ? SKIN.resMiss2.src : SKIN.resMiss1.src;
       }, 80);
     }
     function stopResultBlinking() {
@@ -2645,9 +2645,9 @@ AUTO`;
           const chartInfo = filename ? chartInfos[filename] : null;
           if (matchingKey && chartInfo && chartInfo.level && chartInfo.level > 0) {
             const levelStr = chartInfo.level.toString();
-            imgSrc = `assets/${encodeURIComponent("難易度ロゴ")}${levelStr}.png`;
+            imgSrc = `assets/選曲画面/${encodeURIComponent("難易度ロゴ")}${levelStr}.png`;
           } else {
-            imgSrc = `assets/${encodeURIComponent("難易度ロゴ譜面なし")}.png`;
+            imgSrc = `assets/選曲画面/${encodeURIComponent("難易度ロゴ譜面なし")}.png`;
           }
           img.src = imgSrc;
           img.alt = `${diffKey.toUpperCase()}`;
@@ -2849,10 +2849,11 @@ AUTO`;
       const getLayoutData = (type) => {
         const vLanes = [];
         const lConfigs = [];
+        let sx = 0;
         if (currentKeyMode === "8key") {
           if (type === "type-a") {
             const totalPlayWidth = tempWidth * 4;
-            const sx = (canvas.width - totalPlayWidth) / 2;
+            sx = (canvas.width - totalPlayWidth) / 2;
             laneStartX = sx;
             for (let i = 0; i < 4; i++) {
               vLanes.push({ x: sx + i * tempWidth, width: tempWidth });
@@ -2876,7 +2877,7 @@ AUTO`;
             const groupGap = tempWidth * 0.1;
             const totalScale = 4 * bScale + 4 * wScale;
             const totalPlayWidth = tempWidth * totalScale + 4 * pairGap + 3 * groupGap;
-            const sx = (canvas.width - totalPlayWidth) / 2;
+            sx = (canvas.width - totalPlayWidth) / 2;
             laneStartX = sx;
             const ord = [
               { idx: 0, label: "E", color: "#7CA4FF", scale: bScale, gapAfter: pairGap },
@@ -2900,7 +2901,7 @@ AUTO`;
         } else if (currentKeyMode === "4key") {
           const tempWidth2 = currentLaneWidth * 1.5;
           const totalPlayWidth = tempWidth2 * 4;
-          const sx = (canvas.width - totalPlayWidth) / 2;
+          sx = (canvas.width - totalPlayWidth) / 2;
           laneStartX = sx;
           const indices = [1, 3, 6, 8];
           const labels = ["D", "F", "J", "K"];
@@ -2914,21 +2915,21 @@ AUTO`;
         } else if (currentKeyMode === "6key") {
           const tempWidth2 = currentLaneWidth * 1.2;
           const totalPlayWidth = tempWidth2 * 6;
-          const sx = (canvas.width - totalPlayWidth) / 2;
-          laneStartX = sx;
+          const sx2 = (canvas.width - totalPlayWidth) / 2;
+          laneStartX = sx2;
           const indices = [9, 1, 3, 6, 8, 10];
           const labels = ["S", "D", "F", "J", "K", "L"];
           const colors = ["#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff", "#ffffff"];
           indices.forEach((kIdx, i) => {
-            const x = sx + i * tempWidth2;
+            const x = sx2 + i * tempWidth2;
             vLanes.push({ x, width: tempWidth2 });
             lConfigs[kIdx] = { x, width: tempWidth2, color: colors[i], label: labels[i] };
           });
-          lConfigs[4] = { x: sx, width: totalPlayWidth, color: "#e040fb", label: "SPACE" };
+          lConfigs[4] = { x: sx2, width: totalPlayWidth, color: "#e040fb", label: "SPACE" };
         } else if (currentKeyMode === "12key") {
           const tempWidth2 = currentLaneWidth * 1.5;
           const totalPlayWidth = tempWidth2 * 6;
-          const sx = (canvas.width - totalPlayWidth) / 2;
+          sx = (canvas.width - totalPlayWidth) / 2;
           laneStartX = sx;
           const pairs = [
             { white: 9, blue: 11, label: "S/W" },
@@ -2951,6 +2952,7 @@ AUTO`;
             lConfigs[pair.blue] = { x, width: tempWidth2, color: "#7CA4FF", label: "" };
           });
         }
+        laneEndX = vLanes.length > 0 ? vLanes[vLanes.length - 1].x + vLanes[vLanes.length - 1].width : sx;
         return { vLanes, lConfigs };
       };
       const targets = getLayoutData(targetLayoutType);
@@ -3076,31 +3078,29 @@ AUTO`;
               failGame();
               return;
             }
-            const sign = msError > 0 ? "+" : "";
-            let msDisplay = `
-${sign}${Math.floor(msError)}ms`;
-            if (absError <= 20) {
-              msDisplay = "";
-            }
-            if (absError < THRESHOLD_PERFECT) {
-              judgementText = `PERFECT${msDisplay}`;
+            const msRounded = Math.round(msError);
+            const sign = msRounded >= 0 ? "+" : "";
+            const msDisplay = `
+${sign}${msRounded}ms`;
+            if (absError < THRESHOLD_CRITICAL) {
+              judgementText = `CRITICAL${msDisplay}`;
               judgementColor = "#00ffff";
-              addHit("perfect", msError);
+              addHit("critical", msError);
               spawnHitEffect(note.laneIndex, "#00ffff");
             } else if (absError < THRESHOLD_GREAT) {
               judgementText = `GREAT${msDisplay}`;
               judgementColor = "#ffeb3b";
               addHit("great", msError);
               spawnHitEffect(note.laneIndex, "#ffeb3b");
-            } else if (absError < THRESHOLD_NICE) {
-              judgementText = `NICE${msDisplay}`;
+            } else if (absError < THRESHOLD_GOOD) {
+              judgementText = `GOOD${msDisplay}`;
               judgementColor = "#00ff00";
-              addHit("nice", msError);
+              addHit("good", msError);
               spawnHitEffect(note.laneIndex, "#00ff00");
-            } else if (absError < THRESHOLD_BAD) {
-              judgementText = `BAD${msDisplay}`;
+            } else if (absError < THRESHOLD_FAIL) {
+              judgementText = `FAIL${msDisplay}`;
               judgementColor = "#ffae00";
-              addHit("bad", msError);
+              addHit("fail", msError);
             } else {
               judgementText = `MISS${msDisplay}`;
               judgementColor = "#ff0000";
@@ -3155,7 +3155,7 @@ ${sign}${Math.floor(msError)}ms`;
           note.beingHeld = false;
           const tailTime = note.scheduledTime + note.duration;
           const currentTimeMs = getAudioTime() * 1e3;
-          if (currentTimeMs < tailTime - THRESHOLD_PERFECT) {
+          if (currentTimeMs < tailTime - THRESHOLD_CRITICAL) {
             note.active = false;
             judgementText = "MISS\nRELEASE";
             judgementColor = "#ff0000";

@@ -230,7 +230,7 @@
         style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; background: black;">
         <video id="title-bg-video" autoplay loop muted playsinline
             style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1;">
-            <source src="assets/スタート画面の背景.mp4" type="video/mp4">
+            <source src="assets/タイトル画面/スタート画面の背景.mp4" type="video/mp4">
         </video>
         <img id="title-logo" src="assets/initial2.png" alt="MagsicBeat"
             style="max-width: 900px; width: 80%; margin-bottom: 20px; z-index: 2; position: relative;">
@@ -369,20 +369,7 @@
             </label>
         </div>
         <br>
-        <div style="margin-bottom: 20px;">
-            <label style="cursor: pointer; display: flex; align-items: center; gap: 10px;">
-                <span style="font-weight: bold; color: #fff;">Scroll Mode:</span>
-                <select id="scroll-mode-select"
-                    style="padding: 5px; background: #222; color: white; border: 1px solid #555; border-radius: 5px;">
-                    <option value="beat">Beat (Variable)</option>
-                    <option value="time">Time (Constant)</option>
-                </select>
-            </label>
-            <label style="cursor: pointer; display: flex; align-items: center; gap: 10px; margin-top: 10px;">
-                <input type="checkbox" id="bpm-normalize-checkbox" style="width: 18px; height: 18px;" checked>
-                <span style="color: #ccc; font-size: 0.9em;">Normalize BPM Speed (Beat Mode)</span>
-            </label>
-        </div>
+        <br>
         <label>
             Audio: <input type="file" id="audio-input" accept="audio/*">
         </label>
@@ -460,7 +447,24 @@
                 Move (+))</span>
             <input type="range" id="offset-input" min="-500" max="500" step="1" value="0" style="width: 200px;">
         </label>
+        <label>
+            Judgement Height: <span id="judgement-height-display">200</span>px
+            <input type="range" id="judgement-height-input" min="0" max="600" step="10" value="200" style="width: 200px;">
+        </label>
         <button id="btn-calibrate" style="margin-left: 10px;">Calibrate</button>
+        <br><br>
+        <div style="border: 1px solid #555; padding: 10px; border-radius: 5px; background: rgba(0,255,255,0.05); margin-bottom: 20px;">
+            <h3 style="color:#00ffff; margin:0 0 10px 0; font-size: 1em;">PACEMAKER</h3>
+            <label style="font-size: 0.9em;">
+                Target Accuracy: <span id="pacemaker-target-display">95</span>%
+                <input type="range" id="pacemaker-target-input" min="80" max="100" step="1" value="95" style="width: 100%;">
+            </label>
+            <br>
+            <label style="font-size: 0.9em;">
+                Bar Width: <span id="pacemaker-width-display">1.5</span>x
+                <input type="range" id="pacemaker-width-input" min="1.0" max="3.0" step="0.1" value="1.5" style="width: 100%;">
+            </label>
+        </div>
         <br><br>
         <button id="btn-select-song"
             style="background:#e040fb; color:white; border:none; padding:10px 20px; font-size:16px; cursor:pointer; margin-right:10px;">Select
@@ -482,23 +486,23 @@
                 <!-- Left: Metrics with Skins -->
                 <div id="result-metrics" style="display:flex; flex-direction:column; gap:10px; flex:1;">
                     <div class="result-row" style="display:flex; align-items:center; gap:20px;">
-                        <img id="img-res-perfect" src="assets/リザルトPERFECT.png" style="height:160px;">
-                        <span id="val-res-perfect" style="font-size:3.5em; font-family:monospace; color:#00ffff;">0</span>
+                        <img id="img-res-critical" src="assets/リザルト文字/CRITICAL1.png" style="height:160px;">
+                        <span id="val-res-critical" style="font-size:3.5em; font-family:monospace; color:#e040fb;">0</span>
                     </div>
                     <div class="result-row" style="display:flex; align-items:center; gap:20px;">
-                        <img src="assets/リザルトGREAT.png" style="height:160px;">
-                        <span id="val-res-great" style="font-size:3.5em; font-family:monospace; color:#ffeb3b;">0</span>
+                        <img id="img-res-great" src="assets/リザルト文字/GREAT1.png" style="height:160px;">
+                        <span id="val-res-great" style="font-size:3.5em; font-family:monospace; color:#00ffff;">0</span>
                     </div>
                     <div class="result-row" style="display:flex; align-items:center; gap:20px;">
-                        <img src="assets/リザルトNICE.png" style="height:160px;">
-                        <span id="val-res-nice" style="font-size:3.5em; font-family:monospace; color:#00ff00;">0</span>
+                        <img id="img-res-good" src="assets/リザルト文字/GOOD1.png" style="height:160px;">
+                        <span id="val-res-good" style="font-size:3.5em; font-family:monospace; color:#00ff00;">0</span>
                     </div>
                     <div class="result-row" style="display:flex; align-items:center; gap:20px;">
-                        <img src="assets/リザルトBAD.png" style="height:160px;">
-                        <span id="val-res-bad" style="font-size:3.5em; font-family:monospace; color:#ffae00;">0</span>
+                        <img id="img-res-fail" src="assets/リザルト文字/FAIL1.png" style="height:160px;">
+                        <span id="val-res-fail" style="font-size:3.5em; font-family:monospace; color:#888;">0</span>
                     </div>
                     <div class="result-row" style="display:flex; align-items:center; gap:20px;">
-                        <img id="img-res-miss" src="assets/リザルトMISS1.png" style="height:160px;">
+                        <img id="img-res-miss" src="assets/リザルト文字/MISS1.png" style="height:160px;">
                         <span id="val-res-miss" style="font-size:3.5em; font-family:monospace; color:#ff0000;">0</span>
                     </div>
                 </div>
@@ -512,10 +516,13 @@
                     <div style="text-align:right;">
                         <p style="color:#aaa; font-size:1.5em; margin:0;">SCORE</p>
                         <p id="val-res-score" style="font-size:5em; margin:0; font-weight:bold; color:#00ffff; text-shadow:0 0 15px rgba(0,255,255,0.5);">0</p>
+                        <p id="val-res-raw-score" style="color:#ccc; font-size:1.5em; margin-top:5px;">0 / 0</p>
                     </div>
                 </div>
             </div>
 
+            <canvas id="result-graph" width="800" height="200" style="width:100%; height:200px; background:rgba(0,0,0,0.5); border:1px solid #444; margin:10px 0;"></canvas>
+            
             <button id="btn-close-custom-results"
                 style="margin-top:40px; padding:15px 60px; font-size:1.5em; background:rgba(0,255,255,0.2); border:2px solid #00ffff; color:#00ffff; cursor:pointer; border-radius:50px; font-weight:bold; transition:all 0.2s;">
                 CONTINUE
@@ -589,7 +596,7 @@
         </div>
     </div>
 
-    <script src="magusic.js?v=6"></script>
+    <script src="magusic.js?v=22"></script>
 </body>
 
 </html>

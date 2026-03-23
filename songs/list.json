@@ -52,7 +52,7 @@
             "et": "knights_et.json",
             "et_6k": "knight_of_nights_et_6k.json"
         },
-        "icon": "assets/選曲ロゴ-ナイトオブナイツ.png"
+        "icon": "assets/曲アイコン/選曲ロゴ-ナイトオブナイツ.png"
     },
     {
         "id": "calamity_fortune",
@@ -151,7 +151,8 @@
         "charts": {
             "no": "skairan_no.json",
             "pr_6k": "skairan_pr_6k.json"
-        }
+        },
+        "icon": "assets/曲アイコン/アイコン「寒鰤」.png"
     },
     {
         "id": "ceviche",
@@ -180,6 +181,28 @@
             "et_6k": "isaribi_et_6k.json",
             "et_12k": "isaribi_et_12k.json"
         },
-        "icon": "assets/漁火　アイコン.png"
+        "icon": "assets/曲アイコン/アイコン「漁火」.png"
+    },
+    {
+        "id": "toumou",
+        "title": "艟艨",
+        "artist": "Unknown",
+        "bpm": 150,
+        "folder": "toumou",
+        "audio": "toumou.wav",
+        "charts": {
+            "et_6k": "toumou_et_6k.json"
+        }
+    },
+    {
+        "id": "taihen",
+        "title": "大変",
+        "artist": "Unknown",
+        "bpm": 150,
+        "folder": "taihen",
+        "audio": "taihen.wav",
+        "charts": {
+            "et_6k": "taihen_et_6k.json"
+        }
     }
 ]

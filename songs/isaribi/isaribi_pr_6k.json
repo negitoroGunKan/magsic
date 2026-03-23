@@ -540,6 +540,12 @@
       "type": "death"
     },
     {
+      "beat": 5.25,
+      "lane": 10,
+      "duration": 0,
+      "type": "death"
+    },
+    {
       "beat": 5.5,
       "lane": 6,
       "duration": 0
@@ -1156,6 +1162,11 @@
     {
       "beat": 12,
       "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 12,
+      "lane": 10,
       "duration": 0
     },
     {
@@ -2906,6 +2917,131 @@
     {
       "beat": 80.5,
       "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 99,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 99,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 99,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 99,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 99.25,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 99.25,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 99.25,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 99.25,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 99.5,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 99.5,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 99.5,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 99.5,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 100,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 100,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 100,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 100,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 100.5,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 100.5,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 100.5,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 100.5,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 100.75,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 101,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 101.25,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 101.5,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 101.75,
+      "lane": 6,
       "duration": 0
     }
   ],

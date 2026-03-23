@@ -22,8 +22,19 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     };
     const SKIN: { [key: string]: HTMLImageElement | null } = {
         white: null, blue: null, space: null, titleBg: null, gameBg: null,
-        resBg: null, resPerfect1: null, resPerfect2: null, resMiss1: null, resMiss2: null,
-        resGreat: null, resNice: null, resBad: null
+        resBg: null,
+        // In-game Judgements (PlayRoom)
+        judgeCritical1: null, judgeCritical2: null,
+        judgeGreat1: null,
+        judgeGood1: null,
+        judgeFail1: null,
+        judgeMiss1: null, judgeMiss2: null,
+        // Result Screen Judgements
+        resCritical1: null, resCritical2: null,
+        resGreat1: null,
+        resGood1: null,
+        resFail1: null,
+        resMiss1: null, resMiss2: null
     };
 
     // --- State Variables (Hoisted for Initialization) ---
@@ -46,10 +57,10 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     let daniHealth = 100; // Survival health (0-100)
     const DANI_PENALTIES = {
         miss: 6,
-        bad: 6,
-        nice: 2,
+        fail: 6,
+        good: 2,
         great: 0,
-        perfect: -0.5 // Recovery amount (negative penalty)
+        critical: -0.5
     };
 
     // Layout and Interpolation State
@@ -81,6 +92,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     const logo = document.getElementById('title-logo') as HTMLImageElement;
 
     let HIT_Y = 0;
+    let judgementHeightOffset = 200; // Default height for judgement display
     const NOTE_HEIGHT = 15;
     let currentKeyMode: KeyMode = '8key';
 
@@ -88,6 +100,8 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     const speedDisplay = document.getElementById('speed-display') as HTMLSpanElement;
     const offsetInput = document.getElementById('offset-input') as HTMLInputElement;
     const offsetDisplay = document.getElementById('offset-display') as HTMLSpanElement;
+    const judgementHeightInput = document.getElementById('judgement-height-input') as HTMLInputElement;
+    const judgementHeightDisplay = document.getElementById('judgement-height-display') as HTMLSpanElement;
     const laneWidthInput = document.getElementById('lane-width-input') as HTMLInputElement;
     const laneWidthDisplay = document.getElementById('lane-width-display') as HTMLSpanElement;
     const laneCoverCheckbox = document.getElementById('lane-cover-checkbox') as HTMLInputElement;
@@ -179,6 +193,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     }
 
     // Call initial show
+    loadSkin(); // Load assets
     if (document.readyState === 'complete' || document.readyState === 'interactive') {
         showStartScreen(true);
     } else {
@@ -210,15 +225,18 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     
     // Custom Result Screen Elements
     const customResultScreen = document.getElementById('custom-results-screen') as HTMLDivElement;
-    const valResPerfect = document.getElementById('val-res-perfect') as HTMLSpanElement;
+    const valResCritical = document.getElementById('val-res-critical') as HTMLSpanElement;
     const valResGreat = document.getElementById('val-res-great') as HTMLSpanElement;
-    const valResNice = document.getElementById('val-res-nice') as HTMLSpanElement;
-    const valResBad = document.getElementById('val-res-bad') as HTMLSpanElement;
+    const valResGood = document.getElementById('val-res-good') as HTMLSpanElement;
+    const valResFail = document.getElementById('val-res-fail') as HTMLSpanElement;
     const valResMiss = document.getElementById('val-res-miss') as HTMLSpanElement;
     const valResCombo = document.getElementById('val-res-combo') as HTMLSpanElement;
     const valResScore = document.getElementById('val-res-score') as HTMLSpanElement;
     const btnCloseCustomResults = document.getElementById('btn-close-custom-results') as HTMLButtonElement;
-    const imgResPerfect = document.getElementById('img-res-perfect') as HTMLImageElement;
+    const imgResCritical = document.getElementById('img-res-critical') as HTMLImageElement;
+    const imgResGreat = document.getElementById('img-res-great') as HTMLImageElement;
+    const imgResGood = document.getElementById('img-res-good') as HTMLImageElement;
+    const imgResFail = document.getElementById('img-res-fail') as HTMLImageElement;
     const imgResMiss = document.getElementById('img-res-miss') as HTMLImageElement;
     const resultStatusTitle = document.getElementById('result-status-title') as HTMLHeadingElement;
     // (resultsOverlay and btnCloseResults handled at top)
@@ -240,7 +258,6 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
 
     // Layout Selector
     // (currentLayoutType and targetLayoutType handled at top or below)
-    const scrollModeSelect = document.getElementById('scroll-mode-select') as HTMLSelectElement; // [NEW]
     const layoutRadios = document.getElementsByName('layout-type');
     layoutRadios.forEach(radio => {
         radio.addEventListener('change', (e) => {
@@ -729,17 +746,6 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     if (playerDisplay) playerDisplay.textContent = `Player: ${currentPlayer} ▼`;
     if (playerDisplayInSelect) playerDisplayInSelect.textContent = `Player: ${currentPlayer} ▼`;
 
-    let scrollMode: 'beat' | 'time' = 'beat';
-    let bpmNormalize: boolean = true;
-
-    const bpmNormalizeCheckbox = document.getElementById('bpm-normalize-checkbox') as HTMLInputElement;
-
-    if (bpmNormalizeCheckbox) {
-        bpmNormalizeCheckbox.addEventListener('change', () => {
-            bpmNormalize = bpmNormalizeCheckbox.checked;
-            savePlayerSettings();
-        });
-    }
 
     // --- Per-Player Settings Logic ---
     function loadPlayerSettings() {
@@ -790,20 +796,18 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                     if (laneCoverSpeedDisplay) laneCoverSpeedDisplay.textContent = laneCoverSpeedMult.toFixed(1);
                 }
 
-                if (settings.scrollMode) {
-                    scrollMode = settings.scrollMode;
-                    if (scrollModeSelect) scrollModeSelect.value = scrollMode;
-                }
-
-                if (settings.bpmNormalize !== undefined) {
-                    bpmNormalize = !!settings.bpmNormalize;
-                    if (bpmNormalizeCheckbox) bpmNormalizeCheckbox.checked = bpmNormalize;
-                }
 
                 if (settings.laneOpacity !== undefined) {
                     laneOpacity = parseFloat(settings.laneOpacity);
                     if (laneOpacityInput) laneOpacityInput.value = (laneOpacity * 100).toString();
                     if (laneOpacityDisplay) laneOpacityDisplay.textContent = (laneOpacity * 100).toString();
+                }
+
+                // Judgement Height
+                if (settings.judgementHeight !== undefined) {
+                    judgementHeightOffset = parseInt(settings.judgementHeight);
+                    if (judgementHeightInput) judgementHeightInput.value = judgementHeightOffset.toString();
+                    if (judgementHeightDisplay) judgementHeightDisplay.textContent = judgementHeightOffset.toString();
                 }
 
                 resize(); // Apply loaded lane width
@@ -819,8 +823,6 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 if (offsetInput) offsetInput.value = '0';
                 if (offsetDisplay) offsetDisplay.textContent = '0';
 
-                bpmNormalize = true;
-                if (bpmNormalizeCheckbox) bpmNormalizeCheckbox.checked = true;
             }
         } catch (e) {
             console.error('Failed to load settings', e);
@@ -841,9 +843,8 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 height: laneCoverHeight,
                 speed: laneCoverSpeedMult
             },
-            scrollMode: scrollModeSelect ? scrollModeSelect.value : 'beat',
-            bpmNormalize: bpmNormalizeCheckbox ? bpmNormalizeCheckbox.checked : true,
-            laneOpacity: laneOpacity
+            laneOpacity: laneOpacity,
+            judgementHeight: judgementHeightOffset
         };
         localStorage.setItem(key, JSON.stringify(settings)); // Changed to 'magusic_custom_settings' in the instruction, but keeping 'key' for consistency with per-player settings. If the instruction intended a global setting, this would need to be 'magusic_custom_settings'. Assuming the instruction meant to add to the existing per-player settings structure.
     }
@@ -1003,7 +1004,15 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             const val = parseInt(offsetInput.value);
             globalOffset = val;
             offsetDisplay.textContent = val.toString();
-            savePlayerSettings(); // <--- Save on change
+            savePlayerSettings();
+        });
+    }
+
+    if (judgementHeightInput && judgementHeightDisplay) {
+        judgementHeightInput.addEventListener('input', () => {
+            judgementHeightOffset = parseInt(judgementHeightInput.value);
+            judgementHeightDisplay.textContent = judgementHeightOffset.toString();
+            savePlayerSettings();
         });
     }
 
@@ -1019,11 +1028,6 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     // Option Drawer Toggle
     // (btnOptionsToggle and controlsDiv handled at top)
 
-    if (scrollModeSelect) {
-        scrollModeSelect.addEventListener('change', () => {
-            savePlayerSettings();
-        });
-    }
 
     if (btnOptionsToggle && controlsDiv) {
         btnOptionsToggle.addEventListener('click', (e) => {
@@ -1072,16 +1076,25 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             { key: 'white', src: 'assets/note_white.png' },
             { key: 'blue', src: 'assets/note_blue.png' },
             { key: 'space', src: 'assets/note_space.png' },
-            { key: 'titleBg', src: 'assets/backdrop1.png' }, // Use backdrop1 for title as requested
-            { key: 'gameBg', src: 'assets/initial2.png' },  // Fallback
+            { key: 'titleBg', src: 'assets/initial2.png' }, // Fallback, will be overridden by video if possible
+            { key: 'gameBg', src: 'assets/initial2.png' },
             { key: 'resBg', src: 'assets/リザルト背景.png' },
-            { key: 'resPerfect1', src: 'assets/リザルトPERFECT.png' },
-            { key: 'resPerfect2', src: 'assets/リザルトPERFECT2.png' },
-            { key: 'resMiss1', src: 'assets/リザルトMISS1.png' },
-            { key: 'resMiss2', src: 'assets/リザルトMISS2.png' },
-            { key: 'resGreat', src: 'assets/リザルトGREAT.png' },
-            { key: 'resNice', src: 'assets/リザルトNICE.png' },
-            { key: 'resBad', src: 'assets/リザルトBAD.png' }
+            // In-game Judgements
+            { key: 'judgeCritical1', src: 'assets/プレイ中判定文字/CRITICAL判定1.png' },
+            { key: 'judgeCritical2', src: 'assets/プレイ中判定文字/CRITICAL判定2.png' },
+            { key: 'judgeGreat1', src: 'assets/プレイ中判定文字/GREAT判定1.png' },
+            { key: 'judgeGood1', src: 'assets/プレイ中判定文字/GOOD判定1.png' },
+            { key: 'judgeFail1', src: 'assets/プレイ中判定文字/FAIL判定1.png' },
+            { key: 'judgeMiss1', src: 'assets/プレイ中判定文字/MISS判定1.png' },
+            { key: 'judgeMiss2', src: 'assets/プレイ中判定文字/MISS判定2.png' },
+            // Result Judgements
+            { key: 'resCritical1', src: 'assets/リザルト文字/CRITICAL1.png' },
+            { key: 'resCritical2', src: 'assets/リザルト文字/CRITICAL2.png' },
+            { key: 'resGreat1', src: 'assets/リザルト文字/GREAT1.png' },
+            { key: 'resGood1', src: 'assets/リザルト文字/GOOD1.png' },
+            { key: 'resFail1', src: 'assets/リザルト文字/FAIL1.png' },
+            { key: 'resMiss1', src: 'assets/リザルト文字/MISS1.png' },
+            { key: 'resMiss2', src: 'assets/リザルト文字/MISS2.png' }
         ];
 
         assets.forEach(a => {
@@ -1116,8 +1129,8 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
 
     function loadAudioAssets() {
         const assets = [
-            { key: 'bgm_title', src: 'assets/タイトル画面でループして流れる曲.wav', loop: true, volume: 0.5 },
-            { key: 'bgm_select', src: 'assets/選曲画面でループして流れる曲.wav', loop: true, volume: 0.5 },
+            { key: 'bgm_title', src: 'assets/タイトル画面/タイトル画面でループして流れる曲.wav', loop: true, volume: 0.5 },
+            { key: 'bgm_select', src: 'assets/選曲画面/選曲画面でループして流れる曲.wav', loop: true, volume: 0.5 },
             { key: 'se_start', src: 'assets/ゲームスタートボタンを押す.mp3', volume: 0.8 },
             { key: 'se_option', src: 'assets/設定画面を開く音.mp3', volume: 0.8 },
             { key: 'se_decide', src: 'assets/曲選択時効果音(通常).mp3', volume: 0.8 },
@@ -1207,13 +1220,14 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     }
     let LANE_CONFIGS: LaneConfig[] = [];
     let laneStartX = 0;
+    let laneEndX = 0;
 
     // Judgement Configuration (ms) — delegated to src/core/judgment
-    const THRESHOLD_PERFECT = JUDGMENT_THRESHOLDS.perfect;
-    const THRESHOLD_GREAT = JUDGMENT_THRESHOLDS.great;
-    const THRESHOLD_NICE = JUDGMENT_THRESHOLDS.nice;
-    const THRESHOLD_BAD = JUDGMENT_THRESHOLDS.bad;
-    const MISS_BOUNDARY = JUDGMENT_THRESHOLDS.miss;
+    const THRESHOLD_CRITICAL = (JUDGMENT_THRESHOLDS && JUDGMENT_THRESHOLDS.critical) || 40;
+    const THRESHOLD_GREAT = (JUDGMENT_THRESHOLDS && JUDGMENT_THRESHOLDS.great) || 80;
+    const THRESHOLD_GOOD = (JUDGMENT_THRESHOLDS && JUDGMENT_THRESHOLDS.good) || 133;
+    const THRESHOLD_FAIL = (JUDGMENT_THRESHOLDS && JUDGMENT_THRESHOLDS.fail) || 150;
+    const MISS_BOUNDARY = (JUDGMENT_THRESHOLDS && JUDGMENT_THRESHOLDS.miss) || 180;
 
     // Stats
     // ChartNote, LayoutChangeEvent → imported from src/core/types and src/core/chart
@@ -1248,10 +1262,10 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
 
 
     interface GameStats {
-        perfect: number;
+        critical: number;
         great: number;
-        nice: number;
-        bad: number;
+        good: number;
+        fail: number;
         miss: number;
         combo: number;
         maxCombo: number;
@@ -1260,7 +1274,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         score: number;
     }
     let stats: GameStats = {
-        perfect: 0, great: 0, nice: 0, bad: 0, miss: 0, combo: 0, maxCombo: 0, totalErrorMs: 0, hitCount: 0, score: 0
+        critical: 0, great: 0, good: 0, fail: 0, miss: 0, combo: 0, maxCombo: 0, totalErrorMs: 0, hitCount: 0, score: 0
     };
 
 
@@ -1270,10 +1284,10 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
 
     function resetStats() {
         stats = {
-            perfect: 0,
+            critical: 0,
             great: 0,
-            nice: 0,
-            bad: 0,
+            good: 0,
+            fail: 0,
             miss: 0,
             combo: 0,
             maxCombo: 0,
@@ -1309,14 +1323,14 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         }
     }
 
-    function addHit(type: 'perfect' | 'great' | 'nice' | 'bad' | 'miss', errorMs: number = 0) {
+    function addHit(type: JudgmentType, errorMs: number = 0) {
         stats[type]++;
         if (type !== 'miss') {
             stats.totalErrorMs += errorMs;
             stats.hitCount++;
         }
 
-        if (type === 'miss' || type === 'bad') {
+        if (type === 'miss' || type === 'fail') {
             stats.combo = 0;
         } else {
             stats.combo++;
@@ -1527,6 +1541,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     let judgementText = '';
     let judgementColor = '#fff';
     let judgementTimer = 0;
+    let currentJudgementType: JudgmentType = 'miss';
 
     // Input Handling State
     const pressedKeys: boolean[] = new Array(KEYS.length).fill(false);
@@ -1639,31 +1654,21 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         return Math.max(0, audioContext.currentTime - audioStartTime);
     }
 
-    function getNoteY(scheduledTime: number, beat: number = 0): number {
-        if (scrollMode === 'beat') {
-            // Beat Based: Constant Space Per Beat.
-            // Reference: 1 beat travels (60000 / baseBPM) * effectiveSpeed pixels.
-            // This ensures songs with different base BPMs fall at the SAME visual speed.
-            const currentBeat = getBeatFromTime(getAudioTime() * 1000);
-            const distBeats = beat - currentBeat;
+    function getNoteY(scheduledTime: number, beat: number = 0, currentTimeMs: number = -1): number {
+        const timeMs = currentTimeMs === -1 ? getAudioTime() * 1000 : currentTimeMs;
+        const effectiveSpeed = currentNoteSpeed * (isLaneCoverEnabled ? laneCoverSpeedMult : 1.0);
 
-            // Apply Lane Cover Speed if enabled
-            const effectiveSpeed = currentNoteSpeed * (isLaneCoverEnabled ? laneCoverSpeedMult : 1.0);
+        // Normalized Beat-based Scrolling (Always ON)
+        const currentBeat = getBeatFromTime(timeMs);
+        const distBeats = beat - currentBeat;
 
-            let msPerBeatBaseline = 500; // Legacy default
-            if (bpmNormalize) {
-                // Calculate the baseline ms per beat for the song (using the initial specified BPM)
-                const baseBpm = bpmChanges.length > 0 ? bpmChanges[0].bpm : 120;
-                msPerBeatBaseline = 60000 / baseBpm;
-            }
+        // Use song's initial BPM as reference for normalization.
+        // This ensures all songs scroll at the same speed at their base BPM,
+        // while mid-song BPM changes are reflected as relative speed changes.
+        const baseBpm = bpmChanges.length > 0 ? bpmChanges[0].bpm : 120;
+        const msPerBeatBaseline = 60000 / baseBpm;
 
-            return HIT_Y - distBeats * msPerBeatBaseline * effectiveSpeed;
-        } else {
-            // Time Based (Legacy)
-            const currentTimeMs = getAudioTime() * 1000;
-            const speed = currentNoteSpeed * (isLaneCoverEnabled ? laneCoverSpeedMult : 1.0);
-            return HIT_Y - (scheduledTime - currentTimeMs) * speed;
-        }
+        return HIT_Y - distBeats * msPerBeatBaseline * effectiveSpeed;
     }
 
     function getSpawnAheadTime(): number {
@@ -1808,7 +1813,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                     note.active = false;
                     judgementColor = '#00ffff';
                     judgementTimer = 1000;
-                    addHit('perfect');
+                    addHit('critical');
                     spawnHitEffect(note.laneIndex, '#00ffff');
 
                     if (isAutoPlay || (assistSelect.value === 'auto_space' && note.laneIndex === 4)) {
@@ -1819,10 +1824,10 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             } else if ((isAutoPlay || (assistSelect.value === 'auto_space' && note.laneIndex === 4)) && !note.isLong && !note.processed && currentTimeMs >= note.scheduledTime) {
                 // AUTO PLAY HIT (Head)
                 note.active = false;
-                judgementText = `PERFECT\nAUTO`;
+                judgementText = `CRITICAL\nAUTO`;
                 judgementColor = '#00ffff'; // Cyan for perfect
                 judgementTimer = 1000;
-                addHit('perfect');
+                addHit('critical');
                 spawnHitEffect(note.laneIndex, '#00ffff');
 
                 // Simulate Key Press Visual
@@ -1835,10 +1840,10 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 note.beingHeld = true;
                 heldNotes[note.laneIndex] = note;
 
-                judgementText = `PERFECT\nAUTO`;
+                judgementText = `CRITICAL\nAUTO`;
                 judgementColor = '#00ffff';
                 judgementTimer = 1000;
-                addHit('perfect'); // Count head? 
+                addHit('critical'); // Count head? 
                 spawnHitEffect(note.laneIndex, '#00ffff');
 
                 // Visualize Hold
@@ -1886,14 +1891,13 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             const note = notes[i];
             const tailTime = note.scheduledTime + note.duration;
             const tailBeat = getBeatFromTime(tailTime);
-            const tailY = getNoteY(tailTime, tailBeat);
+            const tailY = getNoteY(tailTime, tailBeat, currentTimeMs);
 
             // 1. Check if Off Screen
             if (tailY > canvas.height + 1000) { // Large buffer for high speeds
                 // If it's still active and going off screen, it's a MISS!
                 // (Fix for high speed notes skipping the time-based miss check)
                 if (note.active) {
-                    const currentTimeMs = getAudioTime() * 1000;
                     if (currentTimeMs > note.scheduledTime + MISS_BOUNDARY) {
                         note.active = false;
                         
@@ -1942,6 +1946,9 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
 
     function draw() {
         if (!ctx) return;
+
+        const currentTime = getAudioTime(); // Capture ONCE per frame
+        const currentTimeMs = currentTime * 1000;
 
         // Clear / Draw Background
         if (!isPlaying && SKIN.titleBg) {
@@ -1996,8 +2003,6 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
 
         // Draw Beat Grid (Measure Lines) [NEW]
         if (bpmChanges.length > 0) {
-            const currentTime = getAudioTime(); // seconds
-            const currentTimeMs = currentTime * 1000;
             const speed = currentNoteSpeed * (isLaneCoverEnabled ? laneCoverSpeedMult : 1.0);
 
             // We need to draw lines that are within the visible range
@@ -2026,37 +2031,24 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 if (segStart < segEnd) {
                     const msPerBeat = 60000 / change.bpm;
 
-                    // We want to iterate GLOBAL beats 'g'
-                    // Time(g) = change.time + (g - change.beat) * msPerBeat
-                    // Find smallest integer 'g' such that Time(g) >= segStart
-                    // change.time + (g - change.beat) * msPerBeat >= segStart
-                    // (g - change.beat) >= (segStart - change.time) / msPerBeat
-                    // g >= change.beat + (segStart - change.time) / msPerBeat
-
                     const minGlobalBeat = change.beat + (segStart - change.time) / msPerBeat;
                     const startGlobalBeat = Math.ceil(minGlobalBeat);
 
-                    // Safety break
                     let safeguard = 0;
-
                     for (let g = startGlobalBeat; safeguard < 1000; g++) {
                         safeguard++;
                         const beatTime = change.time + (g - change.beat) * msPerBeat;
 
                         if (beatTime > segEnd + 1) break;
 
-                        // Measure line? (Assuming 4/4)
-                        // Use epsilon for float safety if g was float, but here g is integer loop
-                        // But change.beat might be float, so g is integer? Yes, we ceil to integer.
                         const isMeasure = (g % 4 === 0);
-
-                        const y = HIT_Y - (beatTime - currentTimeMs) * speed;
+                        const y = getNoteY(beatTime, g, currentTimeMs);
 
                         if (isMeasure) {
                             ctx.strokeStyle = '#888';
                             ctx.lineWidth = 2;
                         } else {
-                            ctx.strokeStyle = '#444'; // Faint beat line
+                            ctx.strokeStyle = '#444'; 
                             ctx.lineWidth = 1;
                         }
 
@@ -2135,11 +2127,11 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         ctx.font = '20px monospace';
         const statsStartY = 150;
         const statsLineH = 30;
-        ctx.fillText(`PERFECT: ${stats.perfect}`, 20, statsStartY);
-        ctx.fillText(`GREAT:   ${stats.great}`, 20, statsStartY + statsLineH);
-        ctx.fillText(`NICE:    ${stats.nice}`, 20, statsStartY + statsLineH * 2);
-        ctx.fillText(`BAD:     ${stats.bad}`, 20, statsStartY + statsLineH * 3);
-        ctx.fillText(`MISS:    ${stats.miss}`, 20, statsStartY + statsLineH * 4);
+        ctx.fillText(`CRITICAL: ${stats.critical}`, 20, statsStartY);
+        ctx.fillText(`GREAT:    ${stats.great}`, 20, statsStartY + statsLineH);
+        ctx.fillText(`GOOD:     ${stats.good}`, 20, statsStartY + statsLineH * 2);
+        ctx.fillText(`FAIL:     ${stats.fail}`, 20, statsStartY + statsLineH * 3);
+        ctx.fillText(`MISS:     ${stats.miss}`, 20, statsStartY + statsLineH * 4);
         const avgVal = stats.hitCount > 0 ? (stats.totalErrorMs / stats.hitCount).toFixed(1) : '0';
         ctx.fillText(`AVG:     ${avgVal}ms`, 20, statsStartY + statsLineH * 5);
 
@@ -2173,7 +2165,10 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         if (isAutoPlay) {
             ctx.fillText('AUTO PLAY', canvas.width / 2, (canvas.height / 2) + 50);
         } else {
-            let pct = ((totalMaxScore - lostScore) / totalMaxScore) * 100;
+            let pct = 0;
+            if (totalMaxScore > 0) {
+                pct = ((totalMaxScore - lostScore) / totalMaxScore) * 100;
+            }
             if (pct < 0) pct = 0;
             const scoreText = pct.toFixed(4) + '%';
             ctx.fillText(scoreText, canvas.width / 2, (canvas.height / 2) + 50);
@@ -2190,21 +2185,21 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             ctx.textAlign = 'right';
             ctx.font = 'bold 24px Arial';
 
-            // Perfect
+            // Critical
             ctx.fillStyle = '#00ffff';
-            ctx.fillText(`PERFECT: ${stats.perfect}`, statsX, statsStartTime);
+            ctx.fillText(`CRITICAL: ${stats.critical}`, statsX, statsStartTime);
 
             // Great
             ctx.fillStyle = '#ffeb3b';
             ctx.fillText(`GREAT: ${stats.great}`, statsX, statsStartTime + lineHeight);
 
-            // Nice
+            // Good
             ctx.fillStyle = '#00ff00';
-            ctx.fillText(`NICE: ${stats.nice}`, statsX, statsStartTime + lineHeight * 2);
+            ctx.fillText(`GOOD: ${stats.good}`, statsX, statsStartTime + lineHeight * 2);
 
-            // Bad
+            // Fail
             ctx.fillStyle = '#ffae00';
-            ctx.fillText(`BAD: ${stats.bad}`, statsX, statsStartTime + lineHeight * 3);
+            ctx.fillText(`FAIL: ${stats.fail}`, statsX, statsStartTime + lineHeight * 3);
 
             // Miss
             ctx.fillStyle = '#ff0000';
@@ -2309,12 +2304,12 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 else skinImg = SKIN.white;
 
                 if (note.isLong) {
-                    const headY = getNoteY(note.scheduledTime, note.beat);
+                    const headY = getNoteY(note.scheduledTime, note.beat, currentTimeMs);
                     // Calculate tail beat
                     // We can approximate or calculate exactly.
                     // note.duration is time.
                     const tailBeat = getBeatFromTime(note.scheduledTime + note.duration);
-                    const tailY = getNoteY(note.scheduledTime + note.duration, tailBeat);
+                    const tailY = getNoteY(note.scheduledTime + note.duration, tailBeat, currentTimeMs);
 
                     // Set transparency for long notes (50% as requested)
                     const originalAlpha = ctx!.globalAlpha;
@@ -2349,7 +2344,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                         ctx!.fillRect(x + H_GAP, headY - (drawHeight / 2), w - (H_GAP * 2), drawHeight);
                     }
                 } else {
-                    const noteY = getNoteY(note.scheduledTime, note.beat);
+                    const noteY = getNoteY(note.scheduledTime, note.beat, currentTimeMs);
                     if (noteY > canvas.height + 100) return; // Optimization check?
 
                     // Draw regular note
@@ -2435,13 +2430,17 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         }
 
         // Draw Judgement
-        if (judgementTimer > 0) {
+        if (judgementTimer > 0 && ctx) {
+            const centerLaneX = (laneStartX + laneEndX) / 2;
+
+            // Reverted to traditional text-only judgment as requested
+            // Reset to default size (40px) as requested
             ctx.fillStyle = judgementColor;
-            ctx.font = 'bold 40px Arial';
+            ctx.font = 'bold 40px Arial'; 
             ctx.textAlign = 'center';
             const lines = judgementText.split('\n');
             lines.forEach((line, i) => {
-                ctx.fillText(line, canvas.width / 2, HIT_Y - 50 + (i * 40));
+                ctx.fillText(line, centerLaneX, HIT_Y - (judgementHeightOffset / 2) + (i * 40)); 
             });
         }
 
@@ -2693,10 +2692,10 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
 
         // Show New Premium Result Screen
         if (customResultScreen) {
-            if (valResPerfect) valResPerfect.textContent = stats.perfect.toString();
+            if (valResCritical) valResCritical.textContent = stats.critical.toString();
             if (valResGreat) valResGreat.textContent = stats.great.toString();
-            if (valResNice) valResNice.textContent = stats.nice.toString();
-            if (valResBad) valResBad.textContent = stats.bad.toString();
+            if (valResGood) valResGood.textContent = stats.good.toString();
+            if (valResFail) valResFail.textContent = stats.fail.toString();
             if (valResMiss) valResMiss.textContent = stats.miss.toString();
             if (valResCombo) valResCombo.textContent = stats.maxCombo.toString();
             if (valResScore) valResScore.textContent = scaledScore.toLocaleString();
@@ -2726,13 +2725,12 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         let toggle = false;
         blinkingTimer = window.setInterval(() => {
             toggle = !toggle;
-            if (imgResPerfect) {
-                imgResPerfect.src = toggle ? 'assets/リザルトPERFECT2.png' : 'assets/リザルトPERFECT.png';
-            }
-            if (imgResMiss) {
-                imgResMiss.src = toggle ? 'assets/リザルトMISS2.png' : 'assets/リザルトMISS1.png';
-            }
-        }, 80); // Fast blinking
+            if (imgResCritical) imgResCritical.src = toggle ? SKIN.resCritical2!.src : SKIN.resCritical1!.src;
+            if (imgResGreat) imgResGreat.src = SKIN.resGreat1!.src; 
+            if (imgResGood) imgResGood.src = SKIN.resGood1!.src;
+            if (imgResFail) imgResFail.src = SKIN.resFail1!.src;
+            if (imgResMiss) imgResMiss.src = toggle ? SKIN.resMiss2!.src : SKIN.resMiss1!.src;
+        }, 80);
     }
 
     function stopResultBlinking() {
@@ -3269,10 +3267,10 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 if (matchingKey && chartInfo && chartInfo.level && chartInfo.level > 0) {
                     const levelStr = chartInfo.level.toString();
                     // Robust encoding for Japanese filenames
-                    imgSrc = `assets/${encodeURIComponent('難易度ロゴ')}${levelStr}.png`;
+                    imgSrc = `assets/選曲画面/${encodeURIComponent('難易度ロゴ')}${levelStr}.png`;
                 } else {
                     // Use "No Chart" icon if missing or level not set
-                    imgSrc = `assets/${encodeURIComponent('難易度ロゴ譜面なし')}.png`;
+                    imgSrc = `assets/選曲画面/${encodeURIComponent('難易度ロゴ譜面なし')}.png`;
                 }
 
                 img.src = imgSrc;
@@ -3676,12 +3674,13 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         const getLayoutData = (type: 'type-a' | 'type-b') => {
             const vLanes: VisualLane[] = [];
             const lConfigs: LaneConfig[] = [];
+            let sx = 0;
 
             // --- 9 KEY (Original Logic) ---
             if (currentKeyMode === '8key') {
                 if (type === 'type-a') {
                     const totalPlayWidth = tempWidth * 4;
-                    const sx = (canvas.width - totalPlayWidth) / 2;
+                    sx = (canvas.width - totalPlayWidth) / 2;
                     laneStartX = sx;
 
                     for (let i = 0; i < 4; i++) {
@@ -3708,7 +3707,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                     const groupGap = tempWidth * 0.1;
                     const totalScale = (4 * bScale) + (4 * wScale);
                     const totalPlayWidth = (tempWidth * totalScale) + (4 * pairGap) + (3 * groupGap);
-                    const sx = (canvas.width - totalPlayWidth) / 2;
+                    sx = (canvas.width - totalPlayWidth) / 2;
                     laneStartX = sx;
 
                     const ord = [
@@ -3736,7 +3735,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             else if (currentKeyMode === '4key') {
                 const tempWidth = currentLaneWidth * 1.5;
                 const totalPlayWidth = tempWidth * 4;
-                const sx = (canvas.width - totalPlayWidth) / 2;
+                sx = (canvas.width - totalPlayWidth) / 2;
                 laneStartX = sx;
 
                 const indices = [1, 3, 6, 8];
@@ -3776,7 +3775,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             else if (currentKeyMode === '12key') {
                 const tempWidth = currentLaneWidth * 1.5;
                 const totalPlayWidth = tempWidth * 6;
-                const sx = (canvas.width - totalPlayWidth) / 2;
+                sx = (canvas.width - totalPlayWidth) / 2;
                 laneStartX = sx;
 
                 const pairs = [
@@ -3797,6 +3796,8 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                     lConfigs[pair.blue] = { x, width: tempWidth, color: '#7CA4FF', label: '' };
                 });
             }
+
+            laneEndX = vLanes.length > 0 ? (vLanes[vLanes.length - 1].x + vLanes[vLanes.length - 1].width) : sx;
 
             return { vLanes, lConfigs };
         };
@@ -3982,37 +3983,38 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                         return;
                     }
 
-                    const sign = msError > 0 ? '+' : '';
-                    let msDisplay = `\n${sign}${Math.floor(msError)}ms`;
-                    if (absError <= 20) {
-                        msDisplay = ''; // Hide if error is small
-                    }
+                    const msRounded = Math.round(msError);
+                    const sign = msRounded >= 0 ? '+' : ''; 
+                    const msDisplay = `\n${sign}${msRounded}ms`;
 
-                    if (absError < THRESHOLD_PERFECT) {
-                        judgementText = `PERFECT${msDisplay}`;
+                    if (absError < THRESHOLD_CRITICAL) {
+                        judgementText = `CRITICAL${msDisplay}`;
                         judgementColor = '#00ffff';
-                        addHit('perfect', msError);
+                        addHit('critical', msError);
                         spawnHitEffect(note.laneIndex, '#00ffff');
+                        currentJudgementType = 'critical';
                     } else if (absError < THRESHOLD_GREAT) {
                         judgementText = `GREAT${msDisplay}`;
                         judgementColor = '#ffeb3b';
                         addHit('great', msError);
                         spawnHitEffect(note.laneIndex, '#ffeb3b');
-                    } else if (absError < THRESHOLD_NICE) {
-                        judgementText = `NICE${msDisplay}`;
+                        currentJudgementType = 'great';
+                    } else if (absError < THRESHOLD_GOOD) {
+                        judgementText = `GOOD${msDisplay}`;
                         judgementColor = '#00ff00';
-                        addHit('nice', msError);
+                        addHit('good', msError);
                         spawnHitEffect(note.laneIndex, '#00ff00');
-                    } else if (absError < THRESHOLD_BAD) {
-                        judgementText = `BAD${msDisplay}`;
+                        currentJudgementType = 'good';
+                    } else if (absError < THRESHOLD_FAIL) {
+                        judgementText = `FAIL${msDisplay}`;
                         judgementColor = '#ffae00';
-                        addHit('bad', msError);
-                        // No effect for BAD? optional
+                        addHit('fail', msError);
+                        currentJudgementType = 'fail';
                     } else {
-                        // 150ms - 180ms: Explicit MISS
                         judgementText = `MISS${msDisplay}`;
                         judgementColor = '#ff0000';
                         addHit('miss', msError);
+                        currentJudgementType = 'miss';
                     }
                     judgementTimer = 1000;
 
@@ -4074,14 +4076,14 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 heldNotes[keyIndex] = null;
                 note.beingHeld = false;
 
-                // If released before completion, deactivate and count as BAD
                 const tailTime = note.scheduledTime + note.duration;
                 const currentTimeMs = getAudioTime() * 1000;
-                if (currentTimeMs < tailTime - THRESHOLD_PERFECT) {
+                if (currentTimeMs < tailTime - THRESHOLD_CRITICAL) {
                     note.active = false;
                     judgementText = "MISS\nRELEASE";
                     judgementColor = "#ff0000";
                     judgementTimer = 1000;
+                    currentJudgementType = 'miss';
                     addHit('miss');
                 }
             }

@@ -91,45 +91,59 @@ const server = http.createServer((req, res) => {
         req.on('data', chunk => body += chunk.toString());
         req.on('end', () => {
             try {
+                fs.appendFileSync('server_log.txt', `[${new Date().toISOString()}] Received /api/score request. Body length: ${body.length}\n`);
                 const newScore = JSON.parse(body);
                 const scoresPath = path.join(ROOT, 'scores.json');
 
                 let scores = {};
                 if (fs.existsSync(scoresPath)) {
                     try {
-                        scores = JSON.parse(fs.readFileSync(scoresPath, 'utf8'));
+                        const content = fs.readFileSync(scoresPath, 'utf8');
+                        scores = JSON.parse(content);
                     } catch (e) {
-                        console.error('Error parsing scores.json', e);
+                        fs.appendFileSync('server_log.txt', `Error parsing scores.json: ${e.message}\n`);
                     }
                 }
 
                 const songId = newScore.songId;
+                if (!songId) {
+                    fs.appendFileSync('server_log.txt', `Error: songId is missing in newScore\n`);
+                    res.writeHead(400);
+                    res.end('Missing songId');
+                    return;
+                }
                 if (!scores[songId]) scores[songId] = [];
 
-                // Add playerName support (default to 'Guest' if missing)
                 if (!newScore.playerName) newScore.playerName = 'Guest';
                 newScore.timestamp = new Date().toISOString();
 
-                // Check for Personal Best: only save if it's better than current records for this song
-                // Since we only want BEST values to save capacity
                 let isBetter = true;
-                if (scores[songId].length > 0) {
-                    const currentBest = scores[songId][0].score || 0;
+                let existingDiffIndex = -1;
+                
+                existingDiffIndex = scores[songId].findIndex(s => s.difficulty === newScore.difficulty && s.playerName === newScore.playerName);
+                if (existingDiffIndex !== -1) {
+                    const currentBest = scores[songId][existingDiffIndex].score || 0;
                     if (newScore.score <= currentBest) {
                         isBetter = false;
                     }
                 }
 
                 if (isBetter) {
-                    // Replace or push? The user wants "Best values". 
-                    // Let's keep only the ONE BEST to maximize capacity efficiency.
-                    scores[songId] = [newScore];
+                    if (existingDiffIndex !== -1) {
+                        scores[songId][existingDiffIndex] = newScore;
+                    } else {
+                        scores[songId].push(newScore);
+                    }
 
-                    fs.writeFile(scoresPath, JSON.stringify(scores, null, 2), err => {
+                    fs.appendFileSync('server_log.txt', `Saving scores for ${songId}. Total scores count: ${Object.keys(scores).length}\n`);
+                    const jsonStr = JSON.stringify(scores, null, 2);
+                    fs.writeFile(scoresPath, jsonStr, err => {
                         if (err) {
+                            fs.appendFileSync('server_log.txt', `Error writing scores.json: ${err.message}\n`);
                             res.writeHead(500);
                             res.end('Error saving score');
                         } else {
+                            fs.appendFileSync('server_log.txt', `Successfully saved scores.json. Size: ${jsonStr.length}\n`);
                             res.writeHead(200);
                             res.end('New Personal Best saved');
                         }
@@ -139,9 +153,9 @@ const server = http.createServer((req, res) => {
                     res.end('Score not a new best, not saved');
                 }
             } catch (e) {
-                console.error(e);
-                res.writeHead(400);
-                res.end('Bad Request');
+                fs.appendFileSync('server_log.txt', `CRASH in /api/score handler: ${e.stack}\n`);
+                res.writeHead(500);
+                res.end('Internal Server Error');
             }
         });
         return;

@@ -5,10 +5,10 @@ import { JudgmentType } from './types';
 
 /** Weight of each judgment type for scoring. Max per note = 9. */
 export const SCORE_WEIGHTS: Record<JudgmentType, number> = {
-  perfect: 9,
+  critical: 9,
   great: 8,
-  nice: 2,
-  bad: 1,
+  good: 2,
+  fail: 1,
   miss: 0,
 };
 
@@ -27,7 +27,8 @@ export interface ScoreResult {
  */
 export function calculateMaxScore(notes: { duration: number }[]): number {
   if (notes.length === 0) return 1;
-  return notes.reduce((acc, n) => acc + (n.duration > 0 ? 18 : 9), 0);
+  const maxWeight = SCORE_WEIGHTS.critical;
+  return notes.reduce((acc, n) => acc + (n.duration > 0 ? maxWeight * 2 : maxWeight), 0);
 }
 
 /**
