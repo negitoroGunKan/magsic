@@ -1,0 +1,3 @@
+[2026-03-22T06:48:56.503Z] Received /api/score request. Body length: 197
+Saving scores for test-song. Total scores count: 1
+Successfully saved scores.json. Size: 382

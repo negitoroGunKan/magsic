@@ -250,6 +250,7 @@
     };
     let currentPlayer = localStorage.getItem("magsic_player") || "Guest";
     let globalOffset = 0;
+    let visualOffset = 0;
     let currentLaneWidth = 100;
     let isLaneCoverEnabled = false;
     let laneCoverHeight = 300;
@@ -299,6 +300,8 @@
     const speedDisplay = document.getElementById("speed-display");
     const offsetInput = document.getElementById("offset-input");
     const offsetDisplay = document.getElementById("offset-display");
+    const visualOffsetInput = document.getElementById("visual-offset-input");
+    const visualOffsetDisplay = document.getElementById("visual-offset-display");
     const judgementHeightInput = document.getElementById("judgement-height-input");
     const judgementHeightDisplay = document.getElementById("judgement-height-display");
     const laneWidthInput = document.getElementById("lane-width-input");
@@ -827,6 +830,11 @@
               if (offsetDisplay) offsetDisplay.textContent = off.toString();
             }
           }
+          if (settings.visualOffset !== void 0) {
+            visualOffset = parseInt(settings.visualOffset);
+            if (visualOffsetInput) visualOffsetInput.value = visualOffset.toString();
+            if (visualOffsetDisplay) visualOffsetDisplay.textContent = visualOffset.toString();
+          }
           if (settings.laneWidth !== void 0) {
             currentLaneWidth = parseInt(settings.laneWidth) || 100;
             if (laneWidthInput) laneWidthInput.value = currentLaneWidth.toString();
@@ -860,6 +868,9 @@
           globalOffset = 0;
           if (offsetInput) offsetInput.value = "0";
           if (offsetDisplay) offsetDisplay.textContent = "0";
+          visualOffset = 0;
+          if (visualOffsetInput) visualOffsetInput.value = "0";
+          if (visualOffsetDisplay) visualOffsetDisplay.textContent = "0";
         }
       } catch (e) {
         console.error("Failed to load settings", e);
@@ -869,9 +880,11 @@
       const key = `magsic_settings_${currentPlayer}`;
       const multiplier = speedInput ? parseFloat(speedInput.value) : 2.5;
       const off = offsetInput ? parseInt(offsetInput.value) : 0;
+      const vOff = visualOffsetInput ? parseInt(visualOffsetInput.value) : 0;
       const settings = {
         speed: multiplier,
         offset: off,
+        visualOffset: vOff,
         laneWidth: currentLaneWidth,
         laneCover: {
           enabled: isLaneCoverEnabled,
@@ -1007,6 +1020,14 @@
         const val = parseInt(offsetInput.value);
         globalOffset = val;
         offsetDisplay.textContent = val.toString();
+        savePlayerSettings();
+      });
+    }
+    if (visualOffsetInput && visualOffsetDisplay) {
+      visualOffsetInput.addEventListener("input", () => {
+        const val = parseInt(visualOffsetInput.value);
+        visualOffset = val;
+        visualOffsetDisplay.textContent = val.toString();
         savePlayerSettings();
       });
     }
@@ -1460,7 +1481,8 @@ Offset Updated.`);
       return Math.max(0, audioContext.currentTime - audioStartTime);
     }
     function getNoteY(scheduledTime, beat = 0, currentTimeMs = -1) {
-      const timeMs = currentTimeMs === -1 ? getAudioTime() * 1e3 : currentTimeMs;
+      const trueTimeMs = currentTimeMs === -1 ? getAudioTime() * 1e3 : currentTimeMs;
+      const timeMs = trueTimeMs + visualOffset;
       const effectiveSpeed = currentNoteSpeed * (isLaneCoverEnabled ? laneCoverSpeedMult : 1);
       const currentBeat = getBeatFromTime$1(timeMs);
       const distBeats = beat - currentBeat;

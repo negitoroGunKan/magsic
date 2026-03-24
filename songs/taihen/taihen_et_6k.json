@@ -1,0 +1,261 @@
+{
+  "mode": "6key",
+  "difficulty": "et",
+  "bpm": 180,
+  "offset": 0,
+  "notes": [
+    {
+      "beat": 1,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 1.25,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 1.5,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 1.75,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 2,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 2,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 2.5,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 2.5,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 3,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 3.5,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 3.5,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 4,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 4.5,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 4.5,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 5,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 5.5,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 5.5,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 6,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 6.5,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 6.5,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 7,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 7.5,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 7.5,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 8,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 8.5,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 8.5,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 9,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 9.5,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 9.5,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 9.5,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 10,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 10,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 10.25,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 10.5,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 10.5,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 10.75,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 11,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 11,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 11.25,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 11.5,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 11.5,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 11.75,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 12,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 12,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 12.5,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 12.5,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 13,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 13,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 13.5,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 13.5,
+      "lane": 1,
+      "duration": 0
+    }
+  ],
+  "layoutChanges": [],
+  "bpmChanges": [],
+  "level": 17
+}

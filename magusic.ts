@@ -40,6 +40,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     // --- State Variables (Hoisted for Initialization) ---
     let currentPlayer = localStorage.getItem('magsic_player') || 'Guest';
     let globalOffset = 0;
+    let visualOffset = 0;
     let currentLaneWidth = 100;
     let isLaneCoverEnabled = false;
     let laneCoverHeight = 300;
@@ -100,6 +101,8 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     const speedDisplay = document.getElementById('speed-display') as HTMLSpanElement;
     const offsetInput = document.getElementById('offset-input') as HTMLInputElement;
     const offsetDisplay = document.getElementById('offset-display') as HTMLSpanElement;
+    const visualOffsetInput = document.getElementById('visual-offset-input') as HTMLInputElement;
+    const visualOffsetDisplay = document.getElementById('visual-offset-display') as HTMLSpanElement;
     const judgementHeightInput = document.getElementById('judgement-height-input') as HTMLInputElement;
     const judgementHeightDisplay = document.getElementById('judgement-height-display') as HTMLSpanElement;
     const laneWidthInput = document.getElementById('lane-width-input') as HTMLInputElement;
@@ -775,6 +778,12 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                     }
                 }
 
+                if (settings.visualOffset !== undefined) {
+                    visualOffset = parseInt(settings.visualOffset);
+                    if (visualOffsetInput) visualOffsetInput.value = visualOffset.toString();
+                    if (visualOffsetDisplay) visualOffsetDisplay.textContent = visualOffset.toString();
+                }
+
                 // Lane Width
                 if (settings.laneWidth !== undefined) {
                     currentLaneWidth = parseInt(settings.laneWidth) || 100;
@@ -823,6 +832,10 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 if (offsetInput) offsetInput.value = '0';
                 if (offsetDisplay) offsetDisplay.textContent = '0';
 
+                visualOffset = 0;
+                if (visualOffsetInput) visualOffsetInput.value = '0';
+                if (visualOffsetDisplay) visualOffsetDisplay.textContent = '0';
+
             }
         } catch (e) {
             console.error('Failed to load settings', e);
@@ -833,10 +846,12 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         const key = `magsic_settings_${currentPlayer}`;
         const multiplier = speedInput ? parseFloat(speedInput.value) : 2.5;
         const off = offsetInput ? parseInt(offsetInput.value) : 0;
+        const vOff = visualOffsetInput ? parseInt(visualOffsetInput.value) : 0;
 
         const settings = {
             speed: multiplier,
             offset: off,
+            visualOffset: vOff,
             laneWidth: currentLaneWidth,
             laneCover: {
                 enabled: isLaneCoverEnabled,
@@ -1004,6 +1019,15 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             const val = parseInt(offsetInput.value);
             globalOffset = val;
             offsetDisplay.textContent = val.toString();
+            savePlayerSettings();
+        });
+    }
+
+    if (visualOffsetInput && visualOffsetDisplay) {
+        visualOffsetInput.addEventListener('input', () => {
+            const val = parseInt(visualOffsetInput.value);
+            visualOffset = val;
+            visualOffsetDisplay.textContent = val.toString();
             savePlayerSettings();
         });
     }
@@ -1655,7 +1679,8 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     }
 
     function getNoteY(scheduledTime: number, beat: number = 0, currentTimeMs: number = -1): number {
-        const timeMs = currentTimeMs === -1 ? getAudioTime() * 1000 : currentTimeMs;
+        const trueTimeMs = currentTimeMs === -1 ? getAudioTime() * 1000 : currentTimeMs;
+        const timeMs = trueTimeMs + visualOffset;
         const effectiveSpeed = currentNoteSpeed * (isLaneCoverEnabled ? laneCoverSpeedMult : 1.0);
 
         // Normalized Beat-based Scrolling (Always ON)

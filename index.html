@@ -441,11 +441,14 @@
                 <option value="life_hard">LIFE HARD (Bad-5%/Miss-10%)</option>
             </select>
         </div>
-
         <label>
             Offset: <span id="offset-display">0</span> ms <span style="font-size:10px; color:#aaa">(Result (+) &rarr;
                 Move (+))</span>
             <input type="range" id="offset-input" min="-500" max="500" step="1" value="0" style="width: 200px;">
+        </label>
+        <label>
+            Visual Offset (描画遅延): <span id="visual-offset-display">0</span> ms
+            <input type="range" id="visual-offset-input" min="-500" max="500" step="1" value="0" style="width: 200px;">
         </label>
         <label>
             Judgement Height: <span id="judgement-height-display">200</span>px
@@ -596,7 +599,7 @@
         </div>
     </div>
 
-    <script src="magusic.js?v=22"></script>
+    <script src="magusic.js?v=23"></script>
 </body>
 
 </html>

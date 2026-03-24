@@ -1,0 +1,374 @@
+
+    <!-- Debug Log -->
+    <div id="debug-log"></div>
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:200; flex-direction:column; justify-content:center; align-items:center;">
+        <div style="width:50px; height:50px; border:5px solid #333; border-top:5px solid #e040fb; border-radius:50%; animation:spin 1s linear infinite;">
+        </div>
+        <p id="loading-text" style="color:white; margin-top:20px; font-size:1.5em; letter-spacing:2px;">LOADING...</p>
+        <style>
+            @keyframes spin {
+                0% {
+                    transform: rotate(0deg);
+                }
+
+                100% {
+                    transform: rotate(360deg);
+                }
+            }
+        </style>
+    </div>
+
+    <!-- Shutter Transition -->
+    <div id="shutter-overlay" style="--shutter-y-offset: 5%;">
+        <img id="shutter-img" src="assets/シャッター.png" alt="Shutter">
+    </div>
+
+    <!-- Menu Overlay -->
+    <div id="menu-overlay" style="display: flex; position: absolute; top: 0px; left: 0px; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 15; flex-direction: row; justify-content: center; align-items: center; gap: 40px;">
+        <div class="menu-item" id="menu-btn-play">PLAY</div>
+        <div class="menu-item selected" id="menu-btn-dani">段位認定</div>
+        <div class="menu-item" id="menu-btn-records">記録</div>
+        <div class="menu-item" id="menu-btn-back">戻る</div>
+    </div>
+
+    <!-- Start Screen -->
+    <div id="start-screen" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; background: black;">
+        <video id="title-bg-video" autoplay="" loop="" muted="" playsinline="" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1;">
+            <source src="assets/スタート画面の背景.mp4" type="video/mp4">
+        </video>
+        <img id="title-logo" src="assets/initial2.png" alt="MagsicBeat" style="max-width: 900px; width: 80%; margin-bottom: 20px; z-index: 2; position: relative; transform: scale(0.974322);">
+        <p style="color: #fff; font-size: 1.2em; margin-bottom: 30px; letter-spacing: 1px; text-shadow: 0 0 5px black; z-index: 2; position: relative;">
+            initial 1.7.1</p>
+
+        <div id="title-ui-content" style="display: flex; flex-direction: column; align-items: center; z-index: 2; position: relative;">
+            <!-- Player Select Display -->
+            <div id="player-display" style="color: #00ffff; margin-bottom: 20px; font-size: 1.2em; cursor: pointer; border: 1px solid #00ffff; padding: 5px 15px; border-radius: 20px;">Player: Guest ▼</div>
+
+            <p id="press-button-text" style="color: #fff; font-family: 'Courier New', monospace; font-size: 2em; letter-spacing: 5px; animation: pulse-text 2s infinite;">
+                PRESS BUTTON
+            </p>
+        </div>
+        <p style="margin-top:20px; color:#aaa; font-size: 0.9em; z-index: 2; position: relative;">MagsicBeat initial
+            1.7.1</p>
+
+        <!-- Announcement Banner -->
+        <style>
+            @keyframes marquee {
+                0% {
+                    transform: translateX(100vw);
+                }
+
+                100% {
+                    transform: translateX(-100%);
+                }
+            }
+        </style>
+        <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 40px; background-color: rgba(0, 0, 0, 0.8); z-index: 5; display: flex; align-items: center; overflow: hidden;">
+            <div style="white-space: nowrap; color: #ffeb3b; font-size: 1.5em; font-weight: bold; animation: marquee 15s linear infinite;">
+                MagsicBEAT 新曲 『漁火』 追加！！
+            </div>
+        </div>
+    </div>
+
+    <!-- Records Overlay -->
+    <div id="records-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:300; flex-direction:column; justify-content:flex-start; align-items:center; padding-top:40px; overflow-y:auto;">
+        <h2 style="color:#00ffff; margin-bottom:20px;">Score Analytics &amp; Records</h2>
+
+        <!-- Charts Row -->
+        <div style="display:flex; flex-direction:column; gap:20px; width:90%; max-width:1100px; margin-bottom:30px;">
+            <div style="background:rgba(255,255,255,0.05); padding:15px; border-radius:10px; border:1px solid #555;">
+                <h3 style="color:#00ffff; margin-top:0; font-size:1.1em; text-align:center;">TOP PERFORMANCE (Best
+                    Scores)</h3>
+                <div style="height:350px;"><canvas id="chart-best"></canvas></div>
+            </div>
+        </div>
+
+        <div id="records-container" style="width:90%; max-width:1100px; background:rgba(255,255,255,0.05); border:1px solid #555; padding:20px; border-radius:10px; margin-bottom:30px;">
+            <table style="width:100%; border-collapse:collapse; color:white; text-align:left;">
+                <thead>
+                    <tr style="border-bottom:2px solid #00bcd4;">
+                        <th style="padding:10px;">Song</th>
+                        <th style="padding:10px;">Result</th>
+                        <th style="padding:10px;">Rank</th>
+                        <th style="padding:10px;">Score</th>
+                        <th style="padding:10px;">Acc</th>
+                        <th style="padding:10px;">Gauge / Modifiers</th>
+                    </tr>
+                </thead>
+                <tbody id="records-body">
+                    <!-- Records injected here -->
+                </tbody>
+            </table>
+        </div>
+        <button id="btn-close-records" style="margin-bottom:40px; padding:12px 30px; background:transparent; border:1px solid #00ffff; color:#00ffff; border-radius:25px; cursor:pointer; font-size:1.1em; transition:all 0.2s;">
+            Close
+        </button>
+    </div>
+
+    <!-- Player Selection Overlay -->
+    <div id="player-select-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:200; flex-direction:column; justify-content:center; align-items:center;">
+        <h2 style="color:white; margin-bottom:20px;">Select Player</h2>
+        <div id="player-list" style="display:flex; flex-direction:column; gap:10px; max-height:300px; overflow-y:auto; width:300px; margin-bottom:20px;">
+            <!-- Player buttons injected here -->
+        </div>
+        <div style="display:flex; gap:10px;">
+            <input type="text" id="new-player-name" placeholder="New Player Name" style="padding:10px; border-radius:5px; border:none;">
+            <button id="btn-add-player" style="padding:10px 20px; background:#00bcd4; color:white; border:none; border-radius:5px;">Add</button>
+        </div>
+        <button id="btn-close-player" style="margin-top:20px; padding:10px; background:transparent; border:1px solid #aaa; color:#aaa; cursor:pointer;">Close</button>
+    </div>
+
+    <canvas id="game-canvas" width="1280" height="720"></canvas>
+
+    <!-- Pause Button UI (Fallback for Esc) -->
+    <button id="btn-pause-ui" style="display:none; position:fixed; top:20px; left:20px; z-index:100; padding:10px 15px; background:rgba(255,255,255,0.2); border:1px solid white; color:white; border-radius:5px; cursor:pointer; font-weight:bold; transition: background 0.2s;">
+        PAUSE (ESC)
+    </button>
+
+    <!-- Option Toggle Button -->
+    <img id="btn-options-toggle" src="assets/opsion.png" alt="Options">
+
+    <!-- Options Drawer -->
+    <div id="controls">
+        <button id="btn-close-options" style="width: 100%; padding: 10px; background: #e040fb; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; margin-bottom: 20px;">
+            CLOSE OPTIONS
+        </button>
+        <h3>Game Mode</h3>
+        <button id="btn-random">Start Random Mode</button>
+        <hr style="border-color: #555;">
+        <label style="cursor: pointer; display: flex; align-items: center; gap: 10px;">
+            <input type="checkbox" id="auto-play-checkbox" style="width: 20px; height: 20px;">
+            <span style="font-weight: bold; color: #00ffff;">AUTO PLAY</span>
+        </label>
+        <br>
+        <div style="margin-bottom: 10px;">
+            <span style="font-weight: bold; color: #fff;">Layout Type:</span><br>
+            <label style="cursor: pointer; margin-right: 15px;">
+                <input type="radio" name="layout-type" value="type-a"> Type A (Paired)
+            </label>
+            <label style="cursor: pointer; margin-right: 15px;">
+                <input type="radio" name="layout-type" value="type-b"> Type B (Linear)
+            </label>
+            <label style="cursor: pointer;">
+                <input type="radio" name="layout-type" value="default" checked=""> Default (Chart)
+            </label>
+        </div>
+        <br>
+        <div style="margin-bottom: 20px;">
+            <label style="cursor: pointer; display: flex; align-items: center; gap: 10px;">
+                <span style="font-weight: bold; color: #fff;">Scroll Mode:</span>
+                <select id="scroll-mode-select" style="padding: 5px; background: #222; color: white; border: 1px solid #555; border-radius: 5px;">
+                    <option value="beat">Beat (Variable)</option>
+                    <option value="time">Time (Constant)</option>
+                </select>
+            </label>
+            <label style="cursor: pointer; display: flex; align-items: center; gap: 10px; margin-top: 10px;">
+                <input type="checkbox" id="bpm-normalize-checkbox" style="width: 18px; height: 18px;" checked="">
+                <span style="color: #ccc; font-size: 0.9em;">Normalize BPM Speed (Beat Mode)</span>
+            </label>
+        </div>
+        <label>
+            Audio: <input type="file" id="audio-input" accept="audio/*">
+        </label>
+        <br><br>
+        <label>
+            Chart (JSON): <input type="file" id="chart-input">
+        </label>
+        <br><br>
+        <label>
+            Speed: <span id="speed-display">2.5</span> (Base: 0.5)
+            <input type="range" id="speed-input" min="1.0" max="5.0" step="0.1" value="2.5" style="width: 200px;">
+        </label>
+        <label>
+            Lane Width: <span id="lane-width-display">100</span>px
+            <input type="range" id="lane-width-input" min="50" max="200" step="5" value="100" style="width: 200px;">
+        </label>
+        <label>
+            Lane Opacity: <span id="lane-opacity-display">100</span>%
+            <input type="range" id="lane-opacity-input" min="0" max="100" step="5" value="100" style="width: 200px;">
+        </label>
+        <br><br>
+        <div style="border: 1px solid #555; padding: 10px; border-radius: 5px; background: rgba(255,255,255,0.05);">
+            <h3 style="color:#00ffff; margin:0 0 10px 0; font-size: 1em;">LANE COVER</h3>
+            <label style="cursor: pointer; display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                <input type="checkbox" id="lane-cover-checkbox" style="width: 18px; height: 18px;">
+                <span style="font-weight: bold; color: #fff;">Enable Cover</span>
+            </label>
+            <label style="font-size: 0.9em;">
+                Height: <span id="lane-cover-height-display">300</span>px
+                <input type="range" id="lane-cover-height-input" min="0" max="600" step="10" value="300" style="width: 100%;">
+            </label>
+            <br>
+            <label style="font-size: 0.9em;">
+                Visual Speed: x<span id="lane-cover-speed-display">1.0</span>
+                <input type="range" id="lane-cover-speed-input" min="0.5" max="3.0" step="0.1" value="1.0" style="width: 100%;">
+            </label>
+        </div>
+        <br>
+
+        <h3 style="color:#e040fb; margin:0 0 5px 0;">MODIFIERS</h3>
+        <div style="margin-bottom:10px;">
+            <label>ASSIST:</label><br>
+            <select id="assist-select" style="width:200px; padding:5px; background:#222; color:white; border:1px solid #555;">
+                <option value="none">None</option>
+                <option value="blue_to_white">Blue -&gt; White</option>
+                <option value="space_boost">Space Boost</option>
+                <option value="auto_space">Auto Space</option>
+            </select>
+        </div>
+        <div style="margin-bottom:10px;">
+            <label>RANDOM:</label><br>
+            <select id="random-select" style="width:200px; padding:5px; background:#222; color:white; border:1px solid #555;">
+                <option value="none">None</option>
+                <option value="mirror">Mirror</option>
+                <option value="shuffle_color">Shuffle (Color)</option>
+                <option value="shuffle_chaos">Shuffle (Chaos)</option>
+            </select>
+        </div>
+        <div style="margin-bottom:20px;">
+            <label>GAUGE TYPE:</label><br>
+            <select id="gauge-select" style="width:200px; padding:5px; background:#222; color:white; border:1px solid #555;">
+                <option value="norma" selected="">NORMA (70% Clear)</option>
+                <option value="life">LIFE NORMAL (Bad-4%/Miss-5%)</option>
+                <option value="life_hard">LIFE HARD (Bad-5%/Miss-10%)</option>
+            </select>
+        </div>
+
+        <label>
+            Offset: <span id="offset-display">0</span> ms <span style="font-size:10px; color:#aaa">(Result (+) →
+                Move (+))</span>
+            <input type="range" id="offset-input" min="-500" max="500" step="1" value="0" style="width: 200px;">
+        </label>
+        <button id="btn-calibrate" style="margin-left: 10px;">Calibrate</button>
+        <br><br>
+        <div style="border: 1px solid #555; padding: 10px; border-radius: 5px; background: rgba(0,255,255,0.05); margin-bottom: 20px;">
+            <h3 style="color:#00ffff; margin:0 0 10px 0; font-size: 1em;">PACEMAKER</h3>
+            <label style="font-size: 0.9em;">
+                Target Accuracy: <span id="pacemaker-target-display">95</span>%
+                <input type="range" id="pacemaker-target-input" min="80" max="100" step="1" value="95" style="width: 100%;">
+            </label>
+            <br>
+            <label style="font-size: 0.9em;">
+                Bar Width: <span id="pacemaker-width-display">1.5</span>x
+                <input type="range" id="pacemaker-width-input" min="1.0" max="3.0" step="0.1" value="1.5" style="width: 100%;">
+            </label>
+        </div>
+        <br><br>
+        <button id="btn-select-song" style="background:#e040fb; color:white; border:none; padding:10px 20px; font-size:16px; cursor:pointer; margin-right:10px;">Select
+            Song</button>
+        <button id="btn-chart">Start from File</button>
+        <p style="font-size: 12px; color: #aaa;">No JSON? Auto-generates BPM 110.</p>
+        <hr style="border-color: #555;">
+        <a href="editor.html" target="_blank" style="color: #00bcd4; text-decoration: none; font-size: 14px;">&gt;&gt; Open
+            Chart Editor</a>
+    </div>
+
+    <!-- Custom Premium Results Screen -->
+    <div id="custom-results-screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:black url('assets/リザルト背景.png') no-repeat center center; background-size:cover; z-index:500; flex-direction:column; justify-content:center; align-items:center;">
+        <div id="result-content" style="width:80%; max-width:1000px; display:flex; flex-direction:column; align-items:center; gap:20px;">
+            <h1 id="result-status-title" style="color:#00ffff; font-size:4em; margin:0; text-shadow:0 0 20px rgba(0,255,255,0.8);">TRACK CLEAR</h1>
+            
+            <div style="display:flex; width:100%; justify-content:space-between; align-items:flex-start;">
+                <!-- Left: Metrics with Skins -->
+                <div id="result-metrics" style="display:flex; flex-direction:column; gap:10px; flex:1;">
+                    <div class="result-row" style="display:flex; align-items:center; gap:20px;">
+                        <img id="img-res-perfect" src="assets/リザルトPERFECT.png" style="height:160px;">
+                        <span id="val-res-perfect" style="font-size:3.5em; font-family:monospace; color:#00ffff;">0</span>
+                    </div>
+                    <div class="result-row" style="display:flex; align-items:center; gap:20px;">
+                        <img src="assets/リザルトGREAT.png" style="height:160px;">
+                        <span id="val-res-great" style="font-size:3.5em; font-family:monospace; color:#ffeb3b;">0</span>
+                    </div>
+                    <div class="result-row" style="display:flex; align-items:center; gap:20px;">
+                        <img src="assets/リザルトNICE.png" style="height:160px;">
+                        <span id="val-res-nice" style="font-size:3.5em; font-family:monospace; color:#00ff00;">0</span>
+                    </div>
+                    <div class="result-row" style="display:flex; align-items:center; gap:20px;">
+                        <img src="assets/リザルトBAD.png" style="height:160px;">
+                        <span id="val-res-bad" style="font-size:3.5em; font-family:monospace; color:#ffae00;">0</span>
+                    </div>
+                    <div class="result-row" style="display:flex; align-items:center; gap:20px;">
+                        <img id="img-res-miss" src="assets/リザルトMISS1.png" style="height:160px;">
+                        <span id="val-res-miss" style="font-size:3.5em; font-family:monospace; color:#ff0000;">0</span>
+                    </div>
+                </div>
+
+                <!-- Right: Score & Rank -->
+                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:20px; flex:1;">
+                    <div style="text-align:right;">
+                        <p style="color:#aaa; font-size:1.5em; margin:0;">MAX COMBO</p>
+                        <p id="val-res-combo" style="font-size:4em; margin:0; font-weight:bold;">0</p>
+                    </div>
+                    <div style="text-align:right;">
+                        <p style="color:#aaa; font-size:1.5em; margin:0;">SCORE</p>
+                        <p id="val-res-score" style="font-size:5em; margin:0; font-weight:bold; color:#00ffff; text-shadow:0 0 15px rgba(0,255,255,0.5);">0</p>
+                        <p id="val-res-raw-score" style="color:#ccc; font-size:1.5em; margin-top:5px;">0 / 0</p>
+                    </div>
+                </div>
+            </div>
+
+            <canvas id="result-graph" width="800" height="200" style="width:100%; height:200px; background:rgba(0,0,0,0.5); border:1px solid #444; margin:10px 0;"></canvas>
+            
+            <button id="btn-close-custom-results" style="margin-top:40px; padding:15px 60px; font-size:1.5em; background:rgba(0,255,255,0.2); border:2px solid #00ffff; color:#00ffff; cursor:pointer; border-radius:50px; font-weight:bold; transition:all 0.2s;">
+                CONTINUE
+            </button>
+        </div>
+        <style>
+            #btn-close-custom-results:hover {
+                background:rgba(0,255,255,0.4);
+                box-shadow:0 0 20px rgba(0,255,255,0.4);
+                transform:scale(1.05);
+            }
+            #btn-close-custom-results:active {
+                transform:scale(0.95);
+            }
+        </style>
+    </div>
+
+    <!-- Ranked Mode (Dani Nintei) Overlay -->
+    <div id="dani-select-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 100; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; padding: 40px;">
+        <h1 style="color: #ff0000; font-size: 3em; margin: 0 0 20px 0; text-shadow: 0 0 10px #ff0000; font-family: 'Sawarabi Mincho', serif;">段位認定</h1>
+        <div id="dani-list" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; max-width: 1000px; padding: 20px; overflow-y: auto; max-height: 70vh;">
+            <!-- Ranks will be populated here -->
+        </div>
+        <button id="btn-close-dani" style="margin-top: 30px; padding: 10px 40px; background: none; border: 2px solid #ff0000; color: #ff0000; font-size: 1.2em; cursor: pointer; transition: all 0.3s;">BACK TO TITLE</button>
+    </div>
+
+    <!-- Song Select Overlay -->
+    <div id="song-select-overlay" style="display: none; position: absolute; top: 0px; left: 0px; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.95); z-index: 20; flex-direction: column; padding: 20px; box-sizing: border-box;">
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+            <h2 style="color: #fff; margin: 0; text-shadow: 0 0 10px #e040fb;">SELECT SONG</h2>
+            <div style="display:flex; gap:15px; align-items:center;">
+                <div id="player-display-in-select" style="color: #00bcd4; font-size: 1em; cursor: pointer; border: 1px solid #00bcd4; padding: 5px 10px; border-radius: 15px;">Player: Guest ▼</div>
+                <button id="btn-close-select" style="background:none; border: 1px solid #777; color:#fff; padding: 5px 15px; cursor:pointer;">CLOSE</button>
+            </div>
+        </div>
+
+        <div id="song-list" style="flex: 1; overflow-y: auto;"></div>
+    </div>
+
+    <!-- Calibration Overlay -->
+    <div id="calibration-overlay" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:40; flex-direction:column; justify-content:center; align-items:center;">
+        <h2 style="color:#fff; font-size: 2em; margin-bottom: 20px;">Audio Calibration</h2>
+        <div id="calibration-visual" style="width: 200px; height: 200px; border-radius: 50%; background: #333; margin-bottom: 30px;">
+        </div>
+        <p style="color:white; font-size: 1.5em; margin-bottom: 20px;">Tap SPACE to the beat!</p>
+        <p id="calibration-status" style="color: #aaa;">Initializing...</p>
+        <button id="btn-cancel-calibration" style="margin-top: 20px; padding: 10px 20px;">Cancel</button>
+    </div>
+    <!-- Pause Overlay -->
+    <div id="pause-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:150; flex-direction:column; justify-content:center; align-items:center;">
+        <h2 id="pause-status" style="color:white; font-size:4em; margin-bottom:40px; text-shadow: 0 0 20px #e040fb;">
+            PAUSED</h2>
+        <div id="pause-buttons" style="display:flex; flex-direction:column; gap:20px;">
+            <button id="btn-resume" style="padding:15px 40px; font-size:1.5em; cursor:pointer; background:#e040fb; color:white; border:none; border-radius:5px; width: 250px;">RESUME</button>
+            <button id="btn-retry" style="padding:15px 40px; font-size:1.5em; cursor:pointer; background:#333; color:white; border:1px solid #555; border-radius:5px; width: 250px;">RETRY</button>
+            <button id="btn-quit" style="padding:15px 40px; font-size:1.5em; cursor:pointer; background:#333; color:white; border:1px solid #555; border-radius:5px; width: 250px;">QUIT</button>
+        </div>
+    </div>
+
+    <script src="magusic.js?v=17"></script>
+
+
