@@ -1,4 +1,3 @@
-"use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -16,6 +15,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     const audio = new Audio();
     audio.preload = 'auto'; // Encourage browser to buffer ahead
     audio.preload = 'auto'; // Encourage browser to buffer ahead
+    const keysoundBank = new Map();
+    let activeSoundId = null;
     let currentClass = 'no';
     let currentLevel = '1';
     let bpmChanges = [];
@@ -24,6 +25,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     const activeHolds = {}; // lane -> startTime (ms)
     let isPlaying = false;
     let isRecording = false;
+    // UI Elements
+    const soundbankInput = document.getElementById('soundbank-input');
+    const soundbankList = document.getElementById('soundbank-list');
+    const currentSoundDisplay = document.getElementById('current-sound-display');
     // Scrolling Strings
     let isUpPressed = false;
     let isDownPressed = false;
@@ -34,6 +39,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     const BASE_PX_PER_MS = 0.2; // Adjusted for better visibility range
     const PLAYHEAD_Y = 850; // Y position of the "current time" line from top of canvas
     let snapDenominator = 16; // 1/16th beat default
+    let waveformCache = null;
     // UI Elements
     const audioInput = document.getElementById('audio-input');
     const btnPlay = document.getElementById('btn-play');
@@ -125,10 +131,125 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     audioInput.addEventListener('change', () => {
         if (audioInput.files && audioInput.files[0]) {
             const file = audioInput.files[0];
-            audio.src = URL.createObjectURL(file);
+            const url = URL.createObjectURL(file);
+            audio.src = url;
             statusDiv.textContent = 'Status: Audio Loaded';
+            generateWaveform(url);
         }
     });
+    // --- Sound Bank (Keysounds) Logic ---
+    if (soundbankInput) {
+        soundbankInput.addEventListener('change', () => __awaiter(this, void 0, void 0, function* () {
+            if (!soundbankInput.files || soundbankInput.files.length === 0)
+                return;
+            statusDiv.textContent = `Status: Decoding ${soundbankInput.files.length} keysounds...`;
+            const actx = getAudioCtx();
+            for (let i = 0; i < soundbankInput.files.length; i++) {
+                const file = soundbankInput.files[i];
+                try {
+                    const arrayBuf = yield file.arrayBuffer();
+                    const audioBuf = yield actx.decodeAudioData(arrayBuf);
+                    keysoundBank.set(file.name, audioBuf);
+                }
+                catch (e) {
+                    console.error("Failed to decode keysound:", file.name, e);
+                }
+            }
+            updateSoundbankList();
+            statusDiv.textContent = `Status: Loaded ${keysoundBank.size} sounds to bank.`;
+        }));
+    }
+    function updateSoundbankList() {
+        if (!soundbankList)
+            return;
+        soundbankList.innerHTML = '';
+        if (keysoundBank.size === 0) {
+            soundbankList.innerHTML = '<div style="color: #666;">No sounds loaded.</div>';
+            return;
+        }
+        keysoundBank.forEach((_, name) => {
+            const div = document.createElement('div');
+            div.style.padding = '4px';
+            div.style.borderBottom = '1px solid #333';
+            div.style.cursor = 'grab';
+            div.style.display = 'flex';
+            div.style.alignItems = 'center';
+            div.style.gap = '8px';
+            div.draggable = true;
+            div.ondragstart = (e) => {
+                var _a;
+                (_a = e.dataTransfer) === null || _a === void 0 ? void 0 : _a.setData('text/plain', name);
+                div.style.opacity = '0.5';
+            };
+            div.ondragend = () => {
+                div.style.opacity = '1';
+            };
+            const radio = document.createElement('input');
+            radio.type = 'radio';
+            radio.name = 'active-keysound';
+            radio.value = name;
+            if (activeSoundId === name)
+                radio.checked = true;
+            radio.onchange = () => {
+                activeSoundId = name;
+                if (currentSoundDisplay)
+                    currentSoundDisplay.textContent = name;
+            };
+            const label = document.createElement('span');
+            label.textContent = name;
+            label.style.flex = '1';
+            label.onclick = () => {
+                radio.checked = true;
+                radio.dispatchEvent(new Event('change'));
+                playPreviewKeysound(name);
+            };
+            div.appendChild(radio);
+            div.appendChild(label);
+            soundbankList.appendChild(div);
+        });
+    }
+    function playPreviewKeysound(name) {
+        const buffer = keysoundBank.get(name);
+        if (!buffer)
+            return;
+        const actx = getAudioCtx();
+        const src = actx.createBufferSource();
+        src.buffer = buffer;
+        src.connect(actx.destination);
+        src.start();
+    }
+    function generateWaveform(url) {
+        return __awaiter(this, void 0, void 0, function* () {
+            statusDiv.textContent = 'Status: Generating Waveform...';
+            const actx = getAudioCtx();
+            try {
+                const res = yield fetch(url);
+                const arrayBuf = yield res.arrayBuffer();
+                const audioBuf = yield actx.decodeAudioData(arrayBuf);
+                const data = audioBuf.getChannelData(0);
+                const msCount = Math.ceil(audioBuf.duration * 1000);
+                const samplesPerMs = audioBuf.sampleRate / 1000;
+                const downsampled = new Float32Array(msCount);
+                for (let i = 0; i < msCount; i++) {
+                    let max = 0;
+                    const start = Math.floor(i * samplesPerMs);
+                    const end = Math.floor((i + 1) * samplesPerMs);
+                    for (let j = start; j < end; j++) {
+                        const abs = Math.abs(data[j]);
+                        if (abs > max)
+                            max = abs;
+                    }
+                    downsampled[i] = max;
+                }
+                waveformCache = downsampled;
+                statusDiv.textContent = 'Status: Waveform Ready';
+            }
+            catch (e) {
+                console.error("Waveform generation failed", url, e);
+                statusDiv.textContent = 'Status: Waveform Failed';
+            }
+        });
+    }
     // Offset Change Listener
     let previousOffset = parseFloat(offsetInput.value) || 0;
     offsetInput.addEventListener('focus', () => {
@@ -140,8 +261,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         if (diff !== 0) {
             bpmChanges.forEach(bc => { bc.time += diff; });
             layoutChanges.forEach(lc => { lc.time += diff; });
-            statusDiv.textContent = `Offset changed: ${previousOffset} -> ${newOffset}. BPM/Layouts shifted.`;
+            recordedNotes.forEach(note => { note.time += diff; });
+            statusDiv.textContent = `Offset changed: ${previousOffset} -> ${newOffset}. Chart items shifted by ${diff}ms.`;
             previousOffset = newOffset;
+            lastMetronomeBeat = -1; // Reset metronome to sync with new offset
         }
     });
     // Reset All Notes
@@ -227,8 +350,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 currentClass = opt.diff.toLowerCase();
             try {
                 audio.pause();
-                audio.src = `songs/${song.folder}/${song.audio}`;
+                const audioUrl = `songs/${song.folder}/${song.audio}`;
+                audio.src = audioUrl;
                 audio.load();
+                generateWaveform(audioUrl);
                 scrollTime = 0;
                 targetScrollTime = 0;
                 const chartRes = yield fetch(`songs/${song.folder}/${opt.filename}?t=${Date.now()}`);
@@ -316,7 +441,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                         time: startTime,
                         lane: n.lane,
                         duration: endTime - startTime,
-                        type: n.type || 'normal'
+                        type: n.type || 'normal',
+                        soundId: n.soundId
                     });
                 });
             }
@@ -463,18 +589,16 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         }
         if (e.key === '[' || e.key === ']') {
             const currentOffset = parseInt(offsetInput.value) || 0;
-            const MathStep = e.shiftKey ? 1 : 5;
-            const diff = e.key === '[' ? -MathStep : MathStep;
+            const step = e.shiftKey ? 1 : 5;
+            const diff = e.key === '[' ? -step : step;
             const newVal = currentOffset + diff;
             offsetInput.value = newVal.toString();
-            if (chkSyncShiftNotes && chkSyncShiftNotes.checked) {
-                recordedNotes.forEach(note => note.time += diff);
-                layoutChanges.forEach(lc => lc.time += diff);
-                statusDiv.textContent = `Offset tuned: ${newVal}ms (Notes Shifted)`;
-            }
-            else {
-                statusDiv.textContent = `Offset tuned: ${newVal}ms`;
-            }
+            previousOffset = newVal;
+            // Always shift everything to keep chart synced with the new grid
+            recordedNotes.forEach(note => note.time += diff);
+            layoutChanges.forEach(lc => lc.time += diff);
+            bpmChanges.forEach(bc => bc.time += diff);
+            statusDiv.textContent = `Offset tuned: ${newVal}ms (Chart Items Shifted)`;
             lastMetronomeBeat = -1;
         }
         if (e.key === 'Enter' && e.shiftKey) {
@@ -503,7 +627,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     time: startTime,
                     lane: keyIndex,
                     duration: duration,
-                    type: noteType
+                    type: noteType,
+                    soundId: activeSoundId || undefined
                 });
                 delete activeHolds[keyIndex];
             }
@@ -560,15 +685,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         const roundedDev = Math.round(avgDev);
         const newOffset = currentOffset + roundedDev;
         offsetInput.value = newOffset.toString();
+        previousOffset = newOffset;
         lastMetronomeBeat = -1;
-        if (chkSyncShiftNotes && chkSyncShiftNotes.checked) {
-            recordedNotes.forEach(note => note.time += roundedDev);
-            layoutChanges.forEach(lc => lc.time += roundedDev);
-            statusDiv.textContent = `Offset synced: Adjusted by ${roundedDev}ms. Notes SHIFTED.`;
-        }
-        else {
-            statusDiv.textContent = `Offset synced: Adjusted by ${roundedDev}ms.`;
-        }
+        // Always shift everything to align with the synced grid
+        recordedNotes.forEach(note => note.time += roundedDev);
+        layoutChanges.forEach(lc => lc.time += roundedDev);
+        bpmChanges.forEach(bc => bc.time += roundedDev);
+        statusDiv.textContent = `Offset synced: Adjusted by ${roundedDev}ms. Chart items shifted.`;
         syncTapTimes = [];
         if (syncTapCountDisp)
             syncTapCountDisp.textContent = '0 taps (Applied)';
@@ -730,6 +853,68 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         return currentTp.time + ((beat - currentTp.beat) * (60000 / currentTp.bpm));
     };
     // Note Placement Click
+    function getTargetKeyIndex(visualLane) {
+        if (editorMode === '9key') {
+            const mapping = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+            return mapping[visualLane] !== undefined ? mapping[visualLane] : -1;
+        }
+        else if (editorMode === '6key') {
+            const mapping = [9, 1, 3, 4, 6, 8, 10];
+            return mapping[visualLane];
+        }
+        else if (editorMode === '8key') {
+            const mapping = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+            return mapping[visualLane];
+        }
+        else if (editorMode === '12key') {
+            const whiteMapping = [9, 1, 3, 6, 8, 10];
+            const blueMapping = [11, 0, 2, 5, 7, 12];
+            return (editMode12k === 'white') ? whiteMapping[visualLane] : blueMapping[visualLane];
+        }
+        else if (editorMode === '4key') {
+            const mapping = [1, 3, 4, 6, 8];
+            return mapping[visualLane];
+        }
+        return -1;
+    }
+    // Drag & Drop Keysound to Canvas
+    editorCanvas.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+    });
+    editorCanvas.addEventListener('drop', (e) => {
+        var _a;
+        e.preventDefault();
+        const soundId = (_a = e.dataTransfer) === null || _a === void 0 ? void 0 : _a.getData('text/plain');
+        if (!soundId)
+            return;
+        const rect = editorCanvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        if (!LANE_DEFS.length)
+            calculateLaneLayout(editorCanvas.width);
+        let clickedLane = -1;
+        for (let i = 0; i < LANE_DEFS.length; i++) {
+            if (mouseX >= LANE_DEFS[i].x && mouseX < LANE_DEFS[i].x + LANE_DEFS[i].width) {
+                clickedLane = i;
+                break;
+            }
+        }
+        if (clickedLane === -1)
+            return;
+        const targetKeyIndex = getTargetKeyIndex(clickedLane);
+        if (targetKeyIndex === -1)
+            return;
+        const pxPerMs = BASE_PX_PER_MS * zoomLevel;
+        const clickedTimeRaw = scrollTime + (PLAYHEAD_Y - mouseY) / pxPerMs;
+        const hitWindow = 50 / zoomLevel;
+        const note = recordedNotes.find(n => n.lane === targetKeyIndex && Math.abs(n.time - clickedTimeRaw) < hitWindow);
+        if (note) {
+            note.soundId = soundId;
+            statusDiv.textContent = `Status: Assigned ${soundId} to note at ${Math.round(note.time)}ms`;
+        }
+    });
+    // Note Placement Click
     editorCanvas.addEventListener('mousedown', (e) => {
         const rect = editorCanvas.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
@@ -746,31 +931,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         if (clickedLane === -1)
             return;
         // NOTE MAPPING - Crucial inheritance
-        let targetKeyIndex = -1;
-        if (editorMode === '9key') {
-            targetKeyIndex = clickedLane;
-            const mapping = [0, 1, 2, 3, 4, 5, 6, 7, 8];
-            if (mapping[clickedLane] !== undefined)
-                targetKeyIndex = mapping[clickedLane];
-        }
-        else if (editorMode === '6key') {
-            const mapping = [9, 1, 3, 4, 6, 8, 10];
-            targetKeyIndex = mapping[clickedLane];
-        }
-        else if (editorMode === '8key') {
-            const mapping = [0, 1, 2, 3, 4, 5, 6, 7, 8];
-            targetKeyIndex = mapping[clickedLane];
-        }
-        else if (editorMode === '12key') {
-            // Mapping for 6 doubled lanes
-            const whiteMapping = [9, 1, 3, 6, 8, 10]; // S, D, F, J, K, L
-            const blueMapping = [11, 0, 2, 5, 7, 12]; // W, E, R, U, I, O
-            targetKeyIndex = (editMode12k === 'white') ? whiteMapping[clickedLane] : blueMapping[clickedLane];
-        }
-        else if (editorMode === '4key') {
-            const mapping = [1, 3, 4, 6, 8];
-            targetKeyIndex = mapping[clickedLane];
-        }
+        const targetKeyIndex = getTargetKeyIndex(clickedLane);
         if (targetKeyIndex === -1)
             return;
         const pxPerMs = BASE_PX_PER_MS * zoomLevel;
@@ -793,7 +954,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     if (pendingHold.lane === targetKeyIndex) {
                         const start = Math.min(pendingHold.time, quantizedTime);
                         const end = Math.max(pendingHold.time, quantizedTime);
-                        recordedNotes.push({ time: start, lane: targetKeyIndex, duration: end - start });
+                        recordedNotes.push({
+                            time: start,
+                            lane: targetKeyIndex,
+                            duration: end - start,
+                            soundId: activeSoundId || undefined
+                        });
                         pendingHold = null;
                     }
                     else {
@@ -831,13 +997,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     time: quantizedTime,
                     lane: targetKeyIndex,
                     duration: 0,
-                    type: noteType
+                    type: noteType,
+                    soundId: activeSoundId || undefined
                 });
                 pendingHold = null;
             }
         }
     });
     // Render Loop
+    let lastPlayheadTime = 0;
     function loop() {
         updateVisuals();
         if (!isPlaying) {
@@ -848,8 +1016,17 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 targetScrollTime -= scrollSpeed;
             const maxScroll = (audio.duration && !isNaN(audio.duration) && audio.duration > 0) ? audio.duration * 1000 : 600000;
             targetScrollTime = Math.max(0, Math.min(maxScroll, targetScrollTime));
+            lastPlayheadTime = scrollTime;
         }
         else {
+            const playheadTime = audio.currentTime * 1000;
+            // Trigger Keysounds
+            recordedNotes.forEach(note => {
+                if (note.soundId && note.time >= lastPlayheadTime && note.time < playheadTime) {
+                    playPreviewKeysound(note.soundId);
+                }
+            });
+            lastPlayheadTime = playheadTime;
             if (chkMetronome && chkMetronome.checked) {
                 const bpm = parseFloat(bpmInput.value) || 120;
                 const offset = parseFloat(offsetInput.value) || 0;
@@ -910,6 +1087,22 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         const currentTime = scrollTime;
         const visibleStartTime = currentTime - ((editorCanvas.height - PLAYHEAD_Y) / pxPerMs);
         const visibleEndTime = currentTime + (PLAYHEAD_Y / pxPerMs);
+        // Draw Waveform Background
+        if (waveformCache) {
+            ctx.fillStyle = 'rgba(0, 188, 212, 0.1)';
+            const wStart = Math.floor(visibleStartTime);
+            const wEnd = Math.ceil(visibleEndTime);
+            for (let ms = wStart; ms < wEnd; ms++) {
+                if (ms < 0 || ms >= waveformCache.length)
+                    continue;
+                const amp = waveformCache[ms];
+                if (amp < 0.02)
+                    continue;
+                const y = PLAYHEAD_Y - (ms - currentTime) * pxPerMs;
+                const waveW = amp * (editorCanvas.width / 2);
+                ctx.fillRect(editorCanvas.width / 2 - waveW, y - 1, waveW * 2, 2);
+            }
+        }
         // Draw Lanes
         if (!LANE_DEFS.length)
             calculateLaneLayout(editorCanvas.width);
@@ -947,7 +1140,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             ctx.stroke();
         }
         // Draw Notes
-        function drawNote(lane, time, duration, isGhost = false, noteType) {
+        function drawNote(lane, time, duration, isGhost = false, noteType, soundId) {
             const y = PLAYHEAD_Y - (time - currentTime) * pxPerMs;
             if (y > editorCanvas.height + 100 && duration === 0)
                 return;
@@ -1015,16 +1208,24 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             }
             if (duration > 0) {
                 const tailHeight = duration * pxPerMs;
-                ctx.globalAlpha = isGhost ? 0.3 : 0.6;
-                // Special rendering for long death notes
-                if (noteType === 'death') {
-                    ctx.fillStyle = '#330000'; // Dark Red
-                }
                 ctx.fillRect(ld.x + 2, y - tailHeight, ld.width - 4, tailHeight);
                 ctx.globalAlpha = isGhost ? 0.5 : 1.0;
             }
             ctx.fillRect(ld.x, y - 5, ld.width, 10);
             ctx.strokeRect(ld.x, y - 5, ld.width, 10);
+            if (soundId) {
+                ctx.fillStyle = 'rgba(0, 188, 212, 0.2)';
+                ctx.fillRect(ld.x, y - 5, ld.width, 10);
+                ctx.fillStyle = '#00bcd4';
+                ctx.font = '9px Consolas, monospace';
+                ctx.textAlign = 'left';
+                const shortName = soundId.length > 10 ? soundId.substring(0, 8) + '..' : soundId;
+                ctx.fillText(shortName, ld.x + 2, y - 6);
+                ctx.fillStyle = '#000';
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('♪', ld.x + ld.width / 2, y + 4);
+            }
             if (noteType === 'sinking' || noteType === 'death') {
                 ctx.fillStyle = '#fff';
                 ctx.font = 'bold 12px Arial';
@@ -1038,7 +1239,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             const ghostType = (customNoteType === 'sinking' || customNoteType === 'death') ? customNoteType : 'normal';
             drawNote(pendingHold.lane, pendingHold.time, 0, true, ghostType);
         }
-        recordedNotes.forEach(note => drawNote(note.lane, note.time, note.duration, false, note.type));
+        recordedNotes.forEach(note => drawNote(note.lane, note.time, note.duration, false, note.type, note.soundId));
         // Draw Layout & BPM Event Texts
         layoutChanges.forEach(lc => {
             const y = PLAYHEAD_Y - (lc.time - currentTime) * pxPerMs;
@@ -1117,7 +1318,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 beat,
                 lane: note.lane,
                 duration: durBeat,
-                type: (note.type && note.type !== 'normal') ? note.type : undefined
+                type: (note.type && note.type !== 'normal') ? note.type : undefined,
+                soundId: note.soundId
             };
         }).sort((a, b) => a.beat - b.beat);
         const layoutChangesOut = layoutChanges.map(lc => ({ beat: Math.round(getBeatFromTime(lc.time) * 1000) / 1000, type: lc.type })).sort((a, b) => a.beat - b.beat);

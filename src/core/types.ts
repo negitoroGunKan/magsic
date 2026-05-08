@@ -12,6 +12,7 @@ export interface ChartNote {
   duration: number;
   isLong: boolean;
   hit: boolean;
+  soundId?: string;
   beat: number;
   visualY?: number;
   type?: 'normal' | 'sinking' | 'death';

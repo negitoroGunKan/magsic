@@ -933,6 +933,111 @@
       "beat": 35.5,
       "lane": 12,
       "duration": 0
+    },
+    {
+      "beat": 35.5,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 35.5,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 36,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 36,
+      "lane": 9,
+      "duration": 0
+    },
+    {
+      "beat": 36,
+      "lane": 12,
+      "duration": 0
+    },
+    {
+      "beat": 36.5,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 36.5,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 37,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 37,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 37,
+      "lane": 11,
+      "duration": 0
+    },
+    {
+      "beat": 37,
+      "lane": 2,
+      "duration": 0
+    },
+    {
+      "beat": 37.5,
+      "lane": 1,
+      "duration": 0
+    },
+    {
+      "beat": 37.5,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 37.5,
+      "lane": 12,
+      "duration": 0
+    },
+    {
+      "beat": 38,
+      "lane": 3,
+      "duration": 0
+    },
+    {
+      "beat": 38,
+      "lane": 8,
+      "duration": 0
+    },
+    {
+      "beat": 38,
+      "lane": 5,
+      "duration": 0
+    },
+    {
+      "beat": 38,
+      "lane": 11,
+      "duration": 0
+    },
+    {
+      "beat": 38.5,
+      "lane": 6,
+      "duration": 0
+    },
+    {
+      "beat": 38.5,
+      "lane": 10,
+      "duration": 0
+    },
+    {
+      "beat": 38.5,
+      "lane": 0,
+      "duration": 0
     }
   ],
   "layoutChanges": [],

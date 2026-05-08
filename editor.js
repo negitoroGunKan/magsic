@@ -111,6 +111,73 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             statusDiv.textContent = 'Status: Audio Loaded';
         }
     });
+    // Sound Bank Logic
+    const soundBankInput = document.getElementById('soundbank-input');
+    const soundBankList = document.getElementById('soundbank-list');
+    const currentSoundDisplay = document.getElementById('current-sound-display');
+    const soundBank = new Map();
+    let activeSoundId = null;
+    if (soundBankInput) {
+        soundBankInput.addEventListener('change', () => __awaiter(this, void 0, void 0, function* () {
+            if (!soundBankInput.files || soundBankInput.files.length === 0)
+                return;
+            const actx = getAudioCtx();
+            for (let i = 0; i < soundBankInput.files.length; i++) {
+                const file = soundBankInput.files[i];
+                const arrayBuffer = yield file.arrayBuffer();
+                try {
+                    const audioBuffer = yield actx.decodeAudioData(arrayBuffer);
+                    soundBank.set(file.name, audioBuffer);
+                }
+                catch (e) {
+                    console.error("Failed to decode audio:", file.name);
+                }
+            }
+            updateSoundBankUI();
+        }));
+    }
+    function updateSoundBankUI() {
+        if (!soundBankList)
+            return;
+        soundBankList.innerHTML = '';
+        if (soundBank.size === 0) {
+            soundBankList.innerHTML = '<div style="color: #888;">No sounds loaded.</div>';
+            return;
+        }
+        if (!activeSoundId && soundBank.size > 0) {
+            activeSoundId = Array.from(soundBank.keys())[0];
+            if (currentSoundDisplay)
+                currentSoundDisplay.textContent = activeSoundId;
+        }
+        soundBank.forEach((buffer, filename) => {
+            const div = document.createElement('div');
+            div.style.padding = '5px';
+            div.style.borderBottom = '1px solid #333';
+            div.style.display = 'flex';
+            div.style.justifyContent = 'space-between';
+            div.style.alignItems = 'center';
+            const label = document.createElement('label');
+            label.style.cursor = 'pointer';
+            label.style.display = 'flex';
+            label.style.alignItems = 'center';
+            label.style.width = '100%';
+            const radio = document.createElement('input');
+            radio.type = 'radio';
+            radio.name = 'soundbank-select';
+            radio.value = filename;
+            radio.checked = filename === activeSoundId;
+            radio.style.marginRight = '10px';
+            radio.addEventListener('change', () => {
+                activeSoundId = filename;
+                if (currentSoundDisplay)
+                    currentSoundDisplay.textContent = filename;
+            });
+            label.appendChild(radio);
+            label.appendChild(document.createTextNode(filename));
+            div.appendChild(label);
+            soundBankList.appendChild(div);
+        });
+    }
     // Offset Change Listener (Manual Update)
     // When offset changes, the "Zero Point" moves.
     // Structural events (BPM, Layout) are usually Beat-based, so they should shift in Time to preserve Beat.
@@ -381,7 +448,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     recordedNotes.push({
                         time: startTime,
                         lane: n.lane,
-                        duration: endTime - startTime
+                        duration: endTime - startTime,
+                        soundId: n.soundId
                     });
                 });
             }
@@ -1005,7 +1073,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                         recordedNotes.push({
                             time: start,
                             lane: targetKeyIndex,
-                            duration: duration
+                            duration: duration,
+                            soundId: activeSoundId || undefined
                         });
                         pendingHold = null;
                     }
@@ -1049,7 +1118,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 recordedNotes.push({
                     time: quantizedTime,
                     lane: targetKeyIndex,
-                    duration: 0
+                    duration: 0,
+                    soundId: activeSoundId || undefined
                 });
                 pendingHold = null;
             }
@@ -1076,12 +1146,33 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             }
         }
         else {
+            const currentTime = audio.currentTime * 1000;
+            // Keysound playback logic
+            if (typeof window.lastPlayheadTime === 'number') {
+                const prevTime = window.lastPlayheadTime;
+                if (currentTime > prevTime && currentTime - prevTime < 500) {
+                    recordedNotes.forEach(note => {
+                        if (note.soundId && note.time > prevTime && note.time <= currentTime) {
+                            const buffer = soundBank.get(note.soundId);
+                            if (buffer) {
+                                const actx = getAudioCtx();
+                                if (actx.state === 'suspended')
+                                    actx.resume();
+                                const src = actx.createBufferSource();
+                                src.buffer = buffer;
+                                src.connect(actx.destination);
+                                src.start();
+                            }
+                        }
+                    });
+                }
+            }
+            window.lastPlayheadTime = currentTime;
             // Metronome logic
             if (chkMetronome && chkMetronome.checked) {
                 const bpm = parseFloat(bpmInput.value) || 110;
                 const offset = parseFloat(offsetInput.value) || 0;
                 const msPerBeat = 60000 / bpm;
-                const currentTime = audio.currentTime * 1000;
                 const currentBeat = Math.floor((currentTime - offset) / msPerBeat);
                 if (currentBeat > lastMetronomeBeat) {
                     // Tick! (Higher pitch for measure start)
@@ -1337,7 +1428,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             }
             // Helper to draw a single note (Moved inside or kept global? It was inside updateVisuals in original)
             // In the original file (Step 506 line 1253), drawNote was inside updateVisuals.
-            function drawNote(lane, time, duration, isGhost = false, noteType) {
+            function drawNote(lane, time, duration, isGhost = false, noteType, soundId) {
                 if (!ctx)
                     return;
                 const y = PLAYHEAD_Y - (time - currentTime) * pxPerMs;
@@ -1451,6 +1542,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     }
                     ctx.fillRect(0, y - drawH / 2, editorCanvas.width, drawH);
                     ctx.globalAlpha = 1.0;
+                    if (soundId) {
+                        ctx.fillStyle = '#ff9800';
+                        ctx.font = '10px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.fillText("♪", editorCanvas.width / 2, y + 4);
+                    }
                 }
                 else if (visualLane !== -1) {
                     const ld = LANE_DEFS[visualLane];
@@ -1466,6 +1563,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     }
                     const noteH = 15;
                     ctx.fillRect(drawX, y - noteH / 2, drawW, noteH);
+                    if (soundId) {
+                        ctx.fillStyle = '#ff9800';
+                        ctx.font = '10px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.fillText("♪", drawX + drawW / 2, y + 4);
+                    }
                 }
             }
             // Draw Notes
@@ -1474,14 +1577,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             }
             recordedNotes.forEach(note => {
                 if (note.lane === 4)
-                    drawNote(note.lane, note.time, note.duration, false);
+                    drawNote(note.lane, note.time, note.duration, false, undefined, note.soundId);
             });
             if (pendingHold && pendingHold.lane !== 4) {
                 drawNote(pendingHold.lane, pendingHold.time, 0, true);
             }
             recordedNotes.forEach(note => {
                 if (note.lane !== 4)
-                    drawNote(note.lane, note.time, note.duration, false);
+                    drawNote(note.lane, note.time, note.duration, false, undefined, note.soundId);
             });
             // Draw Playhead
             ctx.strokeStyle = '#ff0000';
@@ -1541,6 +1644,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
             const endBeat = getBeatFromTime(note.time + note.duration);
             const durBeat = Math.round((endBeat - beat) * 1000) / 1000;
             const out = { beat, lane: note.lane, duration: durBeat };
+            if (note.soundId)
+                out.soundId = note.soundId;
             return out;
         }).sort((a, b) => a.beat - b.beat);
         // 4. Layout

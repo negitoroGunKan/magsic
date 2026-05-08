@@ -123,7 +123,8 @@
       isLong: n.duration > 0,
       hit: false,
       beat: n.beat,
-      type: n.type || "normal"
+      type: n.type || "normal",
+      soundId: n.soundId
     })).sort((a, b) => a.time - b.time);
     const layoutChanges = [];
     if (Array.isArray(json.layoutChanges)) {
@@ -259,6 +260,7 @@
     let isAutoPlay = false;
     let isMVLayout = false;
     let laneOpacity = 1;
+    let currentSkin = "default";
     let isDaniMode = false;
     let daniCourses = [];
     let currentDaniCourse = null;
@@ -307,6 +309,7 @@
     const laneWidthInput = document.getElementById("lane-width-input");
     const laneWidthDisplay = document.getElementById("lane-width-display");
     const laneCoverCheckbox = document.getElementById("lane-cover-checkbox");
+    const skinSelect = document.getElementById("skin-select");
     const laneCoverHeightInput = document.getElementById("lane-cover-height-input");
     const laneCoverHeightDisplay = document.getElementById("lane-cover-height-display");
     const laneCoverSpeedInput = document.getElementById("lane-cover-speed-input");
@@ -350,6 +353,12 @@
       console.log("btn-calibrate found!");
     }
     let titleAnimRequestId = null;
+    let previewNotes = [];
+    let previewJudgementText = "";
+    let previewJudgementColor = "#fff";
+    let previewJudgementTimer = 0;
+    let lastPreviewSpawnTime = 0;
+    const PREVIEW_INTERVAL = 1e3;
     function startTitleLoop() {
       if (!logo || !startScreen || !titleBgVideo) return;
       if (titleAnimRequestId) return;
@@ -442,7 +451,7 @@
       btnCloseResults.addEventListener("click", () => {
         showStartScreen(true);
         controlsDiv.style.display = "block";
-        if (controlsDiv.classList.contains("open")) controlsDiv.classList.remove("open");
+        if (controlsDiv.classList.contains("show-options")) controlsDiv.classList.remove("show-options");
         songSelectOverlay.style.display = "none";
       });
     }
@@ -565,7 +574,7 @@
       showStartScreen(false);
       if (controlsDiv) {
         controlsDiv.style.display = "block";
-        controlsDiv.classList.remove("open");
+        controlsDiv.classList.remove("show-options");
       }
       if (songSelectOverlay) {
         songSelectOverlay.style.display = "flex";
@@ -860,6 +869,10 @@
             if (judgementHeightInput) judgementHeightInput.value = judgementHeightOffset.toString();
             if (judgementHeightDisplay) judgementHeightDisplay.textContent = judgementHeightOffset.toString();
           }
+          if (settings.currentSkin !== void 0) {
+            currentSkin = settings.currentSkin;
+            if (skinSelect) skinSelect.value = currentSkin;
+          }
           resize();
         } else {
           currentNoteSpeed = BASE_NOTE_SPEED * 2.5;
@@ -892,7 +905,8 @@
           speed: laneCoverSpeedMult
         },
         laneOpacity,
-        judgementHeight: judgementHeightOffset
+        judgementHeight: judgementHeightOffset,
+        currentSkin
       };
       localStorage.setItem(key, JSON.stringify(settings));
     }
@@ -987,6 +1001,14 @@
         savePlayerSettings();
       });
     }
+    if (skinSelect) {
+      skinSelect.addEventListener("change", () => {
+        currentSkin = skinSelect.value;
+        console.log("Skin changed to:", currentSkin);
+        loadSkin();
+        savePlayerSettings();
+      });
+    }
     if (laneCoverHeightInput && laneCoverHeightDisplay) {
       laneCoverHeightInput.addEventListener("input", () => {
         laneCoverHeight = parseInt(laneCoverHeightInput.value);
@@ -1049,12 +1071,12 @@
     if (btnOptionsToggle && controlsDiv) {
       btnOptionsToggle.addEventListener("click", (e) => {
         e.stopPropagation();
-        controlsDiv.classList.toggle("open");
+        controlsDiv.classList.toggle("show-options");
         playSE("se_option");
       });
       if (btnCloseOptions) {
         btnCloseOptions.addEventListener("click", () => {
-          controlsDiv.classList.remove("open");
+          controlsDiv.classList.remove("show-options");
         });
       }
       let touchStartX = 0;
@@ -1065,28 +1087,70 @@
         const touchEndX = e.changedTouches[0].clientX;
         const diffX = touchEndX - touchStartX;
         if (diffX > 50) {
-          controlsDiv.classList.remove("open");
+          controlsDiv.classList.remove("show-options");
         }
       }, { passive: true });
       document.addEventListener("click", (e) => {
         const target = e.target;
-        if (controlsDiv.classList.contains("open")) {
+        if (controlsDiv.classList.contains("show-options")) {
           if (!controlsDiv.contains(target) && target !== btnOptionsToggle) {
-            controlsDiv.classList.remove("open");
+            controlsDiv.classList.remove("show-options");
           }
         }
       });
     }
-    function loadSkin() {
-      const assets = [
-        { key: "white", src: "assets/note_white.png" },
-        { key: "blue", src: "assets/note_blue.png" },
-        { key: "space", src: "assets/note_space.png" },
+    async function loadSkin() {
+      const tryPaths = async (key, candidates) => {
+        for (const path of candidates) {
+          try {
+            const img = await new Promise((resolve, reject) => {
+              const i = new Image();
+              i.onload = () => resolve(i);
+              i.onerror = () => reject();
+              i.src = encodeURI(path);
+            });
+            SKIN[key] = img;
+            console.log(`Loaded ${key}: ${path}`);
+            return true;
+          } catch (e) {
+            continue;
+          }
+        }
+        return false;
+      };
+      const skinBase = `assets/スキン/${currentSkin}`;
+      const defBase = `assets/スキン/default`;
+      await tryPaths("lane", [
+        `${skinBase}/${currentSkin}_レーン/レーン_${currentSkin}.png`,
+        `${skinBase}/${currentSkin}_レーン/lane.png`,
+        `${skinBase}/レーン_${currentSkin}.png`,
+        `${skinBase}/lane.png`,
+        `${defBase}/レーン_default.png`,
+        `${defBase}/lane.png`
+      ]);
+      await tryPaths("white", [
+        `${skinBase}/${currentSkin}_白ノーツ/note_white.png`,
+        `${skinBase}/note_white_${currentSkin}.png`,
+        `${skinBase}/note_white.png`,
+        `${defBase}/note_white.png`
+      ]);
+      await tryPaths("blue", [
+        `${skinBase}/${currentSkin}_青ノーツ/note_blue.png`,
+        `${skinBase}/note_blue_${currentSkin}.png`,
+        `${skinBase}/note_blue.png`,
+        `${defBase}/note_blue.png`
+      ]);
+      await tryPaths("space", [
+        `${skinBase}/${currentSkin}_スペースノーツ/note_space.png`,
+        `${skinBase}/note_space_${currentSkin}.png`,
+        `${skinBase}/note_space.png`,
+        `${skinBase}/note_space_Tunared.png`,
+        `${defBase}/note_space.png`
+      ]);
+      const staticAssets = [
         { key: "titleBg", src: "assets/initial2.png" },
-        // Fallback, will be overridden by video if possible
         { key: "gameBg", src: "assets/initial2.png" },
         { key: "resBg", src: "assets/リザルト背景.png" },
-        // In-game Judgements
         { key: "judgeCritical1", src: "assets/プレイ中判定文字/CRITICAL判定1.png" },
         { key: "judgeCritical2", src: "assets/プレイ中判定文字/CRITICAL判定2.png" },
         { key: "judgeGreat1", src: "assets/プレイ中判定文字/GREAT判定1.png" },
@@ -1094,7 +1158,6 @@
         { key: "judgeFail1", src: "assets/プレイ中判定文字/FAIL判定1.png" },
         { key: "judgeMiss1", src: "assets/プレイ中判定文字/MISS判定1.png" },
         { key: "judgeMiss2", src: "assets/プレイ中判定文字/MISS判定2.png" },
-        // Result Judgements
         { key: "resCritical1", src: "assets/リザルト文字/CRITICAL1.png" },
         { key: "resCritical2", src: "assets/リザルト文字/CRITICAL2.png" },
         { key: "resGreat1", src: "assets/リザルト文字/GREAT1.png" },
@@ -1103,16 +1166,16 @@
         { key: "resMiss1", src: "assets/リザルト文字/MISS1.png" },
         { key: "resMiss2", src: "assets/リザルト文字/MISS2.png" }
       ];
-      assets.forEach((a) => {
+      staticAssets.forEach((a) => {
         const img = new Image();
         img.src = a.src;
         img.onload = () => {
           SKIN[a.key] = img;
-          if (songSelectOverlay) {
-            songSelectOverlay.style.background = "rgba(0,0,0,0.95)";
-          }
         };
       });
+      if (songSelectOverlay) {
+        songSelectOverlay.style.background = "rgba(0,0,0,0.95)";
+      }
     }
     const AUDIO_ASSETS = {
       bgm_title: null,
@@ -1373,6 +1436,16 @@ Offset Updated.`);
     let audioBuffer = null;
     let audioSource = null;
     let audioStartTime = 0;
+    const keysoundBank = /* @__PURE__ */ new Map();
+    function playKeysound(soundId) {
+      if (!soundId || !audioContext) return;
+      const buffer = keysoundBank.get(soundId);
+      if (!buffer) return;
+      const src = audioContext.createBufferSource();
+      src.buffer = buffer;
+      src.connect(audioContext.destination);
+      src.start();
+    }
     function logDebug(msg) {
       if (!debugLog) return;
       const div = document.createElement("div");
@@ -1507,7 +1580,7 @@ Offset Updated.`);
         shutterOverlay.style.setProperty("--shutter-scale", "2.8");
       }
     }
-    function spawnNote(laneIndex, scheduledTime, isLong, duration, beat, noteType) {
+    function spawnNote(laneIndex, scheduledTime, isLong, duration, beat, noteType, soundId) {
       notes.push({
         laneIndex,
         scheduledTime,
@@ -1517,7 +1590,8 @@ Offset Updated.`);
         processed: false,
         beingHeld: false,
         beat,
-        type: noteType
+        type: noteType,
+        soundId
       });
     }
     function update(deltaTime) {
@@ -1568,7 +1642,7 @@ Offset Updated.`);
         while (nextNoteIndex < chartData.length) {
           const noteData = chartData[nextNoteIndex];
           if (noteData.time <= currentTimeMs + spawnAheadTime) {
-            spawnNote(noteData.lane, noteData.time, noteData.duration > 0, noteData.duration, noteData.beat, noteData.type);
+            spawnNote(noteData.lane, noteData.time, noteData.duration > 0, noteData.duration, noteData.beat, noteData.type, noteData.soundId);
             nextNoteIndex++;
           } else {
             break;
@@ -1708,8 +1782,12 @@ AUTO`;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
       VISUAL_LANES.forEach((lane) => {
-        ctx.fillStyle = `rgba(17, 17, 17, ${laneOpacity})`;
-        ctx.fillRect(lane.x, 0, lane.width, canvas.height);
+        if (SKIN["lane"]) {
+          ctx.drawImage(SKIN["lane"], lane.x, 0, lane.width, canvas.height);
+        } else {
+          ctx.fillStyle = `rgba(17, 17, 17, ${laneOpacity})`;
+          ctx.fillRect(lane.x, 0, lane.width, canvas.height);
+        }
         ctx.strokeStyle = "#555";
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -2070,6 +2148,110 @@ AUTO`;
         }
       }
     }
+    function drawPreview(deltaTime) {
+      const previewCanvas = document.getElementById("preview-canvas");
+      if (!previewCanvas) return;
+      const pCtx = previewCanvas.getContext("2d");
+      if (!pCtx) return;
+      const modeRadios = document.getElementsByName("preview-mode");
+      let previewLanes = 4;
+      for (const radio of modeRadios) {
+        if (radio.checked && radio.value === "6key") previewLanes = 6;
+      }
+      const laneW = currentLaneWidth;
+      const totalW = laneW * previewLanes;
+      if (previewCanvas.height !== window.innerHeight) previewCanvas.height = window.innerHeight;
+      if (previewCanvas.width !== totalW) previewCanvas.width = totalW;
+      pCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+      const nowMs = performance.now();
+      if (nowMs - lastPreviewSpawnTime > PREVIEW_INTERVAL) {
+        lastPreviewSpawnTime = nowMs;
+        previewNotes.push({ timeMs: nowMs + 2e3, active: true, hit: false });
+      }
+      previewNotes = previewNotes.filter((n) => n.timeMs > nowMs - 1e3 && !n.hit);
+      const hitY = previewCanvas.height - 100;
+      const w = previewCanvas.width;
+      const h = previewCanvas.height;
+      pCtx.fillStyle = "rgba(255, 255, 255, 0.05)";
+      pCtx.fillRect(0, 0, w, h);
+      pCtx.fillStyle = "#ff00ff";
+      pCtx.fillRect(0, hitY, w, 2);
+      pCtx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+      pCtx.lineWidth = 1;
+      pCtx.beginPath();
+      for (let i = 1; i < previewLanes; i++) {
+        pCtx.moveTo(i * laneW, 0);
+        pCtx.lineTo(i * laneW, h);
+      }
+      pCtx.stroke();
+      const effectiveSpeed = currentNoteSpeed * (isLaneCoverEnabled ? laneCoverSpeedMult : 1);
+      const currentVisualTime = nowMs + visualOffset;
+      const noteHeight = 15;
+      for (const note of previewNotes) {
+        if (note.hit) continue;
+        const y = hitY - (note.timeMs - currentVisualTime) * effectiveSpeed;
+        if (y > -50 && y < h + 50) {
+          for (let i = 0; i < previewLanes; i++) {
+            const gap = 2;
+            pCtx.fillStyle = i % 2 === 0 ? "#ffffff" : "#7CA4FF";
+            pCtx.fillRect(i * laneW + gap, y, laneW - gap * 2, noteHeight);
+          }
+        }
+      }
+      if (isLaneCoverEnabled) {
+        pCtx.fillStyle = "rgba(0,0,0,0.8)";
+        pCtx.fillRect(0, 0, w, laneCoverHeight);
+        pCtx.fillStyle = "#00ffff";
+        pCtx.fillRect(0, laneCoverHeight - 2, w, 2);
+      }
+      if (previewJudgementTimer > 0) {
+        previewJudgementTimer -= deltaTime;
+        pCtx.fillStyle = previewJudgementColor;
+        pCtx.font = "bold 24px Arial";
+        pCtx.textAlign = "center";
+        pCtx.fillText(previewJudgementText, w / 2, hitY - judgementHeightOffset / 2);
+      }
+    }
+    function testPreviewHit() {
+      const nowMs = performance.now();
+      let nearestNote = null;
+      let minDiff = 9999;
+      for (const n of previewNotes) {
+        if (n.hit) continue;
+        const msError = Math.abs(nowMs - n.timeMs - globalOffset);
+        if (msError < minDiff) {
+          minDiff = msError;
+          nearestNote = n;
+        }
+      }
+      const THRESHOLD_CRITICAL2 = 40;
+      const THRESHOLD_GREAT2 = 80;
+      const THRESHOLD_GOOD2 = 133;
+      const THRESHOLD_FAIL2 = 150;
+      const MISS_BOUNDARY2 = 180;
+      if (nearestNote && minDiff <= MISS_BOUNDARY2) {
+        nearestNote.hit = true;
+        let result = "MISS";
+        let color = "#ff0000";
+        if (minDiff <= THRESHOLD_CRITICAL2) {
+          result = "CRITICAL";
+          color = "#ffff00";
+        } else if (minDiff <= THRESHOLD_GREAT2) {
+          result = "GREAT";
+          color = "#00ff00";
+        } else if (minDiff <= THRESHOLD_GOOD2) {
+          result = "GOOD";
+          color = "#00ffff";
+        } else if (minDiff <= THRESHOLD_FAIL2) {
+          result = "BAD";
+          color = "#ff00ff";
+        }
+        previewJudgementText = result;
+        previewJudgementColor = color;
+        previewJudgementTimer = 1e3;
+        playSE("se_tap");
+      }
+    }
     function loop(timestamp) {
       if (!lastTime) lastTime = timestamp;
       const deltaTime = timestamp - lastTime;
@@ -2103,6 +2285,9 @@ AUTO`;
         ctx.font = "bold 80px Arial";
         ctx.textAlign = "center";
         ctx.fillText(countdownValue.toString(), canvas.width / 2, canvas.height / 2);
+      }
+      if (controlsDiv && controlsDiv.classList.contains("show-options")) {
+        drawPreview(deltaTime);
       }
       requestAnimationFrame(loop);
     }
@@ -2404,6 +2589,11 @@ AUTO`;
           updateModeTabsUI();
           loadSongList();
           playSE("se_select");
+        } else if (e.key === " " && !e.repeat) {
+          if (controlsDiv) {
+            controlsDiv.classList.add("show-options");
+          }
+          e.preventDefault();
         }
       }
     });
@@ -2790,6 +2980,26 @@ AUTO`;
             return;
           }
           chartData = parseChart$1(json);
+          keysoundBank.clear();
+          const uniqueSoundIds = Array.from(new Set(chartData.map((n) => n.soundId).filter((s) => !!s)));
+          if (uniqueSoundIds.length > 0) {
+            if (loadingText) loadingText.textContent = `LOADING KEYSOUNDS (0/${uniqueSoundIds.length})...`;
+            let loadedCount = 0;
+            await Promise.all(uniqueSoundIds.map(async (soundId) => {
+              try {
+                const res = await fetch(`songs/${songFolder}/${soundId}`);
+                if (res.ok) {
+                  const buf = await res.arrayBuffer();
+                  const keysoundBuf = await audioContext.decodeAudioData(buf);
+                  keysoundBank.set(soundId, keysoundBuf);
+                }
+              } catch (e) {
+                console.error(`Failed to load keysound: ${soundId}`, e);
+              }
+              loadedCount++;
+              if (loadingText) loadingText.textContent = `LOADING KEYSOUNDS (${loadedCount}/${uniqueSoundIds.length})...`;
+            }));
+          }
           if (assistSelect && randomSelect) {
             const assistMode = assistSelect.value;
             const randomMode = randomSelect.value;
@@ -3005,6 +3215,14 @@ AUTO`;
     window.addEventListener("resize", resize);
     resize();
     window.addEventListener("keydown", (e) => {
+      if (controlsDiv && controlsDiv.classList.contains("show-options")) {
+        const keyLower2 = e.key.toLowerCase();
+        if (["d", "f", "j", "k"].includes(keyLower2) && !e.repeat) {
+          testPreviewHit();
+          e.preventDefault();
+          return;
+        }
+      }
       if (isCalibrating) {
         if (e.code === "Space") {
           e.preventDefault();
@@ -3129,6 +3347,7 @@ ${sign}${msRounded}ms`;
               addHit("miss", msError);
             }
             judgementTimer = 1e3;
+            playKeysound(note.soundId);
             if (note.isLong) {
               note.processed = true;
               note.beingHeld = true;
@@ -3148,6 +3367,11 @@ ${sign}${msRounded}ms`;
       }
     });
     window.addEventListener("keyup", (e) => {
+      if (e.key === " ") {
+        if (controlsDiv) {
+          controlsDiv.classList.remove("show-options");
+        }
+      }
       const keyLower = e.key.toLowerCase();
       if (keyLower === "n") {
         performance.now();

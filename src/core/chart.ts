@@ -71,6 +71,7 @@ export function parseChart(json: any): ParsedChart {
     hit: false,
     beat: n.beat,
     type: n.type || 'normal',
+    soundId: n.soundId,
   })).sort((a: ChartNote, b: ChartNote) => a.time - b.time);
 
   // 4. Parse Layout Changes

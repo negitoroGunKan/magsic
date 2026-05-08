@@ -49,6 +49,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     let isAutoPlay = false;
     let isMVLayout = false;
     let laneOpacity = 1.0;
+    let currentSkin = 'default';
 
     // Ranked Mode (Dani Nintei) State
     let isDaniMode = false;
@@ -108,6 +109,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     const laneWidthInput = document.getElementById('lane-width-input') as HTMLInputElement;
     const laneWidthDisplay = document.getElementById('lane-width-display') as HTMLSpanElement;
     const laneCoverCheckbox = document.getElementById('lane-cover-checkbox') as HTMLInputElement;
+    const skinSelect = document.getElementById('skin-select') as HTMLSelectElement;
     const laneCoverHeightInput = document.getElementById('lane-cover-height-input') as HTMLInputElement;
     const laneCoverHeightDisplay = document.getElementById('lane-cover-height-display') as HTMLSpanElement;
     const laneCoverSpeedInput = document.getElementById('lane-cover-speed-input') as HTMLInputElement;
@@ -158,6 +160,14 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
 
     // --- Title Animation Logic ---
     let titleAnimRequestId: number | null = null;
+
+    // --- Preview Canvas Logic ---
+    let previewNotes: { timeMs: number, active: boolean, hit: boolean }[] = [];
+    let previewJudgementText: string = "";
+    let previewJudgementColor: string = "#fff";
+    let previewJudgementTimer: number = 0;
+    let lastPreviewSpawnTime: number = 0;
+    const PREVIEW_INTERVAL = 1000;
 
     function startTitleLoop() {
         if (!logo || !startScreen || !titleBgVideo) return;
@@ -285,12 +295,12 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         });
     }
 
-    if (btnCloseResults) {
+        if (btnCloseResults) {
         btnCloseResults.addEventListener('click', () => {
             // Return to start screen or controls? 
             showStartScreen(true);
             controlsDiv.style.display = 'block'; // Make drawer available
-            if (controlsDiv.classList.contains('open')) controlsDiv.classList.remove('open');
+            if (controlsDiv.classList.contains('show-options')) controlsDiv.classList.remove('show-options');
             songSelectOverlay.style.display = 'none';
         });
     }
@@ -435,7 +445,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         showStartScreen(false);
         if (controlsDiv) {
             controlsDiv.style.display = 'block';
-            controlsDiv.classList.remove('open'); // Close drawer if open
+            controlsDiv.classList.remove('show-options'); // Close drawer if open
         }
 
         if (songSelectOverlay) {
@@ -819,6 +829,11 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                     if (judgementHeightDisplay) judgementHeightDisplay.textContent = judgementHeightOffset.toString();
                 }
 
+                if (settings.currentSkin !== undefined) {
+                    currentSkin = settings.currentSkin;
+                    if (skinSelect) skinSelect.value = currentSkin;
+                }
+
                 resize(); // Apply loaded lane width
             } else {
                 // Default fallback if no settings for this user
@@ -859,7 +874,8 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 speed: laneCoverSpeedMult
             },
             laneOpacity: laneOpacity,
-            judgementHeight: judgementHeightOffset
+            judgementHeight: judgementHeightOffset,
+            currentSkin: currentSkin
         };
         localStorage.setItem(key, JSON.stringify(settings)); // Changed to 'magusic_custom_settings' in the instruction, but keeping 'key' for consistency with per-player settings. If the instruction intended a global setting, this would need to be 'magusic_custom_settings'. Assuming the instruction meant to add to the existing per-player settings structure.
     }
@@ -977,6 +993,15 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         });
     }
 
+    if (skinSelect) {
+        skinSelect.addEventListener('change', () => {
+            currentSkin = skinSelect.value;
+            console.log('Skin changed to:', currentSkin);
+            loadSkin(); // Reload assets
+            savePlayerSettings();
+        });
+    }
+
     if (laneCoverHeightInput && laneCoverHeightDisplay) {
         laneCoverHeightInput.addEventListener('input', () => {
             laneCoverHeight = parseInt(laneCoverHeightInput.value);
@@ -1056,17 +1081,17 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     if (btnOptionsToggle && controlsDiv) {
         btnOptionsToggle.addEventListener('click', (e) => {
             e.stopPropagation(); // Stop bubbling
-            controlsDiv.classList.toggle('open');
+            controlsDiv.classList.toggle('show-options');
             playSE('se_option');
         });
 
         if (btnCloseOptions) {
             btnCloseOptions.addEventListener('click', () => {
-                controlsDiv.classList.remove('open');
+                controlsDiv.classList.remove('show-options');
             });
         }
 
-        // Touch swipe-to-close logic
+        // Touch swipe-to-close logic (can keep it or remove it, but renaming class is safe)
         let touchStartX = 0;
         controlsDiv.addEventListener('touchstart', (e) => {
             touchStartX = e.touches[0].clientX;
@@ -1077,16 +1102,16 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             const diffX = touchEndX - touchStartX;
             // If swiped significantly to the right (e.g. > 50px), close drawer
             if (diffX > 50) {
-                controlsDiv.classList.remove('open');
+                controlsDiv.classList.remove('show-options');
             }
         }, { passive: true });
 
         document.addEventListener('click', (e) => {
             const target = e.target as HTMLElement;
-            if (controlsDiv.classList.contains('open')) {
+            if (controlsDiv.classList.contains('show-options')) {
                 // If click is NOT inside drawer AND NOT the toggle button
                 if (!controlsDiv.contains(target) && target !== btnOptionsToggle) {
-                    controlsDiv.classList.remove('open');
+                    controlsDiv.classList.remove('show-options');
                 }
             }
         });
@@ -1095,15 +1120,70 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     // Game Config (Values assigned at top)
     // NOTE_HEIGHT, currentKeyMode, HIT_Y handled at top
 
-    function loadSkin() {
-        const assets = [
-            { key: 'white', src: 'assets/note_white.png' },
-            { key: 'blue', src: 'assets/note_blue.png' },
-            { key: 'space', src: 'assets/note_space.png' },
-            { key: 'titleBg', src: 'assets/initial2.png' }, // Fallback, will be overridden by video if possible
+    async function loadSkin() {
+        const tryPaths = async (key: string, candidates: string[]) => {
+            for (const path of candidates) {
+                try {
+                    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+                        const i = new Image();
+                        i.onload = () => resolve(i);
+                        i.onerror = () => reject();
+                        i.src = encodeURI(path);
+                    });
+                    SKIN[key] = img;
+                    console.log(`Loaded ${key}: ${path}`);
+                    return true;
+                } catch (e) {
+                    continue;
+                }
+            }
+            return false;
+        };
+
+        // Define candidates for each part
+        const skinBase = `assets/スキン/${currentSkin}`;
+        const defBase = `assets/スキン/default`;
+
+        // Lane
+        await tryPaths('lane', [
+            `${skinBase}/${currentSkin}_レーン/レーン_${currentSkin}.png`,
+            `${skinBase}/${currentSkin}_レーン/lane.png`,
+            `${skinBase}/レーン_${currentSkin}.png`,
+            `${skinBase}/lane.png`,
+            `${defBase}/レーン_default.png`,
+            `${defBase}/lane.png`
+        ]);
+
+        // White Note
+        await tryPaths('white', [
+            `${skinBase}/${currentSkin}_白ノーツ/note_white.png`,
+            `${skinBase}/note_white_${currentSkin}.png`,
+            `${skinBase}/note_white.png`,
+            `${defBase}/note_white.png`
+        ]);
+
+        // Blue Note
+        await tryPaths('blue', [
+            `${skinBase}/${currentSkin}_青ノーツ/note_blue.png`,
+            `${skinBase}/note_blue_${currentSkin}.png`,
+            `${skinBase}/note_blue.png`,
+            `${defBase}/note_blue.png`
+        ]);
+
+        // Space Note
+        await tryPaths('space', [
+            `${skinBase}/${currentSkin}_スペースノーツ/note_space.png`,
+            `${skinBase}/note_space_${currentSkin}.png`,
+            `${skinBase}/note_space.png`,
+            `${skinBase}/note_space_Tunared.png`,
+            `${defBase}/note_space.png`
+        ]);
+
+        // UI Backgrounds & Other static assets
+        const staticAssets = [
+            { key: 'titleBg', src: 'assets/initial2.png' },
             { key: 'gameBg', src: 'assets/initial2.png' },
             { key: 'resBg', src: 'assets/リザルト背景.png' },
-            // In-game Judgements
             { key: 'judgeCritical1', src: 'assets/プレイ中判定文字/CRITICAL判定1.png' },
             { key: 'judgeCritical2', src: 'assets/プレイ中判定文字/CRITICAL判定2.png' },
             { key: 'judgeGreat1', src: 'assets/プレイ中判定文字/GREAT判定1.png' },
@@ -1111,7 +1191,6 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             { key: 'judgeFail1', src: 'assets/プレイ中判定文字/FAIL判定1.png' },
             { key: 'judgeMiss1', src: 'assets/プレイ中判定文字/MISS判定1.png' },
             { key: 'judgeMiss2', src: 'assets/プレイ中判定文字/MISS判定2.png' },
-            // Result Judgements
             { key: 'resCritical1', src: 'assets/リザルト文字/CRITICAL1.png' },
             { key: 'resCritical2', src: 'assets/リザルト文字/CRITICAL2.png' },
             { key: 'resGreat1', src: 'assets/リザルト文字/GREAT1.png' },
@@ -1121,19 +1200,15 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             { key: 'resMiss2', src: 'assets/リザルト文字/MISS2.png' }
         ];
 
-        assets.forEach(a => {
+        staticAssets.forEach(a => {
             const img = new Image();
             img.src = a.src;
-            img.onload = () => {
-                SKIN[a.key] = img;
-
-                // Ensure background is semi-transparent black
-                if (songSelectOverlay) {
-                    songSelectOverlay.style.background = 'rgba(0,0,0,0.95)';
-                }
-            };
-            // onerror: silently fail -> fallback to null, keep default style
+            img.onload = () => { SKIN[a.key] = img; };
         });
+
+        if (songSelectOverlay) {
+            songSelectOverlay.style.background = 'rgba(0,0,0,0.95)';
+        }
     }
     // Audio Assets (BGM & SE)
     const AUDIO_ASSETS: { [key: string]: HTMLAudioElement | null } = {
@@ -1504,6 +1579,19 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     let audioSource: AudioBufferSourceNode | null = null;
     let audioStartTime = 0; // Context time when playback started
 
+    const keysoundBank: Map<string, AudioBuffer> = new Map();
+
+    function playKeysound(soundId: string | undefined) {
+        if (!soundId || !audioContext) return;
+        const buffer = keysoundBank.get(soundId);
+        if (!buffer) return;
+
+        const src = audioContext.createBufferSource();
+        src.buffer = buffer;
+        src.connect(audioContext.destination);
+        src.start();
+    }
+
     // Notes
     interface Note {
         laneIndex: number; // 0-8 for KEYS
@@ -1515,6 +1603,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         beingHeld: boolean;
         beat: number; // [NEW] For beat-based scrolling
         type?: 'normal' | 'sinking' | 'death';
+        soundId?: string;
     }
 
     function logDebug(msg: string) {
@@ -1727,7 +1816,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
 
     // Overload or just update spawnNote call sites?
     // Let's update spawnNote signature.
-    function spawnNote(laneIndex: number, scheduledTime: number, isLong: boolean, duration: number, beat: number, noteType?: 'normal' | 'sinking' | 'death') {
+    function spawnNote(laneIndex: number, scheduledTime: number, isLong: boolean, duration: number, beat: number, noteType?: 'normal' | 'sinking' | 'death', soundId?: string) {
         notes.push({
             laneIndex: laneIndex,
             scheduledTime: scheduledTime,
@@ -1737,7 +1826,8 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             processed: false,
             beingHeld: false,
             beat: beat,
-            type: noteType
+            type: noteType,
+            soundId: soundId
         });
     }
 
@@ -1808,7 +1898,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 // We should spawn if (noteData.time - currentTime) * speed < HIT_Y
                 // i.e. noteData.time < currentTime + spawnAheadTime
                 if (noteData.time <= currentTimeMs + spawnAheadTime) {
-                    spawnNote(noteData.lane, noteData.time, noteData.duration > 0, noteData.duration, noteData.beat, noteData.type);
+                    spawnNote(noteData.lane, noteData.time, noteData.duration > 0, noteData.duration, noteData.beat, noteData.type, noteData.soundId);
                     nextNoteIndex++;
                 } else {
                     break;
@@ -2004,9 +2094,13 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
 
         // Draw STATIC VISUAL LANES (Background)
         VISUAL_LANES.forEach(lane => {
-            // Lane BG
-            ctx.fillStyle = `rgba(17, 17, 17, ${laneOpacity})`;
-            ctx.fillRect(lane.x, 0, lane.width, canvas.height);
+            // Lane BG (if skin part exists, tile it)
+            if (SKIN['lane']) {
+                ctx.drawImage(SKIN['lane'], lane.x, 0, lane.width, canvas.height);
+            } else {
+                ctx.fillStyle = `rgba(17, 17, 17, ${laneOpacity})`;
+                ctx.fillRect(lane.x, 0, lane.width, canvas.height);
+            }
 
             // Divider
             ctx.strokeStyle = '#555';
@@ -2520,6 +2614,135 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         }
     }
 
+    function drawPreview(deltaTime: number) {
+        const previewCanvas = document.getElementById('preview-canvas') as HTMLCanvasElement;
+        if (!previewCanvas) return;
+        const pCtx = previewCanvas.getContext('2d');
+        if (!pCtx) return;
+
+        // Determine lane count from UI
+        const modeRadios = document.getElementsByName('preview-mode') as NodeListOf<HTMLInputElement>;
+        let previewLanes = 4;
+        for (const radio of modeRadios) {
+            if (radio.checked && radio.value === '6key') previewLanes = 6;
+        }
+
+        const laneW = currentLaneWidth;
+        const totalW = laneW * previewLanes;
+        
+        // Match exact game height
+        if (previewCanvas.height !== window.innerHeight) previewCanvas.height = window.innerHeight;
+        if (previewCanvas.width !== totalW) previewCanvas.width = totalW;
+
+        pCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+
+        const nowMs = performance.now();
+
+        if (nowMs - lastPreviewSpawnTime > PREVIEW_INTERVAL) {
+            lastPreviewSpawnTime = nowMs;
+            previewNotes.push({ timeMs: nowMs + 2000, active: true, hit: false });
+        }
+
+        previewNotes = previewNotes.filter(n => n.timeMs > nowMs - 1000 && !n.hit);
+
+        const hitY = previewCanvas.height - 100; // Same calculation as HIT_Y in main game
+        const w = previewCanvas.width;
+        const h = previewCanvas.height;
+
+        // BG
+        pCtx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+        pCtx.fillRect(0, 0, w, h);
+
+        // Hit Line
+        pCtx.fillStyle = '#ff00ff';
+        pCtx.fillRect(0, hitY, w, 2);
+
+        // Draw lane separators
+        pCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        pCtx.lineWidth = 1;
+        pCtx.beginPath();
+        for (let i = 1; i < previewLanes; i++) {
+            pCtx.moveTo(i * laneW, 0);
+            pCtx.lineTo(i * laneW, h);
+        }
+        pCtx.stroke();
+
+        const effectiveSpeed = currentNoteSpeed * (isLaneCoverEnabled ? laneCoverSpeedMult : 1.0);
+        const currentVisualTime = nowMs + visualOffset;
+        const noteHeight = 15;
+
+        for (const note of previewNotes) {
+            if (note.hit) continue;
+            const y = hitY - (note.timeMs - currentVisualTime) * effectiveSpeed;
+            if (y > -50 && y < h + 50) {
+                // Draw a note spanning across all lanes just for visual preview
+                // Or draw one note per lane? Let's just draw one wide note, or alternate lanes.
+                // We'll draw notes in all lanes to clearly show lane widths.
+                for (let i = 0; i < previewLanes; i++) {
+                    const gap = 2;
+                    pCtx.fillStyle = (i % 2 === 0) ? '#ffffff' : '#7CA4FF'; // alternate white/blue
+                    // simulate note bodies
+                    pCtx.fillRect((i * laneW) + gap, y, laneW - gap * 2, noteHeight);
+                }
+            }
+        }
+
+        // Lane Cover - exact pixel height
+        if (isLaneCoverEnabled) {
+            pCtx.fillStyle = 'rgba(0,0,0,0.8)';
+            pCtx.fillRect(0, 0, w, laneCoverHeight);
+            pCtx.fillStyle = '#00ffff';
+            pCtx.fillRect(0, laneCoverHeight - 2, w, 2);
+        }
+
+        // Judgement Text
+        if (previewJudgementTimer > 0) {
+            previewJudgementTimer -= deltaTime;
+            pCtx.fillStyle = previewJudgementColor;
+            pCtx.font = 'bold 24px Arial';
+            pCtx.textAlign = 'center';
+            // Use judgementHeightOffset similar to main game
+            pCtx.fillText(previewJudgementText, w / 2, hitY - (judgementHeightOffset / 2));
+        }
+    }
+
+    function testPreviewHit() {
+        const nowMs = performance.now();
+        let nearestNote = null;
+        let minDiff = 9999;
+        
+        for (const n of previewNotes) {
+            if (n.hit) continue;
+            const msError = Math.abs(nowMs - n.timeMs - globalOffset);
+            if (msError < minDiff) {
+                minDiff = msError;
+                nearestNote = n;
+            }
+        }
+
+        const THRESHOLD_CRITICAL = 40;
+        const THRESHOLD_GREAT = 80;
+        const THRESHOLD_GOOD = 133;
+        const THRESHOLD_FAIL = 150;
+        const MISS_BOUNDARY = 180;
+
+        if (nearestNote && minDiff <= MISS_BOUNDARY) {
+            nearestNote.hit = true;
+            let result = 'MISS';
+            let color = '#ff0000';
+            
+            if (minDiff <= THRESHOLD_CRITICAL) { result = 'CRITICAL'; color = '#ffff00'; }
+            else if (minDiff <= THRESHOLD_GREAT) { result = 'GREAT'; color = '#00ff00'; }
+            else if (minDiff <= THRESHOLD_GOOD) { result = 'GOOD'; color = '#00ffff'; }
+            else if (minDiff <= THRESHOLD_FAIL) { result = 'BAD'; color = '#ff00ff'; }
+            
+            previewJudgementText = result;
+            previewJudgementColor = color;
+            previewJudgementTimer = 1000;
+            playSE('se_tap');
+        }
+    }
+
     function loop(timestamp: number) {
         if (!lastTime) lastTime = timestamp;
         const deltaTime = timestamp - lastTime;
@@ -2561,6 +2784,10 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             ctx.font = 'bold 80px Arial';
             ctx.textAlign = 'center';
             ctx.fillText(countdownValue.toString(), canvas.width / 2, canvas.height / 2);
+        }
+
+        if (controlsDiv && controlsDiv.classList.contains('show-options')) {
+            drawPreview(deltaTime);
         }
 
         requestAnimationFrame(loop);
@@ -2939,6 +3166,11 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 updateModeTabsUI();
                 loadSongList();
                 playSE('se_select');
+            } else if (e.key === ' ' && !e.repeat) {
+                if (controlsDiv) {
+                    controlsDiv.classList.add('show-options');
+                }
+                e.preventDefault();
             }
         }
     });
@@ -3589,6 +3821,28 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 }
                 chartData = parseChart(json);
 
+                // 1.5. Pre-load Keysounds
+                keysoundBank.clear();
+                const uniqueSoundIds = Array.from(new Set(chartData.map(n => n.soundId).filter(s => !!s))) as string[];
+                if (uniqueSoundIds.length > 0) {
+                    if (loadingText) loadingText.textContent = `LOADING KEYSOUNDS (0/${uniqueSoundIds.length})...`;
+                    let loadedCount = 0;
+                    await Promise.all(uniqueSoundIds.map(async (soundId) => {
+                        try {
+                            const res = await fetch(`songs/${songFolder}/${soundId}`);
+                            if (res.ok) {
+                                const buf = await res.arrayBuffer();
+                                const keysoundBuf = await audioContext!.decodeAudioData(buf);
+                                keysoundBank.set(soundId, keysoundBuf);
+                            }
+                        } catch (e) {
+                            console.error(`Failed to load keysound: ${soundId}`, e);
+                        }
+                        loadedCount++;
+                        if (loadingText) loadingText.textContent = `LOADING KEYSOUNDS (${loadedCount}/${uniqueSoundIds.length})...`;
+                    }));
+                }
+
                 // Apply Modifiers
                 if (assistSelect && randomSelect) {
                     const assistMode = assistSelect.value;
@@ -3872,6 +4126,15 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
 
     // Input handling
     window.addEventListener('keydown', (e) => {
+        if (controlsDiv && controlsDiv.classList.contains('show-options')) {
+            const keyLower = e.key.toLowerCase();
+            if (['d', 'f', 'j', 'k'].includes(keyLower) && !e.repeat) {
+                testPreviewHit();
+                e.preventDefault();
+                return;
+            }
+        }
+
         if (isCalibrating) {
             if (e.code === 'Space') {
                 e.preventDefault(); // Stop scrolling
@@ -4042,6 +4305,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                         currentJudgementType = 'miss';
                     }
                     judgementTimer = 1000;
+                    playKeysound(note.soundId);
 
                     if (note.isLong) {
                         note.processed = true;
@@ -4063,6 +4327,12 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     });
 
     window.addEventListener('keyup', (e) => {
+        if (e.key === ' ') {
+            if (controlsDiv) {
+                controlsDiv.classList.remove('show-options');
+            }
+        }
+
         const keyLower = e.key.toLowerCase();
         if (keyLower === 'n') {
             const now = performance.now();
