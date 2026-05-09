@@ -176,7 +176,6 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         let startTime = performance.now();
         function animLoop(time: number) {
             if (startScreen.style.display === 'none') {
-                titleBgVideo.pause();
                 titleAnimRequestId = null;
                 return;
             }
@@ -201,7 +200,6 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             startTitleLoop();
         } else {
             startScreen.style.display = 'none';
-            if (titleBgVideo) titleBgVideo.pause();
         }
     }
 
@@ -336,7 +334,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     }
 
     // State
-    let selectedModeFilter: '4key' | '6key' | '8key' | '12key' = '8key'; // Default to Legacy
+    let selectedModeFilter: '4key' | '6key' | '8key' | '12key' = '6key'; // Default to 6Key
 
     // --- Select Menu State ---
     const menuOverlay = document.getElementById('menu-overlay') as HTMLDivElement;
@@ -448,6 +446,10 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             controlsDiv.classList.remove('show-options'); // Close drawer if open
         }
 
+        if (menuOverlay) {
+            menuOverlay.style.display = 'none';
+        }
+
         if (songSelectOverlay) {
             songSelectOverlay.style.display = 'flex'; // Fix: Use FLEX not BLOCK
             console.log('songSelectOverlay display set to FLEX'); // DEBUG
@@ -523,7 +525,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         container.style.background = '#222';
         container.style.borderRadius = '8px';
 
-        ['4key', '6key', '8key', '12key'].forEach(mode => {
+        ['6key'].forEach(mode => {
             const btn = document.createElement('button');
             btn.textContent = mode.toUpperCase();
             btn.className = 'mode-tab-btn';
@@ -1206,9 +1208,28 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             img.onload = () => { SKIN[a.key] = img; };
         });
 
-        if (songSelectOverlay) {
-            songSelectOverlay.style.background = 'rgba(0,0,0,0.95)';
-        }
+        // songSelectOverlay background is managed in index.html for transparency
+    }
+    
+    let songPreviewBGM: HTMLAudioElement | null = null;
+    let interpolatedSongIndex = 0;
+    let isSongSelectAnimating = false;
+
+    function fadeVolume(audio: HTMLAudioElement, target: number, duration: number, callback?: () => void) {
+        const start = audio.volume;
+        const startTime = performance.now();
+        const anim = (time: number) => {
+            const elapsed = time - startTime;
+            const p = Math.min(elapsed / duration, 1);
+            audio.volume = start + (target - start) * p;
+            if (p < 1) {
+                requestAnimationFrame(anim);
+            } else {
+                audio.volume = target;
+                if (callback) callback();
+            }
+        };
+        requestAnimationFrame(anim);
     }
     // Audio Assets (BGM & SE)
     const AUDIO_ASSETS: { [key: string]: HTMLAudioElement | null } = {
@@ -1261,25 +1282,45 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         if (!nextBGM) return;
 
         if (currentBGM === nextBGM) {
-            if (currentBGM.paused) currentBGM.play().catch(e => console.log('Autoplay blocked', e));
+            if (currentBGM.paused) {
+                currentBGM.volume = 0;
+                currentBGM.play().catch(e => console.log('Autoplay blocked', e));
+                fadeVolume(currentBGM, 0.5, 800);
+            }
             return;
         }
 
         if (currentBGM) {
-            currentBGM.pause();
-            currentBGM.currentTime = 0;
+            const prevBGM = currentBGM;
+            fadeVolume(prevBGM, 0, 800, () => {
+                prevBGM.pause();
+                prevBGM.currentTime = 0;
+            });
         }
 
         currentBGM = nextBGM;
         currentBGM.currentTime = 0;
+        currentBGM.volume = 0;
         currentBGM.play().catch(e => console.log('Autoplay blocked', e));
+        fadeVolume(currentBGM, 0.5, 800);
     }
 
     function stopBGM() {
         if (currentBGM) {
-            currentBGM.pause();
-            currentBGM.currentTime = 0;
+            const prevBGM = currentBGM;
+            fadeVolume(prevBGM, 0, 500, () => {
+                prevBGM.pause();
+                prevBGM.currentTime = 0;
+            });
             currentBGM = null;
+        }
+        if (songPreviewBGM) {
+            const prevPreview = songPreviewBGM;
+            fadeVolume(prevPreview, 0, 500, () => {
+                prevPreview.pause();
+                prevPreview.currentTime = 0;
+            });
+            songPreviewBGM = null;
         }
     }
 
@@ -2059,17 +2100,23 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         if (judgementTimer > 0) judgementTimer -= deltaTime;
     }
 
+
+
     function draw() {
         if (!ctx) return;
+
+        if (!isPlaying) {
+            // Title or Song Select screen: Clear canvas to show background video
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            requestAnimationFrame(draw);
+            return;
+        }
 
         const currentTime = getAudioTime(); // Capture ONCE per frame
         const currentTimeMs = currentTime * 1000;
 
         // Clear / Draw Background
-        if (!isPlaying && SKIN.titleBg) {
-            // Title Screen BG (Static)
-            ctx.drawImage(SKIN.titleBg, 0, 0, canvas.width, canvas.height);
-        } else if (isPlaying) {
+        if (isPlaying) {
             // Game BG
             if (bgVideo && isVideoReady) {
                 // Draw MV full screen as background
@@ -2087,9 +2134,6 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 ctx.fillStyle = 'rgba(0,0,0,0.5)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
-        } else {
-            ctx.fillStyle = '#222';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
 
         // Draw STATIC VISUAL LANES (Background)
@@ -3119,6 +3163,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     };
 
     let selectedSongIndex = 0;
+    let selectedDiffIndex = 0; // 0..4 (no, st, ad, pr, et)
     let availableSongs: Song[] = [];
 
     // Handle Song Select Navigation
@@ -3138,34 +3183,58 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             }
 
             console.log('Song Select Nav Key:', e.key); // DEBUG
-            if (e.key.toLowerCase() === 'k') {
+            const updateDiff = (delta: number) => {
+                selectedDiffIndex = (selectedDiffIndex + delta + 5) % 5;
+                renderRightColumn();
+                playSE('se_select');
+            };
+
+            const startSelected = () => {
+                const song = availableSongs[selectedSongIndex];
+                if (!song || !song.charts) return;
+                
+                const buttonOrder = ['no', 'st', 'ad', 'pr', 'et'];
+                const diffKey = buttonOrder[selectedDiffIndex];
+                const chartInfos = (song as any).chartInfos || {};
+                const charts = song.charts;
+
+                const matchingKey = Object.keys(charts).find(k => {
+                    const filename = charts[k];
+                    const info = chartInfos[filename];
+                    let mode = '8key';
+                    if (filename.toLowerCase().includes('4k')) mode = '4key';
+                    else if (filename.toLowerCase().includes('6k')) mode = '6key';
+                    else if (filename.toLowerCase().includes('12k')) mode = '12key';
+                    if (mode !== selectedModeFilter) return false;
+                    let effectiveDiff = (info && info.difficulty) ? info.difficulty : k.split('_')[0];
+                    return effectiveDiff === diffKey;
+                });
+
+                if (matchingKey) {
+                    playSE('se_decide');
+                    loadSong(song.folder, song.charts[matchingKey], song.audio);
+                }
+            };
+
+            if (e.key.toLowerCase() === 'k' || e.key === 'ArrowDown') {
+                e.preventDefault();
                 selectedSongIndex = (selectedSongIndex + 1) % availableSongs.length;
                 renderSongSelectInternal();
-                playSE('se_select'); // Assuming se_select exists or use se_decide? se_select usually cleaner.
-                // If se_select doesn't exist, use se_decide short?
-                // Using se_decide for now as it's confirmed existing
-            } else if (e.key.toLowerCase() === 'd') {
+                playSE('se_select');
+            } else if (e.key.toLowerCase() === 'd' || e.key === 'ArrowUp') {
+                e.preventDefault();
                 selectedSongIndex = (selectedSongIndex - 1 + availableSongs.length) % availableSongs.length;
                 renderSongSelectInternal();
                 playSE('se_select');
-            } else if (e.key.toLowerCase() === 's') {
-                // Mode Switch: Left
-                const modes: KeyMode[] = ['4key', '6key', '8key', '12key'];
-                const curIdx = modes.indexOf(selectedModeFilter);
-                const nextIdx = (curIdx - 1 + modes.length) % modes.length;
-                selectedModeFilter = modes[nextIdx];
-                updateModeTabsUI();
-                loadSongList();
-                playSE('se_select');
-            } else if (e.key.toLowerCase() === 'l') {
-                // Mode Switch: Right
-                const modes: KeyMode[] = ['4key', '6key', '8key', '12key'];
-                const curIdx = modes.indexOf(selectedModeFilter);
-                const nextIdx = (curIdx + 1) % modes.length;
-                selectedModeFilter = modes[nextIdx];
-                updateModeTabsUI();
-                loadSongList();
-                playSE('se_select');
+            } else if (e.key.toLowerCase() === 'l' || e.key === 'ArrowRight') {
+                e.preventDefault();
+                updateDiff(1);
+            } else if (e.key.toLowerCase() === 's' || e.key === 'ArrowLeft') {
+                e.preventDefault();
+                updateDiff(-1);
+            } else if (e.key === 'Enter' || e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'j') {
+                e.preventDefault();
+                startSelected();
             } else if (e.key === ' ' && !e.repeat) {
                 if (controlsDiv) {
                     controlsDiv.classList.add('show-options');
@@ -3254,6 +3323,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             // Initial Render
             initSongSelect();
             updateSongSelectVisuals();
+            renderRightColumn();
 
             isInfosLoading = false;
 
@@ -3268,44 +3338,6 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         songListDiv.style.display = 'flex';
         songListDiv.style.overflow = 'hidden';
         songListDiv.style.flexDirection = 'column'; // Change to column to allow Header + Content
-
-        // --- Header: Mode Tabs ---
-        const header = document.createElement('div');
-        header.style.width = '100%';
-        header.style.height = '60px'; // Header height
-        header.style.background = '#222';
-        header.style.borderBottom = '1px solid #444';
-        header.style.display = 'flex';
-        header.style.justifyContent = 'center';
-        header.style.alignItems = 'center';
-        header.style.gap = '20px';
-        header.id = 'mode-tabs-container';
-
-        const modes = ['4key', '6key', '8key', '12key'];
-        modes.forEach(mode => {
-            const tab = document.createElement('div');
-            tab.textContent = mode.toUpperCase(); // e.g. "4KEY"
-            tab.style.padding = '10px 20px';
-            tab.style.cursor = 'pointer';
-            tab.style.color = 'white';
-            tab.style.fontWeight = 'bold';
-            tab.style.borderBottom = '3px solid transparent';
-            tab.style.transition = 'all 0.2s';
-
-            tab.addEventListener('click', () => {
-                selectedModeFilter = mode as any;
-                updateModeTabsUI();
-                playSE('se_select');
-                // Re-render Song Select to update checks/diffs
-                // Actually, renderRightColumn updates diffs. renderSongSelectInternal updates left?
-                // Left column doesn't filter by mode (shows all songs).
-                // Right column filters by mode.
-                renderRightColumn();
-            });
-
-            header.appendChild(tab);
-        });
-        songListDiv.appendChild(header);
 
         // --- Main Content Area (Columns) ---
         const contentArea = document.createElement('div');
@@ -3329,28 +3361,27 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         const rollContainer = document.createElement('div');
 
         rollContainer.id = 'song-roll-container';
-        rollContainer.style.display = 'flex';
-        rollContainer.style.flexDirection = 'column';
-        rollContainer.style.alignItems = 'center';
-        rollContainer.style.transition = 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)'; // Smooth ease-out
         rollContainer.style.position = 'absolute';
         rollContainer.style.top = '50%';
+        rollContainer.style.left = '0';
         rollContainer.style.width = '100%';
+        rollContainer.style.height = '0'; // Center point anchor
+        rollContainer.style.display = 'block';
 
         // Render ALL songs into roll
         availableSongs.forEach((song, idx) => {
             const banner = document.createElement('div');
             banner.className = 'song-banner'; // Class specifically for easier selection
-            banner.style.width = '400px';
-            banner.style.height = '100px'; // 4:1 aspect
-            banner.style.marginBottom = '20px';
-            banner.style.transition = 'all 0.3s cubic-bezier(0.25, 1, 0.5, 1)';
+            banner.style.width = '600px';
+            banner.style.height = '150px'; // 4:1 aspect scaled up
+            banner.style.marginBottom = '30px';
+            banner.style.transition = 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)'; // Faster, snappy response
             banner.style.backgroundSize = 'cover';
             banner.style.backgroundPosition = 'center';
-            banner.style.borderRadius = '10px';
-            banner.style.border = '2px solid transparent';
-            banner.style.transformOrigin = 'center';
+            banner.style.borderRadius = '12px';
+            banner.style.border = '2px solid rgba(255,255,255,0.1)';
             banner.style.cursor = 'pointer';
+            banner.style.boxSizing = 'border-box';
 
             // Image
             if (song.icon) {
@@ -3378,9 +3409,8 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         });
 
         leftCol.appendChild(rollContainer);
-        contentArea.appendChild(leftCol); // Append to contentArea
+        contentArea.appendChild(leftCol);
 
-        // --- RIGHT COLUMN: Diff Buttons ---
         const rightCol = document.createElement('div');
         rightCol.id = 'song-select-right-col';
         rightCol.style.flex = '1';
@@ -3389,40 +3419,78 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         rightCol.style.alignItems = 'center';
         rightCol.style.justifyContent = 'center';
         rightCol.style.gap = '20px';
-        rightCol.style.background = 'rgba(0,0,0,0.5)'; // Slight dim backdrop
+        rightCol.style.background = 'rgba(0,0,0,0.5)';
         rightCol.style.borderLeft = '1px solid #444';
 
-        contentArea.appendChild(rightCol); // Append to contentArea
+        contentArea.appendChild(rightCol);
     }
 
     function updateSongSelectVisuals() {
-        // Update Roll Transform
         const rollContainer = document.getElementById('song-roll-container');
-        if (rollContainer) {
-            const translateY = -((selectedSongIndex * 120) + 50);
-            rollContainer.style.transform = `translateY(${translateY}px)`;
+        if (!rollContainer || availableSongs.length === 0) return;
 
-            // Update Banner Styles
-            Array.from(rollContainer.children).forEach((child, idx) => {
-                const banner = child as HTMLElement;
-                if (idx === selectedSongIndex) {
-                    banner.style.opacity = '1.0';
-                    banner.style.transform = 'scale(1.1)';
-                    banner.style.border = '2px solid #e040fb';
-                    banner.style.boxShadow = '0 0 20px rgba(224, 64, 251, 0.5)';
-                    banner.style.zIndex = '10';
-                } else {
-                    banner.style.opacity = '0.5';
-                    banner.style.transform = 'scale(0.9)';
-                    banner.style.border = '2px solid transparent';
-                    banner.style.boxShadow = 'none';
-                    banner.style.zIndex = '1';
-                }
-            });
+        const bannerHeight = 150;
+        const bannerMargin = 30;
+        const totalStep = bannerHeight + bannerMargin;
+
+        Array.from(rollContainer.children).forEach((child, idx) => {
+            const banner = child as HTMLElement;
+            
+            // Calculate smooth difference for infinite loop
+            let diff = idx - interpolatedSongIndex;
+            const halfLen = availableSongs.length / 2;
+            if (diff > halfLen) diff -= availableSongs.length;
+            if (diff < -halfLen) diff += availableSongs.length;
+
+            const targetY = diff * totalStep;
+            const absDiff = Math.abs(diff);
+
+            // Scale and opacity based on distance from center
+            const scale = Math.max(0.6, 1.2 - (absDiff * 0.4));
+            const opacity = Math.max(0.2, 1.0 - (absDiff * 0.5));
+            const isSelected = Math.abs(diff) < 0.5;
+
+            banner.style.position = 'absolute';
+            banner.style.left = '50%';
+            banner.style.transform = `translate(-50%, ${targetY - bannerHeight/2}px) scale(${scale})`;
+            banner.style.opacity = opacity.toString();
+            banner.style.zIndex = isSelected ? '10' : '5';
+            
+            if (isSelected) {
+                banner.style.border = '4px solid #e040fb';
+                banner.style.boxShadow = '0 0 40px rgba(224, 64, 251, 0.8)';
+            } else {
+                banner.style.border = '2px solid rgba(255,255,255,0.2)';
+                banner.style.boxShadow = 'none';
+            }
+        });
+
+        // Update right column if needed (usually only on actual selection change, but here we do it to be safe)
+        // renderRightColumn();
+    }
+
+    function animateSongSelect() {
+        if (!songSelectOverlay || songSelectOverlay.style.display === 'none') {
+            isSongSelectAnimating = false;
+            return;
         }
 
-        // Re-render Right Column (Diff Buttons) because selected song changed
-        renderRightColumn();
+        isSongSelectAnimating = true;
+
+        // Smoothly interpolate towards target selectedSongIndex
+        let diff = selectedSongIndex - interpolatedSongIndex;
+        const halfLen = availableSongs.length / 2;
+        if (diff > halfLen) diff -= availableSongs.length;
+        if (diff < -halfLen) diff += availableSongs.length;
+
+        interpolatedSongIndex += diff * 0.1; // Smooth factor
+
+        // Wrap around
+        if (interpolatedSongIndex < 0) interpolatedSongIndex += availableSongs.length;
+        if (interpolatedSongIndex >= availableSongs.length) interpolatedSongIndex -= availableSongs.length;
+
+        updateSongSelectVisuals();
+        requestAnimationFrame(animateSongSelect);
     }
 
     function renderRightColumn() {
@@ -3431,6 +3499,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         rightCol.innerHTML = ''; // Clear old buttons
 
         const song = availableSongs[selectedSongIndex];
+        if (!song) return;
         const allScores = (window as any).currentAllScores || {};
 
         if (song && song.charts) {
@@ -3504,14 +3573,27 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 const label = DIFF_LABELS[diffKey];
                 const color = DIFF_COLORS[diffKey];
 
+                const isSelected = (buttonOrder.indexOf(diffKey) === selectedDiffIndex);
                 btn.style.display = 'flex';
                 btn.style.flexDirection = 'column';
                 btn.style.alignItems = 'center';
                 btn.style.cursor = matchingKey ? 'pointer' : 'default';
                 btn.style.transition = 'transform 0.2s';
+                btn.style.padding = '10px';
+                btn.style.borderRadius = '10px';
+                
+                if (isSelected) {
+                    btn.style.background = 'rgba(224, 64, 251, 0.2)';
+                    btn.style.border = '2px solid #e040fb';
+                    btn.style.transform = 'scale(1.1)';
+                } else {
+                    btn.style.background = 'transparent';
+                    btn.style.border = '2px solid transparent';
+                }
+
                 if (matchingKey) {
-                    btn.onmouseover = () => btn.style.transform = 'scale(1.1)';
-                    btn.onmouseout = () => btn.style.transform = 'scale(1.0)';
+                    btn.onmouseover = () => { if (!isSelected) btn.style.transform = 'scale(1.05)'; };
+                    btn.onmouseout = () => { if (!isSelected) btn.style.transform = 'scale(1.0)'; };
                 }
 
                 const img = document.createElement('img');
@@ -3590,7 +3672,64 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     // Keep renderSongSelectInternal as a stub or remove usage?
     // Key handler calls renderSongSelectInternal()
     function renderSongSelectInternal() {
+        // Start animation loop if not running
+        if (!isSongSelectAnimating) {
+            animateSongSelect();
+        }
+        
+        // Handle Song Preview BGM
+        const currentSong = availableSongs[selectedSongIndex];
+        if (currentSong) {
+            let previewSrc = '';
+            if (currentSong.title === '漁火') {
+                previewSrc = 'assets/曲/漁火_選曲画面.m4a';
+            } else if (currentSong.title === 'Ceviche') {
+                previewSrc = 'assets/曲/Ceviche_選曲画面.m4a';
+            }
+
+            if (previewSrc) {
+                // If this preview is already playing, do nothing
+                if (!songPreviewBGM || songPreviewBGM.src.indexOf(encodeURI(previewSrc)) === -1) {
+                    // Stop current preview if exists
+                    if (songPreviewBGM) {
+                        const prev = songPreviewBGM;
+                        fadeVolume(prev, 0, 800, () => {
+                            prev.pause();
+                        });
+                    }
+                    // Fade out general selection BGM
+                    if (currentBGM) {
+                        fadeVolume(currentBGM, 0, 800);
+                    }
+                    
+                    songPreviewBGM = new Audio(previewSrc);
+                    songPreviewBGM.loop = true;
+                    songPreviewBGM.volume = 0;
+                    songPreviewBGM.play().catch(e => console.log('Preview play blocked', e));
+                    fadeVolume(songPreviewBGM, 0.5, 800);
+                }
+            } else {
+                // No special preview: stop any songPreviewBGM and resume general BGM
+                if (songPreviewBGM) {
+                    const prev = songPreviewBGM;
+                    fadeVolume(prev, 0, 800, () => {
+                        prev.pause();
+                    });
+                    songPreviewBGM = null;
+                }
+                if (AUDIO_ASSETS.bgm_select) {
+                    if (AUDIO_ASSETS.bgm_select.paused) {
+                        AUDIO_ASSETS.bgm_select.volume = 0;
+                        playBGM('bgm_select');
+                    } else {
+                        fadeVolume(AUDIO_ASSETS.bgm_select, 0.5, 800);
+                    }
+                }
+            }
+        }
+
         updateSongSelectVisuals();
+        renderRightColumn();
     }
 
     // No need for scrollIntoView anymore

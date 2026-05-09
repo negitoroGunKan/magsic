@@ -365,7 +365,6 @@
       let startTime = performance.now();
       function animLoop(time) {
         if (startScreen.style.display === "none") {
-          titleBgVideo.pause();
           titleAnimRequestId = null;
           return;
         }
@@ -386,7 +385,6 @@
         startTitleLoop();
       } else {
         startScreen.style.display = "none";
-        if (titleBgVideo) titleBgVideo.pause();
       }
     }
     loadSkin();
@@ -477,7 +475,7 @@
         openSongSelect();
       });
     }
-    let selectedModeFilter = "8key";
+    let selectedModeFilter = "6key";
     const menuOverlay = document.getElementById("menu-overlay");
     const menuBtnPlay = document.getElementById("menu-btn-play");
     const menuBtnDani = document.getElementById("menu-btn-dani");
@@ -576,6 +574,9 @@
         controlsDiv.style.display = "block";
         controlsDiv.classList.remove("show-options");
       }
+      if (menuOverlay) {
+        menuOverlay.style.display = "none";
+      }
       if (songSelectOverlay) {
         songSelectOverlay.style.display = "flex";
         console.log("songSelectOverlay display set to FLEX");
@@ -626,7 +627,7 @@
       container.style.padding = "10px";
       container.style.background = "#222";
       container.style.borderRadius = "8px";
-      ["4key", "6key", "8key", "12key"].forEach((mode) => {
+      ["6key"].forEach((mode) => {
         const btn = document.createElement("button");
         btn.textContent = mode.toUpperCase();
         btn.className = "mode-tab-btn";
@@ -1173,9 +1174,25 @@
           SKIN[a.key] = img;
         };
       });
-      if (songSelectOverlay) {
-        songSelectOverlay.style.background = "rgba(0,0,0,0.95)";
-      }
+    }
+    let songPreviewBGM = null;
+    let interpolatedSongIndex = 0;
+    let isSongSelectAnimating = false;
+    function fadeVolume(audio2, target, duration, callback) {
+      const start = audio2.volume;
+      const startTime = performance.now();
+      const anim = (time) => {
+        const elapsed = time - startTime;
+        const p = Math.min(elapsed / duration, 1);
+        audio2.volume = start + (target - start) * p;
+        if (p < 1) {
+          requestAnimationFrame(anim);
+        } else {
+          audio2.volume = target;
+          if (callback) callback();
+        }
+      };
+      requestAnimationFrame(anim);
     }
     const AUDIO_ASSETS = {
       bgm_title: null,
@@ -1218,22 +1235,42 @@
       const nextBGM = AUDIO_ASSETS[key];
       if (!nextBGM) return;
       if (currentBGM === nextBGM) {
-        if (currentBGM.paused) currentBGM.play().catch((e) => console.log("Autoplay blocked", e));
+        if (currentBGM.paused) {
+          currentBGM.volume = 0;
+          currentBGM.play().catch((e) => console.log("Autoplay blocked", e));
+          fadeVolume(currentBGM, 0.5, 800);
+        }
         return;
       }
       if (currentBGM) {
-        currentBGM.pause();
-        currentBGM.currentTime = 0;
+        const prevBGM = currentBGM;
+        fadeVolume(prevBGM, 0, 800, () => {
+          prevBGM.pause();
+          prevBGM.currentTime = 0;
+        });
       }
       currentBGM = nextBGM;
       currentBGM.currentTime = 0;
+      currentBGM.volume = 0;
       currentBGM.play().catch((e) => console.log("Autoplay blocked", e));
+      fadeVolume(currentBGM, 0.5, 800);
     }
     function stopBGM() {
       if (currentBGM) {
-        currentBGM.pause();
-        currentBGM.currentTime = 0;
+        const prevBGM = currentBGM;
+        fadeVolume(prevBGM, 0, 500, () => {
+          prevBGM.pause();
+          prevBGM.currentTime = 0;
+        });
         currentBGM = null;
+      }
+      if (songPreviewBGM) {
+        const prevPreview = songPreviewBGM;
+        fadeVolume(prevPreview, 0, 500, () => {
+          prevPreview.pause();
+          prevPreview.currentTime = 0;
+        });
+        songPreviewBGM = null;
       }
     }
     function playSE(key) {
@@ -1761,11 +1798,14 @@ AUTO`;
     }
     function draw() {
       if (!ctx) return;
+      if (!isPlaying) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        requestAnimationFrame(draw);
+        return;
+      }
       const currentTime = getAudioTime();
       const currentTimeMs = currentTime * 1e3;
-      if (!isPlaying && SKIN.titleBg) {
-        ctx.drawImage(SKIN.titleBg, 0, 0, canvas.width, canvas.height);
-      } else if (isPlaying) {
+      if (isPlaying) {
         if (bgVideo && isVideoReady) {
           ctx.drawImage(bgVideo, 0, 0, canvas.width, canvas.height);
         } else if (currentSongBackground) {
@@ -1777,9 +1817,6 @@ AUTO`;
           ctx.fillStyle = "rgba(0,0,0,0.5)";
           ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
-      } else {
-        ctx.fillStyle = "#222";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
       VISUAL_LANES.forEach((lane) => {
         if (SKIN["lane"]) {
@@ -2553,6 +2590,7 @@ AUTO`;
       // Purple
     };
     let selectedSongIndex = 0;
+    let selectedDiffIndex = 0;
     let availableSongs = [];
     window.addEventListener("keydown", (e) => {
       if (songSelectOverlay.style.display !== "none") {
@@ -2565,30 +2603,53 @@ AUTO`;
           return;
         }
         console.log("Song Select Nav Key:", e.key);
-        if (e.key.toLowerCase() === "k") {
+        const updateDiff = (delta) => {
+          selectedDiffIndex = (selectedDiffIndex + delta + 5) % 5;
+          renderRightColumn();
+          playSE("se_select");
+        };
+        const startSelected = () => {
+          const song = availableSongs[selectedSongIndex];
+          if (!song || !song.charts) return;
+          const buttonOrder = ["no", "st", "ad", "pr", "et"];
+          const diffKey = buttonOrder[selectedDiffIndex];
+          const chartInfos = song.chartInfos || {};
+          const charts = song.charts;
+          const matchingKey = Object.keys(charts).find((k) => {
+            const filename = charts[k];
+            const info = chartInfos[filename];
+            let mode = "8key";
+            if (filename.toLowerCase().includes("4k")) mode = "4key";
+            else if (filename.toLowerCase().includes("6k")) mode = "6key";
+            else if (filename.toLowerCase().includes("12k")) mode = "12key";
+            if (mode !== selectedModeFilter) return false;
+            let effectiveDiff = info && info.difficulty ? info.difficulty : k.split("_")[0];
+            return effectiveDiff === diffKey;
+          });
+          if (matchingKey) {
+            playSE("se_decide");
+            loadSong(song.folder, song.charts[matchingKey], song.audio);
+          }
+        };
+        if (e.key.toLowerCase() === "k" || e.key === "ArrowDown") {
+          e.preventDefault();
           selectedSongIndex = (selectedSongIndex + 1) % availableSongs.length;
           renderSongSelectInternal();
           playSE("se_select");
-        } else if (e.key.toLowerCase() === "d") {
+        } else if (e.key.toLowerCase() === "d" || e.key === "ArrowUp") {
+          e.preventDefault();
           selectedSongIndex = (selectedSongIndex - 1 + availableSongs.length) % availableSongs.length;
           renderSongSelectInternal();
           playSE("se_select");
-        } else if (e.key.toLowerCase() === "s") {
-          const modes = ["4key", "6key", "8key", "12key"];
-          const curIdx = modes.indexOf(selectedModeFilter);
-          const nextIdx = (curIdx - 1 + modes.length) % modes.length;
-          selectedModeFilter = modes[nextIdx];
-          updateModeTabsUI();
-          loadSongList();
-          playSE("se_select");
-        } else if (e.key.toLowerCase() === "l") {
-          const modes = ["4key", "6key", "8key", "12key"];
-          const curIdx = modes.indexOf(selectedModeFilter);
-          const nextIdx = (curIdx + 1) % modes.length;
-          selectedModeFilter = modes[nextIdx];
-          updateModeTabsUI();
-          loadSongList();
-          playSE("se_select");
+        } else if (e.key.toLowerCase() === "l" || e.key === "ArrowRight") {
+          e.preventDefault();
+          updateDiff(1);
+        } else if (e.key.toLowerCase() === "s" || e.key === "ArrowLeft") {
+          e.preventDefault();
+          updateDiff(-1);
+        } else if (e.key === "Enter" || e.key.toLowerCase() === "f" || e.key.toLowerCase() === "j") {
+          e.preventDefault();
+          startSelected();
         } else if (e.key === " " && !e.repeat) {
           if (controlsDiv) {
             controlsDiv.classList.add("show-options");
@@ -2654,6 +2715,7 @@ AUTO`;
         window.currentAllScores = allScores;
         initSongSelect();
         updateSongSelectVisuals();
+        renderRightColumn();
         isInfosLoading = false;
       } catch (e) {
         songListDiv.innerHTML = '<p style="color:red">Failed to load song list. Make sure "songs/list.json" exists.</p>';
@@ -2665,35 +2727,6 @@ AUTO`;
       songListDiv.style.display = "flex";
       songListDiv.style.overflow = "hidden";
       songListDiv.style.flexDirection = "column";
-      const header = document.createElement("div");
-      header.style.width = "100%";
-      header.style.height = "60px";
-      header.style.background = "#222";
-      header.style.borderBottom = "1px solid #444";
-      header.style.display = "flex";
-      header.style.justifyContent = "center";
-      header.style.alignItems = "center";
-      header.style.gap = "20px";
-      header.id = "mode-tabs-container";
-      const modes = ["4key", "6key", "8key", "12key"];
-      modes.forEach((mode) => {
-        const tab = document.createElement("div");
-        tab.textContent = mode.toUpperCase();
-        tab.style.padding = "10px 20px";
-        tab.style.cursor = "pointer";
-        tab.style.color = "white";
-        tab.style.fontWeight = "bold";
-        tab.style.borderBottom = "3px solid transparent";
-        tab.style.transition = "all 0.2s";
-        tab.addEventListener("click", () => {
-          selectedModeFilter = mode;
-          updateModeTabsUI();
-          playSE("se_select");
-          renderRightColumn();
-        });
-        header.appendChild(tab);
-      });
-      songListDiv.appendChild(header);
       const contentArea = document.createElement("div");
       contentArea.style.flex = "1";
       contentArea.style.display = "flex";
@@ -2711,26 +2744,25 @@ AUTO`;
       leftCol.style.position = "relative";
       const rollContainer = document.createElement("div");
       rollContainer.id = "song-roll-container";
-      rollContainer.style.display = "flex";
-      rollContainer.style.flexDirection = "column";
-      rollContainer.style.alignItems = "center";
-      rollContainer.style.transition = "transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)";
       rollContainer.style.position = "absolute";
       rollContainer.style.top = "50%";
+      rollContainer.style.left = "0";
       rollContainer.style.width = "100%";
+      rollContainer.style.height = "0";
+      rollContainer.style.display = "block";
       availableSongs.forEach((song, idx) => {
         const banner = document.createElement("div");
         banner.className = "song-banner";
-        banner.style.width = "400px";
-        banner.style.height = "100px";
-        banner.style.marginBottom = "20px";
-        banner.style.transition = "all 0.3s cubic-bezier(0.25, 1, 0.5, 1)";
+        banner.style.width = "600px";
+        banner.style.height = "150px";
+        banner.style.marginBottom = "30px";
+        banner.style.transition = "all 0.4s cubic-bezier(0.16, 1, 0.3, 1)";
         banner.style.backgroundSize = "cover";
         banner.style.backgroundPosition = "center";
-        banner.style.borderRadius = "10px";
-        banner.style.border = "2px solid transparent";
-        banner.style.transformOrigin = "center";
+        banner.style.borderRadius = "12px";
+        banner.style.border = "2px solid rgba(255,255,255,0.1)";
         banner.style.cursor = "pointer";
+        banner.style.boxSizing = "border-box";
         if (song.icon) {
           banner.style.backgroundImage = `url('${song.icon}')`;
         } else {
@@ -2766,33 +2798,57 @@ AUTO`;
     }
     function updateSongSelectVisuals() {
       const rollContainer = document.getElementById("song-roll-container");
-      if (rollContainer) {
-        const translateY = -(selectedSongIndex * 120 + 50);
-        rollContainer.style.transform = `translateY(${translateY}px)`;
-        Array.from(rollContainer.children).forEach((child, idx) => {
-          const banner = child;
-          if (idx === selectedSongIndex) {
-            banner.style.opacity = "1.0";
-            banner.style.transform = "scale(1.1)";
-            banner.style.border = "2px solid #e040fb";
-            banner.style.boxShadow = "0 0 20px rgba(224, 64, 251, 0.5)";
-            banner.style.zIndex = "10";
-          } else {
-            banner.style.opacity = "0.5";
-            banner.style.transform = "scale(0.9)";
-            banner.style.border = "2px solid transparent";
-            banner.style.boxShadow = "none";
-            banner.style.zIndex = "1";
-          }
-        });
+      if (!rollContainer || availableSongs.length === 0) return;
+      const bannerHeight = 150;
+      const bannerMargin = 30;
+      const totalStep = bannerHeight + bannerMargin;
+      Array.from(rollContainer.children).forEach((child, idx) => {
+        const banner = child;
+        let diff = idx - interpolatedSongIndex;
+        const halfLen = availableSongs.length / 2;
+        if (diff > halfLen) diff -= availableSongs.length;
+        if (diff < -halfLen) diff += availableSongs.length;
+        const targetY = diff * totalStep;
+        const absDiff = Math.abs(diff);
+        const scale = Math.max(0.6, 1.2 - absDiff * 0.4);
+        const opacity = Math.max(0.2, 1 - absDiff * 0.5);
+        const isSelected = Math.abs(diff) < 0.5;
+        banner.style.position = "absolute";
+        banner.style.left = "50%";
+        banner.style.transform = `translate(-50%, ${targetY - bannerHeight / 2}px) scale(${scale})`;
+        banner.style.opacity = opacity.toString();
+        banner.style.zIndex = isSelected ? "10" : "5";
+        if (isSelected) {
+          banner.style.border = "4px solid #e040fb";
+          banner.style.boxShadow = "0 0 40px rgba(224, 64, 251, 0.8)";
+        } else {
+          banner.style.border = "2px solid rgba(255,255,255,0.2)";
+          banner.style.boxShadow = "none";
+        }
+      });
+    }
+    function animateSongSelect() {
+      if (!songSelectOverlay || songSelectOverlay.style.display === "none") {
+        isSongSelectAnimating = false;
+        return;
       }
-      renderRightColumn();
+      isSongSelectAnimating = true;
+      let diff = selectedSongIndex - interpolatedSongIndex;
+      const halfLen = availableSongs.length / 2;
+      if (diff > halfLen) diff -= availableSongs.length;
+      if (diff < -halfLen) diff += availableSongs.length;
+      interpolatedSongIndex += diff * 0.1;
+      if (interpolatedSongIndex < 0) interpolatedSongIndex += availableSongs.length;
+      if (interpolatedSongIndex >= availableSongs.length) interpolatedSongIndex -= availableSongs.length;
+      updateSongSelectVisuals();
+      requestAnimationFrame(animateSongSelect);
     }
     function renderRightColumn() {
       const rightCol = document.getElementById("song-select-right-col");
       if (!rightCol) return;
       rightCol.innerHTML = "";
       const song = availableSongs[selectedSongIndex];
+      if (!song) return;
       const allScores = window.currentAllScores || {};
       if (song && song.charts) {
         if (song.icon) {
@@ -2842,14 +2898,29 @@ AUTO`;
           });
           const btn = document.createElement("div");
           const color = DIFF_COLORS[diffKey];
+          const isSelected = buttonOrder.indexOf(diffKey) === selectedDiffIndex;
           btn.style.display = "flex";
           btn.style.flexDirection = "column";
           btn.style.alignItems = "center";
           btn.style.cursor = matchingKey ? "pointer" : "default";
           btn.style.transition = "transform 0.2s";
+          btn.style.padding = "10px";
+          btn.style.borderRadius = "10px";
+          if (isSelected) {
+            btn.style.background = "rgba(224, 64, 251, 0.2)";
+            btn.style.border = "2px solid #e040fb";
+            btn.style.transform = "scale(1.1)";
+          } else {
+            btn.style.background = "transparent";
+            btn.style.border = "2px solid transparent";
+          }
           if (matchingKey) {
-            btn.onmouseover = () => btn.style.transform = "scale(1.1)";
-            btn.onmouseout = () => btn.style.transform = "scale(1.0)";
+            btn.onmouseover = () => {
+              if (!isSelected) btn.style.transform = "scale(1.05)";
+            };
+            btn.onmouseout = () => {
+              if (!isSelected) btn.style.transform = "scale(1.0)";
+            };
           }
           const img = document.createElement("img");
           let imgSrc = "";
@@ -2907,7 +2978,54 @@ AUTO`;
       }
     }
     function renderSongSelectInternal() {
+      if (!isSongSelectAnimating) {
+        animateSongSelect();
+      }
+      const currentSong = availableSongs[selectedSongIndex];
+      if (currentSong) {
+        let previewSrc = "";
+        if (currentSong.title === "漁火") {
+          previewSrc = "assets/曲/漁火_選曲画面.m4a";
+        } else if (currentSong.title === "Ceviche") {
+          previewSrc = "assets/曲/Ceviche_選曲画面.m4a";
+        }
+        if (previewSrc) {
+          if (!songPreviewBGM || songPreviewBGM.src.indexOf(encodeURI(previewSrc)) === -1) {
+            if (songPreviewBGM) {
+              const prev = songPreviewBGM;
+              fadeVolume(prev, 0, 800, () => {
+                prev.pause();
+              });
+            }
+            if (currentBGM) {
+              fadeVolume(currentBGM, 0, 800);
+            }
+            songPreviewBGM = new Audio(previewSrc);
+            songPreviewBGM.loop = true;
+            songPreviewBGM.volume = 0;
+            songPreviewBGM.play().catch((e) => console.log("Preview play blocked", e));
+            fadeVolume(songPreviewBGM, 0.5, 800);
+          }
+        } else {
+          if (songPreviewBGM) {
+            const prev = songPreviewBGM;
+            fadeVolume(prev, 0, 800, () => {
+              prev.pause();
+            });
+            songPreviewBGM = null;
+          }
+          if (AUDIO_ASSETS.bgm_select) {
+            if (AUDIO_ASSETS.bgm_select.paused) {
+              AUDIO_ASSETS.bgm_select.volume = 0;
+              playBGM("bgm_select");
+            } else {
+              fadeVolume(AUDIO_ASSETS.bgm_select, 0.5, 800);
+            }
+          }
+        }
+      }
       updateSongSelectVisuals();
+      renderRightColumn();
     }
     let currentChartFilename = "";
     let currentSongFolder = "";

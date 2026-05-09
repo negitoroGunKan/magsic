@@ -312,5 +312,21 @@
             "pr_6k": "empty_pr_6k.json",
             "et_6k": "empty_et_6k.json"
         }
+    },
+    {
+        "id": "kaijin_guhai",
+        "title": "海神寓拝",
+        "artist": "sasakure.UK",
+        "bpm": 200,
+        "folder": "kaijin_guhai",
+        "audio": "audio.mp3",
+        "video": "pv.mp4",
+        "charts": {
+            "no_6k": "empty_no_6k.json",
+            "st_6k": "empty_st_6k.json",
+            "ad_6k": "empty_ad_6k.json",
+            "pr_6k": "kaijin_guhai_pr_6k.json",
+            "et_6k": "kaijin_guhai_et_6k.json"
+        }
     }
 ]
