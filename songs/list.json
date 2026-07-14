@@ -69,7 +69,8 @@
             "no_6k": "empty_no_6k.json",
             "st_6k": "empty_st_6k.json",
             "ad_6k": "empty_ad_6k.json",
-            "pr_6k": "empty_pr_6k.json"
+            "pr_6k": "empty_pr_6k.json",
+            "et_4k": "knight_of_nights_et_4k.json"
         },
         "icon": "assets/曲アイコン/選曲ロゴ-ナイトオブナイツ.png"
     },
@@ -90,7 +91,8 @@
             "st_6k": "empty_st_6k.json",
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json",
-            "et_6k": "empty_et_6k.json"
+            "et_6k": "empty_et_6k.json",
+            "pr_12k": "calamity_fortune_pr_12k.json"
         }
     },
     {
@@ -105,7 +107,11 @@
             "no_6k": "empty_no_6k.json",
             "st_6k": "empty_st_6k.json",
             "ad_6k": "empty_ad_6k.json",
-            "pr_6k": "empty_pr_6k.json"
+            "pr_6k": "empty_pr_6k.json",
+            "ad_8k": "poison_and_or_affection_ad_8k.json",
+            "no_8k": "poison_and_or_affection_no_8k.json",
+            "pr_8k": "poison_and_or_affection_pr_8k.json",
+            "st_8k": "poison_and_or_affection_st_8k.json"
         }
     },
     {
@@ -120,8 +126,8 @@
             "et_6k": "chromania_et_6k.json",
             "no_6k": "empty_no_6k.json",
             "st_6k": "empty_st_6k.json",
-            "ad_6k": "empty_ad_6k.json",
-            "pr_6k": "empty_pr_6k.json"
+            "ad_6k": "chromania_ad_6k.json",
+            "pr_6k": "chromania_pr_6k.json"
         }
     },
     {
@@ -168,7 +174,8 @@
             "et_6k": "shining_star_et_6k.json",
             "st_6k": "empty_st_6k.json",
             "ad_6k": "empty_ad_6k.json",
-            "pr_6k": "empty_pr_6k.json"
+            "pr_6k": "empty_pr_6k.json",
+            "no_6k": "shining_star_no_6k.json"
         }
     },
     {
@@ -200,8 +207,9 @@
             "pr_6k": "skairan_pr_6k.json",
             "no_6k": "empty_no_6k.json",
             "st_6k": "empty_st_6k.json",
-            "ad_6k": "empty_ad_6k.json",
-            "et_6k": "empty_et_6k.json"
+            "ad_6k": "skairan_ad_6k.json",
+            "et_6k": "empty_et_6k.json",
+            "pr_12k": "skairan_pr_12k.json"
         },
         "icon": "assets/曲アイコン/アイコン「寒鰤」.png"
     },
@@ -234,7 +242,8 @@
             "pr_6k": "isaribi_pr_6k.json",
             "et_6k": "isaribi_et_6k.json",
             "et_12k": "isaribi_et_12k.json",
-            "no_6k": "empty_no_6k.json"
+            "no_6k": "empty_no_6k.json",
+            "no": "chart.json"
         },
         "icon": "assets/曲アイコン/アイコン「漁火」.png"
     },
@@ -250,7 +259,7 @@
             "no_6k": "empty_no_6k.json",
             "st_6k": "empty_st_6k.json",
             "ad_6k": "empty_ad_6k.json",
-            "pr_6k": "empty_pr_6k.json"
+            "pr_6k": "toumou_pr_6k.json"
         }
     },
     {
@@ -280,7 +289,8 @@
             "st_6k": "empty_st_6k.json",
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "hotaru_no_hikari_pr_6k.json",
-            "et_6k": "hotaru_no_hikari_et_6k.json"
+            "et_6k": "hotaru_no_hikari_et_6k.json",
+            "no": "chart.json"
         }
     },
     {
@@ -295,7 +305,8 @@
             "st_6k": "empty_st_6k.json",
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json",
-            "et_6k": "empty_et_6k.json"
+            "et_6k": "empty_et_6k.json",
+            "no": "chart.json"
         }
     },
     {
@@ -310,7 +321,8 @@
             "st_6k": "empty_st_6k.json",
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json",
-            "et_6k": "empty_et_6k.json"
+            "et_6k": "lets_themepark_et_6k.json",
+            "no": "chart.json"
         }
     },
     {
@@ -327,6 +339,277 @@
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "kaijin_guhai_pr_6k.json",
             "et_6k": "kaijin_guhai_et_6k.json"
+        }
+    },
+    {
+        "id": "afmar",
+        "title": "AFmAR",
+        "artist": "Unknown",
+        "bpm": 150,
+        "folder": "AFmAR",
+        "audio": "AfmA.m4a",
+        "charts": {
+            "no_6k": "empty_no_6k.json",
+            "st_6k": "empty_st_6k.json",
+            "ad_6k": "empty_ad_6k.json",
+            "pr_6k": "empty_pr_6k.json",
+            "et_6k": "afmar_et_6k.json"
+        }
+    },
+    {
+        "id": "aleph-0",
+        "title": "aleph 0",
+        "artist": "Unknown",
+        "bpm": 150,
+        "folder": "aleph-0",
+        "audio": "aleph-0.mp3",
+        "charts": {
+            "no_6k": "empty_no_6k.json",
+            "st_6k": "empty_st_6k.json",
+            "ad_6k": "empty_ad_6k.json",
+            "pr_6k": "empty_pr_6k.json",
+            "et_6k": "aleph-0_et_6k.json"
+        }
+    },
+    {
+        "id": "Battle02",
+        "title": "Battle02",
+        "artist": "Unknown",
+        "bpm": 150,
+        "folder": "Battle02",
+        "audio": "Battle02.mp3",
+        "charts": {
+            "no_6k": "empty_no_6k.json",
+            "st_6k": "empty_st_6k.json",
+            "ad_6k": "empty_ad_6k.json",
+            "pr_6k": "empty_pr_6k.json",
+            "et_6k": "Battle02_et_6k.json"
+        }
+    },
+    {
+        "id": "Elemental-Sage",
+        "title": "Elemental Sage",
+        "artist": "Unknown",
+        "bpm": 150,
+        "folder": "Elemental-Sage",
+        "audio": "Elemental-Sage.mp3",
+        "charts": {
+            "no_6k": "empty_no_6k.json",
+            "st_6k": "empty_st_6k.json",
+            "ad_6k": "empty_ad_6k.json",
+            "pr_6k": "empty_pr_6k.json",
+            "et_6k": "Elemental-Sage_et_6k.json"
+        }
+    },
+    {
+        "id": "Fight-Against-the-Thunderstorm",
+        "title": "Fight Against the Thunderstorm",
+        "artist": "Unknown",
+        "bpm": 150,
+        "folder": "Fight-Against-the-Thunderstorm",
+        "audio": "Fight-Against-the-Thunderstorm.mp3",
+        "charts": {
+            "no_6k": "empty_no_6k.json",
+            "st_6k": "empty_st_6k.json",
+            "ad_6k": "empty_ad_6k.json",
+            "pr_6k": "empty_pr_6k.json",
+            "et_6k": "Fight-Against-the-Thunderstorm_et_6k.json"
+        }
+    },
+    {
+        "id": "Le-Cirque-du-Diable",
+        "title": "Le Cirque du Diable",
+        "artist": "Unknown",
+        "bpm": 150,
+        "folder": "Le-Cirque-du-Diable",
+        "audio": "Le-Cirque-du-Diable.mp3",
+        "charts": {
+            "no_6k": "empty_no_6k.json",
+            "st_6k": "empty_st_6k.json",
+            "ad_6k": "empty_ad_6k.json",
+            "pr_6k": "empty_pr_6k.json",
+            "et_6k": "Le-Cirque-du-Diable_et_6k.json"
+        }
+    },
+    {
+        "id": "Path-in-the-Sky",
+        "title": "Path in the Sky",
+        "artist": "Unknown",
+        "bpm": 150,
+        "folder": "Path-in-the-Sky",
+        "audio": "Path-in-the-Sky.mp3",
+        "charts": {
+            "no_6k": "empty_no_6k.json",
+            "st_6k": "empty_st_6k.json",
+            "ad_6k": "empty_ad_6k.json",
+            "pr_6k": "empty_pr_6k.json",
+            "et_6k": "empty_et_6k.json"
+        }
+    },
+    {
+        "id": "StarangeNight",
+        "title": "StarangeNight",
+        "artist": "Unknown",
+        "bpm": 150,
+        "folder": "StarangeNight",
+        "audio": "StarangeNight.wav",
+        "charts": {
+            "no_6k": "empty_no_6k.json",
+            "st_6k": "empty_st_6k.json",
+            "ad_6k": "empty_ad_6k.json",
+            "pr_6k": "empty_pr_6k.json",
+            "et_6k": "StarangeNight_et_6k.json"
+        }
+    },
+    {
+        "id": "The-Charlatan",
+        "title": "The Charlatan",
+        "artist": "Unknown",
+        "bpm": 150,
+        "folder": "The-Charlatan",
+        "audio": "The-Charlatan.mp3",
+        "charts": {
+            "no_6k": "empty_no_6k.json",
+            "st_6k": "empty_st_6k.json",
+            "ad_6k": "empty_ad_6k.json",
+            "pr_6k": "empty_pr_6k.json",
+            "et_6k": "empty_et_6k.json"
+        }
+    },
+    {
+        "id": "そんな雨上がり",
+        "title": "そんな雨上がり",
+        "artist": "Unknown",
+        "bpm": 150,
+        "folder": "そんな雨上がり",
+        "audio": "そんな雨上がり.wav",
+        "charts": {
+            "no_6k": "empty_no_6k.json",
+            "st_6k": "empty_st_6k.json",
+            "ad_6k": "empty_ad_6k.json",
+            "pr_6k": "empty_pr_6k.json",
+            "et_6k": "そんな雨上がり_et_6k.json"
+        }
+    },
+    {
+        "id": "夜明けのプレリュード",
+        "title": "夜明けのプレリュード",
+        "artist": "Unknown",
+        "bpm": 150,
+        "folder": "夜明けのプレリュード",
+        "audio": "夜明けのプレリュード.wav",
+        "charts": {
+            "no_6k": "empty_no_6k.json",
+            "st_6k": "empty_st_6k.json",
+            "ad_6k": "empty_ad_6k.json",
+            "pr_6k": "empty_pr_6k.json",
+            "et_6k": "empty_et_6k.json"
+        }
+    },
+    {
+        "id": "天使迎撃戦",
+        "title": "天使迎撃戦",
+        "artist": "Unknown",
+        "bpm": 150,
+        "folder": "天使迎撃戦",
+        "audio": "天使迎撃戦.mp3",
+        "charts": {
+            "no_6k": "empty_no_6k.json",
+            "st_6k": "empty_st_6k.json",
+            "ad_6k": "empty_ad_6k.json",
+            "pr_6k": "empty_pr_6k.json",
+            "et_6k": "empty_et_6k.json"
+        }
+    },
+    {
+        "id": "差引き零",
+        "title": "差引き零",
+        "artist": "Unknown",
+        "bpm": 150,
+        "folder": "差引き零",
+        "audio": "差引き零.wav",
+        "charts": {
+            "no_6k": "empty_no_6k.json",
+            "st_6k": "empty_st_6k.json",
+            "ad_6k": "empty_ad_6k.json",
+            "pr_6k": "empty_pr_6k.json",
+            "et_6k": "empty_et_6k.json"
+        }
+    },
+    {
+        "id": "熱異常",
+        "title": "熱異常",
+        "artist": "Unknown",
+        "bpm": 150,
+        "folder": "熱異常",
+        "audio": "netsu_ijo.mp3",
+        "charts": {
+            "no_6k": "empty_no_6k.json",
+            "st_6k": "empty_st_6k.json",
+            "ad_6k": "empty_ad_6k.json",
+            "pr_6k": "empty_pr_6k.json",
+            "et_6k": "empty_et_6k.json",
+            "no": "chart.json"
+        }
+    },
+    {
+        "id": "赫月の魔女",
+        "title": "赫月の魔女",
+        "artist": "Unknown",
+        "bpm": 150,
+        "folder": "赫月の魔女",
+        "audio": "赫月の魔女.mp3",
+        "charts": {
+            "no_6k": "empty_no_6k.json",
+            "st_6k": "empty_st_6k.json",
+            "ad_6k": "empty_ad_6k.json",
+            "pr_6k": "empty_pr_6k.json",
+            "et_6k": "empty_et_6k.json"
+        }
+    },
+    {
+        "id": "風の列車",
+        "title": "風の列車",
+        "artist": "Unknown",
+        "bpm": 150,
+        "folder": "風の列車",
+        "audio": "風の列車.wav",
+        "charts": {
+            "no_6k": "empty_no_6k.json",
+            "st_6k": "empty_st_6k.json",
+            "ad_6k": "empty_ad_6k.json",
+            "pr_6k": "empty_pr_6k.json",
+            "et_6k": "empty_et_6k.json"
+        }
+    },
+    {
+        "id": "鳴神の魔女",
+        "title": "鳴神の魔女",
+        "artist": "Unknown",
+        "bpm": 150,
+        "folder": "鳴神の魔女",
+        "audio": "鳴神の魔女.mp3",
+        "charts": {
+            "no_6k": "empty_no_6k.json",
+            "st_6k": "empty_st_6k.json",
+            "ad_6k": "empty_ad_6k.json",
+            "pr_6k": "empty_pr_6k.json",
+            "et_6k": "empty_et_6k.json"
+        }
+    },
+    {
+        "id": "黒曜の羽根舞う",
+        "title": "黒曜の羽根舞う",
+        "artist": "Unknown",
+        "bpm": 150,
+        "folder": "黒曜の羽根舞う",
+        "audio": "黒曜の羽根舞う.mp3",
+        "charts": {
+            "no_6k": "empty_no_6k.json",
+            "st_6k": "empty_st_6k.json",
+            "ad_6k": "empty_ad_6k.json",
+            "pr_6k": "empty_pr_6k.json",
+            "et_6k": "empty_et_6k.json"
         }
     }
 ]
