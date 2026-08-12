@@ -341,3 +341,141 @@ server.listen(PORT, () => {
     console.log(`Server listening on http://localhost:${PORT}`);
     console.log('Use Ctrl+C to stop.');
 });
+
+// --- WebSocket Battle Matching & Transit Server ---
+const WebSocket = require('ws');
+const wss = new WebSocket.Server({ server });
+
+// Room management
+// Structure: { roomId: { id: string, p1: ws, p2: ws } }
+let rooms = {};
+let waitingWs = null; // Client waiting for match
+
+wss.on('connection', (ws) => {
+    console.log('[WS] New Client Connected');
+    ws.room = null;
+    ws.role = null; // 'p1' or 'p2'
+    ws.playerInfo = { nickname: 'Guest', icon: '' };
+
+    ws.on('message', (message) => {
+        try {
+            const data = JSON.parse(message);
+            
+            if (data.type === 'join') {
+                ws.playerInfo.nickname = data.nickname || 'Guest';
+                ws.playerInfo.icon = data.icon || '';
+                
+                // Matching logic
+                if (waitingWs && waitingWs.readyState === WebSocket.OPEN && waitingWs !== ws) {
+                    // Match found! Create a room
+                    const roomId = 'room_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+                    const room = {
+                        id: roomId,
+                        p1: waitingWs,
+                        p2: ws
+                    };
+                    rooms[roomId] = room;
+                    
+                    waitingWs.room = room;
+                    waitingWs.role = 'p1';
+                    ws.room = room;
+                    ws.role = 'p2';
+                    
+                    waitingWs = null; // Reset waiting queue
+                    
+                    // Send MATCHED status to both
+                    room.p1.send(JSON.stringify({
+                        type: 'matched',
+                        role: 'p1',
+                        opponent: ws.playerInfo
+                    }));
+                    room.p2.send(JSON.stringify({
+                        type: 'matched',
+                        role: 'p2',
+                        opponent: room.p1.playerInfo
+                    }));
+                    console.log(`[WS] Match created in ${roomId}: ${room.p1.playerInfo.nickname} vs ${room.p2.playerInfo.nickname}`);
+                } else {
+                    // No one waiting (or it was the same client requesting double join, prevent self-match)
+                    waitingWs = ws;
+                    ws.send(JSON.stringify({ type: 'waiting' }));
+                    console.log(`[WS] Client ${ws.playerInfo.nickname} is waiting for match...`);
+                }
+            }
+            
+            else if (data.type === 'cursor_move') {
+                sendToOpponent(ws, {
+                    type: 'cursor_move',
+                    index: data.index
+                });
+            }
+            
+            else if (data.type === 'diff_change') {
+                sendToOpponent(ws, {
+                    type: 'diff_change',
+                    index: data.index
+                });
+            }
+            
+            else if (data.type === 'song_decide') {
+                sendToOpponent(ws, {
+                    type: 'song_decide',
+                    songFolder: data.songFolder,
+                    chartName: data.chartName,
+                    audioName: data.audioName
+                });
+            }
+            
+            else if (data.type === 'play_state') {
+                sendToOpponent(ws, {
+                    type: 'play_state',
+                    score: data.score,
+                    health: data.health,
+                    combo: data.combo,
+                    clearRate: data.clearRate
+                });
+            }
+            
+            else if (data.type === 'results') {
+                sendToOpponent(ws, {
+                    type: 'results',
+                    score: data.score,
+                    clearRate: data.clearRate,
+                    maxCombo: data.maxCombo,
+                    isClear: data.isClear,
+                    rank: data.rank
+                });
+            }
+
+        } catch (e) {
+            console.error('[WS] Message handling error:', e);
+        }
+    });
+
+    ws.on('close', () => {
+        console.log('[WS] Client Disconnected');
+        if (waitingWs === ws) {
+            waitingWs = null;
+        }
+        
+        if (ws.room) {
+            const room = ws.room;
+            const opponent = ws.role === 'p1' ? room.p2 : room.p1;
+            if (opponent && opponent.readyState === WebSocket.OPEN) {
+                opponent.send(JSON.stringify({ type: 'opponent_left' }));
+                opponent.room = null;
+                opponent.role = null;
+            }
+            delete rooms[room.id];
+        }
+    });
+});
+
+function sendToOpponent(ws, payload) {
+    if (ws.room) {
+        const opponent = ws.role === 'p1' ? ws.room.p2 : ws.room.p1;
+        if (opponent && opponent.readyState === WebSocket.OPEN) {
+            opponent.send(JSON.stringify(payload));
+        }
+    }
+}

@@ -17,7 +17,8 @@
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json",
             "et_6k": "empty_et_6k.json"
-        }
+        },
+        "enabled": false
     },
     {
         "id": "50jing",
@@ -33,7 +34,8 @@
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json",
             "et_6k": "empty_et_6k.json"
-        }
+        },
+        "enabled": false
     },
     {
         "id": "shoshitsu",
@@ -53,7 +55,8 @@
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json",
             "et_6k": "empty_et_6k.json"
-        }
+        },
+        "enabled": false
     },
     {
         "id": "knight_of_nights",
@@ -72,7 +75,8 @@
             "pr_6k": "empty_pr_6k.json",
             "et_4k": "knight_of_nights_et_4k.json"
         },
-        "icon": "assets/曲アイコン/選曲ロゴ-ナイトオブナイツ.png"
+        "icon": "assets/曲アイコン/選曲ロゴ-ナイトオブナイツ.png",
+        "enabled": false
     },
     {
         "id": "calamity_fortune",
@@ -93,7 +97,8 @@
             "pr_6k": "empty_pr_6k.json",
             "et_6k": "empty_et_6k.json",
             "pr_12k": "calamity_fortune_pr_12k.json"
-        }
+        },
+        "enabled": false
     },
     {
         "id": "poison_and_or_affection",
@@ -112,7 +117,8 @@
             "no_8k": "poison_and_or_affection_no_8k.json",
             "pr_8k": "poison_and_or_affection_pr_8k.json",
             "st_8k": "poison_and_or_affection_st_8k.json"
-        }
+        },
+        "enabled": false
     },
     {
         "id": "chromania",
@@ -128,7 +134,11 @@
             "st_6k": "empty_st_6k.json",
             "ad_6k": "chromania_ad_6k.json",
             "pr_6k": "chromania_pr_6k.json"
-        }
+        },
+        "enabled": true,
+        "previewStart": 65.5,
+        "previewDuration": 18,
+        "previewBgm": "preview.wav"
     },
     {
         "id": "kyuukurarin",
@@ -143,7 +153,8 @@
             "st_6k": "empty_st_6k.json",
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json"
-        }
+        },
+        "enabled": false
     },
     {
         "id": "amara",
@@ -158,7 +169,8 @@
             "st_6k": "empty_st_6k.json",
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json"
-        }
+        },
+        "enabled": false
     },
     {
         "id": "shining_star",
@@ -176,7 +188,8 @@
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json",
             "no_6k": "shining_star_no_6k.json"
-        }
+        },
+        "enabled": false
     },
     {
         "id": "seimeisei_syndrome",
@@ -193,7 +206,8 @@
             "st_6k": "empty_st_6k.json",
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json"
-        }
+        },
+        "enabled": false
     },
     {
         "id": "skairan",
@@ -211,7 +225,10 @@
             "et_6k": "empty_et_6k.json",
             "pr_12k": "skairan_pr_12k.json"
         },
-        "icon": "assets/曲アイコン/アイコン「寒鰤」.png"
+        "icon": "songs/skairan/無題17_20260731191056.png",
+        "previewBgm": "preview.wav",
+        "previewStart": 0,
+        "previewDuration": 15.5
     },
     {
         "id": "ceviche",
@@ -226,7 +243,8 @@
             "no_6k": "empty_no_6k.json",
             "st_6k": "empty_st_6k.json",
             "ad_6k": "empty_ad_6k.json"
-        }
+        },
+        "introAudio": "セヴィチェ効果音.m4a"
     },
     {
         "id": "isaribi",
@@ -245,7 +263,7 @@
             "no_6k": "empty_no_6k.json",
             "no": "chart.json"
         },
-        "icon": "assets/曲アイコン/アイコン「漁火」.png"
+        "icon": "songs/isaribi/無題17_20260731190347.png"
     },
     {
         "id": "toumou",
@@ -260,7 +278,10 @@
             "st_6k": "empty_st_6k.json",
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "toumou_pr_6k.json"
-        }
+        },
+        "previewBgm": "preview.wav",
+        "previewStart": 49.5,
+        "previewDuration": 20
     },
     {
         "id": "taihen",
@@ -275,7 +296,8 @@
             "st_6k": "empty_st_6k.json",
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json"
-        }
+        },
+        "previewBgm": "preview.wav"
     },
     {
         "id": "hotaru_no_hikari",
@@ -291,7 +313,8 @@
             "pr_6k": "hotaru_no_hikari_pr_6k.json",
             "et_6k": "hotaru_no_hikari_et_6k.json",
             "no": "chart.json"
-        }
+        },
+        "previewBgm": "preview.wav"
     },
     {
         "id": "baseball",
@@ -307,7 +330,8 @@
             "pr_6k": "empty_pr_6k.json",
             "et_6k": "empty_et_6k.json",
             "no": "chart.json"
-        }
+        },
+        "previewBgm": "preview.wav"
     },
     {
         "id": "lets_themepark",
@@ -323,7 +347,10 @@
             "pr_6k": "empty_pr_6k.json",
             "et_6k": "lets_themepark_et_6k.json",
             "no": "chart.json"
-        }
+        },
+        "previewStart": 34.5,
+        "previewDuration": 17.5,
+        "previewBgm": "preview.wav"
     },
     {
         "id": "kaijin_guhai",
@@ -339,7 +366,11 @@
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "kaijin_guhai_pr_6k.json",
             "et_6k": "kaijin_guhai_et_6k.json"
-        }
+        },
+        "icon": "songs/kaijin_guhai/r1280x720l.jpg",
+        "previewStart": 109.5,
+        "previewBgm": "preview.wav",
+        "previewDuration": 15
     },
     {
         "id": "afmar",
@@ -354,7 +385,10 @@
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json",
             "et_6k": "afmar_et_6k.json"
-        }
+        },
+        "previewStart": 134,
+        "previewBgm": "preview.wav",
+        "previewDuration": 14
     },
     {
         "id": "aleph-0",
@@ -369,7 +403,10 @@
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json",
             "et_6k": "aleph-0_et_6k.json"
-        }
+        },
+        "previewStart": 46,
+        "previewBgm": "preview.wav",
+        "previewDuration": 15
     },
     {
         "id": "Battle02",
@@ -384,7 +421,11 @@
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json",
             "et_6k": "Battle02_et_6k.json"
-        }
+        },
+        "previewBgm": "preview.wav",
+        "previewStart": 30,
+        "previewDuration": 15,
+        "introAudio": "battle02_uI7sWOxH.mp3"
     },
     {
         "id": "Elemental-Sage",
@@ -399,7 +440,8 @@
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json",
             "et_6k": "Elemental-Sage_et_6k.json"
-        }
+        },
+        "enabled": false
     },
     {
         "id": "Fight-Against-the-Thunderstorm",
@@ -414,7 +456,11 @@
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json",
             "et_6k": "Fight-Against-the-Thunderstorm_et_6k.json"
-        }
+        },
+        "enabled": true,
+        "previewStart": 143.5,
+        "previewBgm": "preview.wav",
+        "previewDuration": 15
     },
     {
         "id": "Le-Cirque-du-Diable",
@@ -429,7 +475,8 @@
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json",
             "et_6k": "Le-Cirque-du-Diable_et_6k.json"
-        }
+        },
+        "enabled": false
     },
     {
         "id": "Path-in-the-Sky",
@@ -444,7 +491,8 @@
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json",
             "et_6k": "empty_et_6k.json"
-        }
+        },
+        "enabled": false
     },
     {
         "id": "StarangeNight",
@@ -459,7 +507,8 @@
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json",
             "et_6k": "StarangeNight_et_6k.json"
-        }
+        },
+        "enabled": false
     },
     {
         "id": "The-Charlatan",
@@ -474,7 +523,8 @@
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json",
             "et_6k": "empty_et_6k.json"
-        }
+        },
+        "enabled": false
     },
     {
         "id": "そんな雨上がり",
@@ -489,7 +539,8 @@
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json",
             "et_6k": "そんな雨上がり_et_6k.json"
-        }
+        },
+        "enabled": false
     },
     {
         "id": "夜明けのプレリュード",
@@ -504,7 +555,8 @@
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json",
             "et_6k": "empty_et_6k.json"
-        }
+        },
+        "enabled": false
     },
     {
         "id": "天使迎撃戦",
@@ -519,7 +571,8 @@
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json",
             "et_6k": "empty_et_6k.json"
-        }
+        },
+        "enabled": false
     },
     {
         "id": "差引き零",
@@ -534,7 +587,8 @@
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json",
             "et_6k": "empty_et_6k.json"
-        }
+        },
+        "enabled": false
     },
     {
         "id": "熱異常",
@@ -550,7 +604,8 @@
             "pr_6k": "empty_pr_6k.json",
             "et_6k": "empty_et_6k.json",
             "no": "chart.json"
-        }
+        },
+        "enabled": false
     },
     {
         "id": "赫月の魔女",
@@ -564,8 +619,9 @@
             "st_6k": "empty_st_6k.json",
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json",
-            "et_6k": "empty_et_6k.json"
-        }
+            "et_6k": "赫月の魔女_et_6k.json"
+        },
+        "enabled": true
     },
     {
         "id": "風の列車",
@@ -580,7 +636,8 @@
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json",
             "et_6k": "empty_et_6k.json"
-        }
+        },
+        "enabled": false
     },
     {
         "id": "鳴神の魔女",
@@ -595,7 +652,8 @@
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json",
             "et_6k": "empty_et_6k.json"
-        }
+        },
+        "enabled": false
     },
     {
         "id": "黒曜の羽根舞う",
@@ -610,6 +668,7 @@
             "ad_6k": "empty_ad_6k.json",
             "pr_6k": "empty_pr_6k.json",
             "et_6k": "empty_et_6k.json"
-        }
+        },
+        "enabled": false
     }
 ]

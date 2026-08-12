@@ -7,6 +7,20 @@
     <title>Circular Motion Sprite</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+        @keyframes marquee {
+            0% { transform: translateX(100vw); }
+            100% { transform: translateX(-100%); }
+        }
+        @keyframes songHover {
+            0% { transform: translateY(0); box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+            50% { transform: translateY(-5px); box-shadow: 0 15px 25px rgba(0,0,0,0.6); }
+            100% { transform: translateY(0); box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        }
+        @keyframes introZoom {
+            0% { transform: scale(0.9); opacity: 0; }
+            10% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(1.1); opacity: 1; }
+        }
         body {
             margin: 0;
             overflow: hidden;
@@ -20,7 +34,7 @@
             position: fixed;
             top: 0;
             left: 0;
-            z-index: 1;
+            z-index: 2;
             pointer-events: none;
         }
 
@@ -29,9 +43,8 @@
             position: fixed !important;
             top: 0; left: 0; right: 0; bottom: 0;
             width: 100%; height: 100%;
-            background: rgba(10, 10, 15, 0.85) !important;
-            backdrop-filter: blur(15px);
-            padding: 40px !important;
+            background: #ff5722 !important; /* 完全に不透明なオレンジ */
+            padding: 20px !important;
             box-sizing: border-box;
             z-index: 1000;
             opacity: 0;
@@ -41,6 +54,7 @@
             flex-direction: column;
             align-items: center;
             justify-content: flex-start;
+            color: #ffffff;
         }
 
         #controls[style*="display: block"] {
@@ -54,28 +68,32 @@
 
         .options-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(6, 1fr); /* 6列に配備 */
+            gap: 15px;
             width: 100%;
-            max-width: 1200px;
-            margin-bottom: 30px;
+            max-width: 100%;
+            margin-bottom: 20px;
         }
 
         .option-card {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(0, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.4);
+            border: 2px solid rgba(255, 255, 255, 0.2);
             border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            height: auto;
         }
 
         .option-card h3 {
-            color: #00ffff;
+            color: #ffff00; /* 黄色で見やすく強調 */
             margin-top: 0;
-            border-bottom: 1px solid rgba(0, 255, 255, 0.3);
-            padding-bottom: 10px;
-            font-size: 1.2em;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+            padding-bottom: 8px;
+            font-size: 1.1em;
             letter-spacing: 1px;
+            text-align: center;
         }
 
         .option-row {
@@ -263,7 +281,7 @@
 
 <body>
     <video id="title-bg-video" autoplay loop muted playsinline
-        style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: -1; pointer-events: none;">
+        style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; pointer-events: none;">
         <source src="assets/タイトル画面/スタート画面の背景.mp4" type="video/mp4">
     </video>
 
@@ -286,7 +304,140 @@
                     transform: rotate(360deg);
                 }
             }
-        </style>
+
+                /* Mode Select & Dani Select Styling */
+                .mode-card {
+                    background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+                    border: 2px solid rgba(255,255,255,0.1);
+                    border-radius: 16px;
+                    width: 180px;
+                    height: 240px;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                    align-items: center;
+                    font-size: 1.4em;
+                    font-weight: bold;
+                    color: rgba(255,255,255,0.4);
+                    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+                    box-sizing: border-box;
+                    cursor: pointer;
+                    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+                    backdrop-filter: blur(5px);
+                    position: relative;
+                    overflow: hidden;
+                    font-family: 'Outfit', sans-serif;
+                    letter-spacing: 1px;
+                }
+                
+                .mode-card::before {
+                    content: '';
+                    position: absolute;
+                    top: 0; left: -100%;
+                    width: 50%; height: 100%;
+                    background: linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent);
+                    transform: skewX(-25deg);
+                    transition: 0.75s;
+                }
+
+                .mode-card:hover::before {
+                    left: 125%;
+                }
+
+                .mode-card.active {
+                    transform: scale(1.2);
+                    color: #ffffff;
+                    border-color: #00ffff;
+                    box-shadow: 0 0 25px rgba(0, 255, 255, 0.3), inset 0 0 10px rgba(0,255,255,0.2);
+                    background: linear-gradient(135deg, rgba(0,255,255,0.15), rgba(0,255,255,0.02));
+                }
+
+                .mode-card.disabled {
+                    opacity: 0.25;
+                    cursor: not-allowed;
+                }
+
+                /* Dani Select Vertical Scroll Styling */
+                #dani-scroll-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 15px;
+                    width: 320px;
+                    height: 80%;
+                    overflow-y: auto;
+                    padding: 20px;
+                    box-sizing: border-box;
+                    scroll-behavior: smooth;
+                }
+                
+                #dani-scroll-list::-webkit-scrollbar {
+                    width: 6px;
+                }
+                #dani-scroll-list::-webkit-scrollbar-track {
+                    background: rgba(0,0,0,0.3);
+                }
+                #dani-scroll-list::-webkit-scrollbar-thumb {
+                    background: rgba(255,255,255,0.2);
+                    border-radius: 3px;
+                }
+
+                .dani-card {
+                    background: rgba(255, 255, 255, 0.05);
+                    border: 2px solid rgba(255,255,255,0.1);
+                    border-radius: 12px;
+                    padding: 18px 25px;
+                    font-size: 1.4em;
+                    color: rgba(255,255,255,0.6);
+                    transition: all 0.3s ease;
+                    cursor: pointer;
+                    text-align: left;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+                    font-family: 'Sawarabi Mincho', serif;
+                }
+
+                .dani-card.active {
+                    transform: translateX(15px) scale(1.05);
+                    color: #ffffff;
+                    background: linear-gradient(90deg, rgba(255,255,255,0.15), rgba(255,255,255,0.02));
+                    box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+                    border-color: #ff3d00;
+                }
+
+                .dani-card.cleared {
+                    background: linear-gradient(90deg, rgba(212,175,55,0.25), rgba(212,175,55,0.03));
+                    border-color: #d4af37 !important;
+                    color: #ffd700 !important;
+                    box-shadow: 0 0 15px rgba(212,175,55,0.35), inset 0 0 8px rgba(212,175,55,0.1);
+                    text-shadow: 0 0 5px rgba(212,175,55,0.5);
+                }
+                
+                .dani-card.cleared.active {
+                    transform: translateX(15px) scale(1.05);
+                    box-shadow: 0 0 25px rgba(212,175,55,0.65), inset 0 0 10px rgba(212,175,55,0.2);
+                    background: linear-gradient(90deg, rgba(212,175,55,0.4), rgba(212,175,55,0.05));
+                }
+
+                /* Battle Selection Layout Modification */
+                #song-select-overlay.battle-mode {
+                    background: linear-gradient(135deg, rgba(32, 6, 6, 0.95), rgba(6, 6, 32, 0.95)) !important;
+                    border: 4px solid #ff0055 !important;
+                    box-shadow: inset 0 0 60px rgba(255, 0, 85, 0.4);
+                }
+
+                #song-select-overlay.battle-mode h2 {
+                    color: #ff0055 !important;
+                    text-shadow: 0 0 20px rgba(255, 0, 85, 0.8) !important;
+                    animation: pulse-glow 1s infinite alternate;
+                }
+
+                @keyframes pulse-glow {
+                    from { text-shadow: 0 0 10px rgba(255, 0, 85, 0.6); }
+                    to { text-shadow: 0 0 25px rgba(255, 0, 85, 1); transform: scale(1.02); }
+                }
+            </style>
     </div>
 
     <!-- Shutter Transition -->
@@ -294,13 +445,30 @@
         <img id="shutter-img" src="assets/シャッター.png" alt="Shutter">
     </div>
 
-    <!-- Menu Overlay -->
+    <!-- Menu Overlay (Play Mode Select Screen) -->
     <div id="menu-overlay"
-        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:15; flex-direction:row; justify-content:center; align-items:center; gap: 40px;">
-        <div class="menu-item" id="menu-btn-play">PLAY</div>
-        <div class="menu-item" id="menu-btn-dani">段位認定</div>
-        <div class="menu-item" id="menu-btn-records">記録</div>
-        <div class="menu-item" id="menu-btn-back">戻る</div>
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:radial-gradient(circle, #201a30, #0d0b14); z-index:15; flex-direction:column; justify-content:center; align-items:center; box-sizing: border-box;">
+        <h1 style="font-size: 2.6em; color: #ffff00; text-shadow: 0 0 15px rgba(255,255,0,0.4); font-weight: bold; letter-spacing: 6px; margin: 0 0 45px 0; font-family: 'Outfit', sans-serif;">SELECT PLAY MODE</h1>
+        
+        <!-- Carousel Container -->
+        <div style="display: flex; align-items: center; justify-content: center; gap: 40px; width: 100%; max-width: 1100px; height: 320px; overflow: hidden; position: relative;">
+            <div id="mode-arrow-left" style="font-size: 3em; color: rgba(255,255,255,0.2); cursor: pointer; transition: color 0.2s; user-select: none;">&lt;</div>
+            <div id="mode-cards-wrapper" style="display: flex; align-items: center; justify-content: center; gap: 30px; width: 850px; height: 100%;">
+                <!-- Populated dynamically via TypeScript -->
+            </div>
+            <div id="mode-arrow-right" style="font-size: 3em; color: rgba(255,255,255,0.2); cursor: pointer; transition: color 0.2s; user-select: none;">&gt;</div>
+        </div>
+
+        <!-- Description Panel -->
+        <div id="mode-desc-panel" style="margin-top: 35px; width: 50%; max-width: 600px; text-align: center; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); padding: 20px 30px; border-radius: 12px; min-height: 100px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box; backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+            <div id="mode-desc-title" style="font-size: 1.4em; font-weight: bold; color: #00ffff; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 2px;">SINGLE</div>
+            <div id="mode-desc-text" style="font-size: 0.95em; color: rgba(255,255,255,0.7); line-height: 1.6; font-family: sans-serif;">今までの普通のプレイをおこないます。</div>
+        </div>
+        
+        <!-- Guide Instructions -->
+        <div style="margin-top: 30px; font-size: 0.8em; color: rgba(255,255,255,0.3); font-family: monospace; letter-spacing: 2px; text-align: center;">
+            PRESS [S / L] OR [← / →] TO SELECT &nbsp;|&nbsp; PRESS [D / J] OR [ENTER] TO DECIDE
+        </div>
     </div>
 
     <!-- Start Screen -->
@@ -330,17 +498,7 @@
             1.7.1</p>
 
         <!-- Announcement Banner -->
-        <style>
-            @keyframes marquee {
-                0% {
-                    transform: translateX(100vw);
-                }
-
-                100% {
-                    transform: translateX(-100%);
-                }
-            }
-        </style>
+        <!-- Announcement Banner -->
         <div
             style="position: absolute; bottom: 0; left: 0; width: 100%; height: 40px; background-color: rgba(0, 0, 0, 0.8); z-index: 5; display: flex; align-items: center; overflow: hidden;">
             <div
@@ -419,33 +577,10 @@
 
     <!-- Options Drawer (Now Fullscreen Overlay) -->
     <div id="controls">
-        <h2 style="color: #00ffff; text-shadow: 0 0 15px rgba(0,255,255,0.5); font-size: 2.5em; margin-top: 0; margin-bottom: 20px; letter-spacing: 2px;">PLAY OPTIONS</h2>
-        <div style="display: flex; width: 100%; height: calc(100vh - 120px); gap: 30px;">
-            <div style="flex: 1; overflow-y: auto; padding-right: 10px;">
-                <div class="options-grid">
-
+        <h2 style="color: #ffff00; text-shadow: 0 0 15px rgba(255,255,0,0.5); font-size: 2.2em; margin-top: 0; margin-bottom: 20px; letter-spacing: 2px; text-align: center; font-weight: bold;">PLAY OPTIONS</h2>
+        <div id="options-grid" class="options-grid">
             
-            <!-- CARD 1: GAMEPLAY -->
-            <div class="option-card">
-                <h3>GAMEPLAY</h3>
-                <div class="option-row">
-                    <button id="btn-random" class="premium-btn">Start Random Mode</button>
-                </div>
-                <div class="option-row">
-                    <label style="cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 1.1em; margin-top: 10px;">
-                        <input type="checkbox" id="auto-play-checkbox" style="width: 20px; height: 20px;">
-                        <span style="font-weight: bold; color: #00ffff;">AUTO PLAY</span>
-                    </label>
-                </div>
-                <div class="option-row" style="margin-top: 15px;">
-                    <span style="font-weight: bold; color: #fff; margin-bottom: 8px;">Layout Type:</span>
-                    <label style="cursor: pointer; margin-bottom: 5px;"><input type="radio" name="layout-type" value="default" checked> Default (Chart)</label>
-                    <label style="cursor: pointer; margin-bottom: 5px;"><input type="radio" name="layout-type" value="type-a"> Type A (Paired)</label>
-                    <label style="cursor: pointer; margin-bottom: 5px;"><input type="radio" name="layout-type" value="type-b"> Type B (Linear)</label>
-                </div>
-            </div>
-
-            <!-- CARD 2: SPEED & VISUALS -->
+            <!-- COLUMN 1: SPEED & VISUALS -->
             <div class="option-card">
                 <h3>SPEED & VISUALS</h3>
                 <div class="option-row">
@@ -454,7 +589,7 @@
                 </div>
                 <div class="option-row">
                     <label><span>Lane Width</span> <span><span id="lane-width-display">100</span>px</span></label>
-                    <input type="range" id="lane-width-input" min="50" max="200" step="5" value="100">
+                    <input type="range" id="lane-width-input" min="50" max="100" step="5" value="100">
                 </div>
                 <div class="option-row">
                     <label><span>Lane Opacity</span> <span><span id="lane-opacity-display">100</span>%</span></label>
@@ -462,42 +597,22 @@
                 </div>
                 <div class="option-row">
                     <label><span>Judgement Height</span> <span><span id="judgement-height-display">200</span>px</span></label>
-                    <input type="range" id="judgement-height-input" min="0" max="600" step="10" value="200">
+                    <input type="range" id="judgement-height-input" min="0" max="300" step="10" value="200">
+                </div>
+                <div class="option-row" style="margin-top: 5px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
+                    <label><span>Offset (ms)</span> <span id="offset-display">0</span></label>
+                    <input type="range" id="offset-input" min="-500" max="500" step="1" value="0">
+                </div>
+                <div class="option-row">
+                    <label><span>Visual Offset (ms)</span> <span id="visual-offset-display">0</span></label>
+                    <input type="range" id="visual-offset-input" min="-500" max="500" step="1" value="0">
+                </div>
+                <div class="option-row" style="margin-top: 10px;">
+                    <button id="btn-calibrate" class="premium-btn" style="padding: 6px;">Auto Calibrate</button>
                 </div>
             </div>
 
-            <!-- CARD 3: MODIFIERS -->
-            <div class="option-card">
-                <h3 style="color:#e040fb;">MODIFIERS</h3>
-                <div class="option-row">
-                    <label>ASSIST</label>
-                    <select id="assist-select">
-                        <option value="none">None</option>
-                        <option value="blue_to_white">Blue -> White</option>
-                        <option value="space_boost">Space Boost</option>
-                        <option value="auto_space">Auto Space</option>
-                    </select>
-                </div>
-                <div class="option-row">
-                    <label>RANDOM</label>
-                    <select id="random-select">
-                        <option value="none">None</option>
-                        <option value="mirror">Mirror</option>
-                        <option value="shuffle_color">Shuffle (Color)</option>
-                        <option value="shuffle_chaos">Shuffle (Chaos)</option>
-                    </select>
-                </div>
-                <div class="option-row">
-                    <label>GAUGE TYPE</label>
-                    <select id="gauge-select">
-                        <option value="norma" selected>NORMA (70% Clear)</option>
-                        <option value="life">LIFE NORMAL</option>
-                        <option value="life_hard">LIFE HARD</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- CARD 4: LANE COVER -->
+            <!-- COLUMN 2: LANE COVER -->
             <div class="option-card">
                 <h3>LANE COVER</h3>
                 <div class="option-row">
@@ -506,9 +621,8 @@
                         <span style="font-weight: bold; color: #fff;">Enable Cover</span>
                     </label>
                 </div>
-
                 <div class="option-row">
-                    <label><span>Skin Selection</span></label>
+                    <label><span>レーンスキン</span></label>
                     <select id="skin-select" style="width: 100%; padding: 8px; background: #222; color: #fff; border: 1px solid #555; border-radius: 5px;">
                         <option value="default">Default</option>
                         <option value="growAJIC">growAJIC</option>
@@ -528,9 +642,12 @@
                         <option value="TunalitySunburn">TunalitySunburn</option>
                     </select>
                 </div>
-                <div class="option-row">
+                <div class="option-row" style="margin-top: 8px; color: #ffeb3b; font-size: 0.85em; text-align: center; font-style: italic;">
+                    レーンスキン: 実装されている部分もあるが、開発中
+                </div>
+                <div class="option-row" style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
                     <label><span>Height</span> <span><span id="lane-cover-height-display">300</span>px</span></label>
-                    <input type="range" id="lane-cover-height-input" min="0" max="600" step="10" value="300">
+                    <input type="range" id="lane-cover-height-input" min="0" max="1000" step="10" value="300">
                 </div>
                 <div class="option-row">
                     <label><span>Visual Speed</span> <span>x<span id="lane-cover-speed-display">1.0</span></span></label>
@@ -538,71 +655,137 @@
                 </div>
             </div>
 
-            <!-- CARD 5: TIMING -->
+            <!-- COLUMN 3: GAUGE TYPE -->
             <div class="option-card">
-                <h3>TIMING</h3>
-                <div class="option-row">
-                    <label><span>Offset (ms)</span> <span id="offset-display">0</span></label>
-                    <input type="range" id="offset-input" min="-500" max="500" step="1" value="0">
-                </div>
-                <div class="option-row">
-                    <label><span>Visual Offset (ms)</span> <span id="visual-offset-display">0</span></label>
-                    <input type="range" id="visual-offset-input" min="-500" max="500" step="1" value="0">
-                </div>
-                <div class="option-row" style="margin-top: 15px;">
-                    <button id="btn-calibrate" class="premium-btn">Auto Calibrate</button>
+                <h3>GAUGE TYPE</h3>
+                <div class="option-row" style="align-items: center; margin-top: 15px; flex: 1; justify-content: center;">
+                    <button id="btn-gauge-roll" class="premium-btn" style="width: 100%; font-size: 1.1em; padding: 12px; margin-bottom: 20px; border-color: #ffeb3b; background: rgba(255,235,59,0.1);">
+                        CHANGE GAUGE
+                    </button>
+                    <div id="gauge-roll-display" style="background: rgba(0,0,0,0.6); padding: 15px; border-radius: 8px; border: 2px solid #ff9800; width: 100%; box-sizing: border-box; min-height: 120px;">
+                        <div style="font-weight: bold; color: #ffff00; font-size: 1.2em; text-align: center; margin-bottom: 8px;" id="gauge-roll-name">NORMA</div>
+                        <div style="font-size: 0.85em; color: #fff; line-height: 1.4; text-align: center;" id="gauge-roll-desc">80%スタート。80%以上でクリア。</div>
+                    </div>
                 </div>
             </div>
 
-            <!-- CARD 6: PACEMAKER & DEV -->
+            <!-- COLUMN 4: RIVAL SCORE -->
             <div class="option-card">
-                <h3>PACEMAKER</h3>
+                <h3>RIVAL SCORE</h3>
                 <div class="option-row">
-                    <label><span>Target Accuracy</span> <span><span id="pacemaker-target-display">95</span>%</span></label>
-                    <input type="range" id="pacemaker-target-input" min="80" max="100" step="1" value="95">
+                    <span style="font-weight: bold; color: #fff; margin-bottom: 6px; font-size: 0.95em;">Score Display Type:</span>
+                    <select id="score-display-type-select" style="width: 100%; padding: 8px; background: #222; color: #fff; border: 1px solid #555; border-radius: 5px; cursor: pointer;">
+                        <option value="percent" selected>PERCENT (％)</option>
+                        <option value="value">VALUE (数値)</option>
+                    </select>
+                </div>
+                <div class="option-row" style="margin-top: 10px;">
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 1.0em;">
+                        <input type="checkbox" id="rival-show-checkbox" style="width: 18px; height: 18px;" checked>
+                        <span style="font-weight: bold; color: #00ffff;">SHOW RIVAL (可視化)</span>
+                    </label>
+                </div>
+                <div class="option-row" style="margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
+                    <span style="font-weight: bold; color: #888; font-size: 0.9em; margin-bottom: 5px;">自己ベストレーン表示（未実装）</span>
+                    <label style="cursor: not-allowed; display: flex; align-items: center; gap: 8px; opacity: 0.5;">
+                        <input type="checkbox" disabled style="width: 18px; height: 18px;">
+                        <span>SHOW BEST</span>
+                    </label>
+                </div>
+                <div class="option-row" style="margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 1.0em; margin-bottom: 8px;">
+                        <input type="checkbox" id="rival-bar-checkbox" style="width: 18px; height: 18px;" checked>
+                        <span style="font-weight: bold; color: #ff9800; font-size: 0.95em;">ライバルスコアレーン表示</span>
+                    </label>
+                    <label><span>Rival Target</span> <span><span id="rival-score-display">90</span>%</span></label>
+                    <input type="range" id="rival-score-input" min="0" max="100" step="1" value="90">
+                </div>
+            </div>
+
+            <!-- COLUMN 5: OTHERS -->
+            <div class="option-card">
+                <h3>OTHERS</h3>
+                <div class="option-row">
+                    <label style="cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 1.1em; margin-bottom: 10px;">
+                        <input type="checkbox" id="auto-play-checkbox" style="width: 18px; height: 18px;">
+                        <span style="font-weight: bold; color: #00ffff;">AUTO PLAY</span>
+                    </label>
+                </div>
+                <div class="option-row" style="margin-top: 5px; margin-bottom: 8px;">
+                    <label style="font-size: 0.85em; display: block; margin-bottom: 4px; font-weight: bold; color: #aaa;">ASSIST MODE</label>
+                    <select id="assist-select" style="width: 100%; padding: 6px; background: #222; color: #fff; border: 1px solid #555; border-radius: 5px; box-sizing: border-box; font-size: 0.9em;">
+                        <option value="none">NONE</option>
+                        <option value="blue_to_white">BLUE TO WHITE</option>
+                        <option value="space_boost">SPACE BOOST</option>
+                        <option value="auto_space">AUTO SPACE</option>
+                    </select>
+                </div>
+                <div class="option-row" style="margin-top: 5px; margin-bottom: 10px;">
+                    <label style="font-size: 0.85em; display: block; margin-bottom: 4px; font-weight: bold; color: #aaa;">RANDOM MODE</label>
+                    <select id="random-select" style="width: 100%; padding: 6px; background: #222; color: #fff; border: 1px solid #555; border-radius: 5px; box-sizing: border-box; font-size: 0.9em;">
+                        <option value="none">NONE</option>
+                        <option value="shuffle_color">SHUFFLE COLOR</option>
+                        <option value="shuffle_chaos">SHUFFLE CHAOS</option>
+                        <option value="mirror">MIRROR</option>
+                    </select>
                 </div>
                 <div class="option-row">
-                    <label><span>Bar Width</span> <span><span id="pacemaker-width-display">1.5</span>x</span></label>
-                    <input type="range" id="pacemaker-width-input" min="1.0" max="3.0" step="0.1" value="1.5">
+                    <label><span style="font-size: 0.9em;">Nickname (Max 7 chars)</span></label>
+                    <input type="text" id="nickname-input" maxlength="7" style="width: 100%; padding: 6px; background: #222; color: #fff; border: 1px solid #555; border-radius: 5px; box-sizing: border-box; font-size: 0.9em;">
                 </div>
-                <hr style="border-color: rgba(255,255,255,0.1); margin: 20px 0;">
-                <div class="option-row" style="font-size: 0.8em; color: #aaa;">
-                    <label style="margin-bottom: 5px;">Custom Audio: <input type="file" id="audio-input" accept="audio/*"></label>
-                    <label>Custom Chart: <input type="file" id="chart-input"></label>
-                    <div style="margin-top: 10px; display: flex; gap: 10px;">
-                        <button id="btn-select-song" class="premium-btn" style="flex: 1; font-size: 0.9em; padding: 5px;">Select Song</button>
-                        <button id="btn-chart" class="premium-btn" style="flex: 1; font-size: 0.9em; padding: 5px;">File Start</button>
+                <div class="option-row" style="margin-top: 10px;">
+                    <label><span style="font-size: 0.9em;">Bio (Max 50 chars)</span></label>
+                    <input type="text" id="bio-input" maxlength="50" style="width: 100%; padding: 6px; background: #222; color: #fff; border: 1px solid #555; border-radius: 5px; box-sizing: border-box; font-size: 0.9em;">
+                </div>
+                <div class="option-row" style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
+                    <button id="btn-random" class="premium-btn" style="font-size: 0.85em; padding: 6px;">Start Random Mode</button>
+                </div>
+                <div class="option-row" style="margin-top: 8px; font-size: 0.75em; color: #aaa; display: flex; flex-direction: column; gap: 5px;">
+                    <label>Audio: <input type="file" id="audio-input" accept="audio/*" style="font-size: 0.9em; width: 100%;"></label>
+                    <label>Chart: <input type="file" id="chart-input" style="font-size: 0.9em; width: 100%;"></label>
+                    <button id="btn-chart" class="premium-btn" style="font-size: 0.85em; padding: 4px; margin-top: 3px;">File Start</button>
+                </div>
+            </div>
+
+            <!-- COLUMN 6: BATTLE -->
+            <div class="option-card" style="align-items: center; justify-content: flex-start; gap: 15px; height: 100%;">
+                <h3>BATTLE</h3>
+                
+                <!-- Icon Upload & Preview -->
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; box-sizing: border-box; margin-top: 10px;">
+                    <label style="font-size: 0.9em; color: #aaa; text-align: center; font-weight: bold; margin-bottom: 5px;">PROFILE ICON</label>
+                    
+                    <!-- Circular Icon Preview Container -->
+                    <div style="position: relative; width: 110px; height: 110px; border-radius: 50%; border: 3px solid #ff007f; background: #111; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px rgba(255, 0, 127, 0.4); box-sizing: border-box;">
+                        <img id="opt-icon-preview" style="width: 100%; height: 100%; object-fit: cover; display: none;" alt="Icon">
+                        <span id="opt-icon-placeholder" style="font-size: 3.5em; line-height: 110px; user-select: none;">👽</span>
+                    </div>
+
+                    <!-- File input label style as premium button -->
+                    <label style="display: block; width: 85%; margin-top: 5px;">
+                        <span class="premium-btn" style="display: block; text-align: center; font-size: 0.85em; padding: 6px 12px; cursor: pointer; border-radius: 6px; background: rgba(255,0,127,0.2); border-color: #ff007f; color: #ff007f; font-weight: bold; transition: all 0.2s;">SELECT IMAGE</span>
+                        <input type="file" id="opt-icon-input" accept="image/*" style="display: none;">
+                    </label>
+                    <p style="font-size: 0.72em; color: #777; margin: 0; text-align: center; line-height: 1.4; width: 90%;">Images will be automatically cropped into a 1:1 circle.</p>
+
+                    <!-- Server URL Input for GitHub Pages integration -->
+                    <div style="width: 85%; margin-top: 15px; display: flex; flex-direction: column; gap: 5px; box-sizing: border-box;">
+                        <label style="font-size: 0.82em; color: #aaa; font-weight: bold; text-align: left; width: 100%;">SERVER URL</label>
+                        <input type="text" id="battle-server-url" placeholder="wss://your-battle-server.com" style="width: 100%; padding: 6px 10px; background: #222; color: #fff; border: 1px solid #ff007f; border-radius: 5px; box-sizing: border-box; font-size: 0.8em; font-family: monospace;">
+                        <p style="font-size: 0.65em; color: #666; margin: 0; line-height: 1.3; text-align: left; width: 100%;">Leave blank to auto-detect (local or default server).</p>
                     </div>
                 </div>
             </div>
 
-                </div>
-            </div> <!-- End Left Area -->
+        </div> <!-- End Grid -->
 
-            <!-- Right Area (Preview) -->
-            <div style="width: auto; min-width: 300px; display: flex; flex-direction: column; align-items: center; border-left: 1px solid rgba(0,255,255,0.2); padding-left: 30px; position: relative;">
-                <div style="position: absolute; top: 0; z-index: 10; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 5px; text-align: center;">
-                    <h3 style="color: #00ffff; margin: 0 0 10px 0;">PREVIEW</h3>
-                    <div style="margin-bottom: 10px; color: #fff;">
-                        <label style="cursor:pointer; margin-right: 10px;"><input type="radio" name="preview-mode" value="4key" checked> 4 Lane</label>
-                        <label style="cursor:pointer;"><input type="radio" name="preview-mode" value="6key"> 6 Lane</label>
-                    </div>
-                    <div style="color: #aaa; font-size: 0.8em;">
-                        Press (D, F, J, K) to test timing
-                    </div>
-                </div>
-            </div>
-        </div> <!-- End Flex Container -->
-
-        <button id="btn-close-options" style="padding: 15px 60px; font-size: 1.5em; background: rgba(0, 255, 255, 0.2); border: 2px solid #00ffff; color: #00ffff; border-radius: 50px; cursor: pointer; transition: all 0.2s; font-weight: bold; letter-spacing: 2px; margin-top: 20px;">
+        <button id="btn-close-options" style="padding: 10px 50px; font-size: 1.3em; background: rgba(255, 255, 255, 0.2); border: 2px solid #fff; color: #fff; border-radius: 50px; cursor: pointer; transition: all 0.2s; font-weight: bold; letter-spacing: 2px; margin-top: 10px;">
             CLOSE
         </button>
-        <div style="margin-top: 20px;">
-            <a href="editor.html" target="_blank" style="color: #00bcd4; text-decoration: none; font-size: 14px;">>> Open Chart Editor</a>
+        <div style="margin-top: 10px; display: flex; gap: 20px;">
+            <a href="editor.html" target="_blank" style="color: #ffff00; text-decoration: none; font-size: 13px; font-weight: bold;">>> Open Chart Editor</a>
+            <a href="song_editor.html" target="_blank" style="color: #ffff00; text-decoration: none; font-size: 13px; font-weight: bold;">>> Open Song Asset Editor</a>
         </div>
-        
-        <!-- Absolute Full-Height Preview Canvas -->
-        <canvas id="preview-canvas" style="position: absolute; right: 0; top: 0; height: 100vh; background: rgba(0,0,0,0.8); border-left: 1px solid #555; z-index: 5;"></canvas>
     </div>
 
     <!-- Custom Premium Results Screen -->
@@ -669,15 +852,89 @@
         </style>
     </div>
 
+    <!-- Online Battle Lobby Overlay -->
+    <div id="battle-lobby-overlay"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, #1a0f2e, #07030d); z-index: 120; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; padding: 40px; color: #fff;">
+        <h1 style="color: #ff007f; font-size: 3em; margin: 0 0 10px 0; text-shadow: 0 0 15px rgba(255,0,127,0.6); font-family: 'Outfit', sans-serif; font-weight: bold; letter-spacing: 4px;">ONLINE BATTLE</h1>
+        <p style="color: #888; font-size: 1em; letter-spacing: 2px; margin-bottom: 40px;">MATCHING LOBBY</p>
+
+        <!-- Lobby Status and Player Slots -->
+        <div style="display: flex; gap: 50px; margin-bottom: 50px; align-items: center; justify-content: center; width: 100%; max-width: 800px;">
+            <!-- Player 1 (You) -->
+            <div id="lobby-player-you" style="width: 250px; background: rgba(0,255,255,0.05); border: 2px solid #00ffff; border-radius: 15px; padding: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 15px; box-shadow: 0 0 20px rgba(0,255,255,0.15); box-sizing: border-box;">
+                <!-- Circular Profile Icon for Lobby -->
+                <div style="width: 90px; height: 90px; border-radius: 50%; border: 3px solid #00ffff; background: #111; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(0, 255, 255, 0.3); box-sizing: border-box;">
+                    <img id="lobby-player-you-icon" style="width: 100%; height: 100%; object-fit: cover; display: none;" alt="Icon">
+                    <span id="lobby-player-you-placeholder" style="font-size: 3em; line-height: 90px; user-select: none;">👽</span>
+                </div>
+                <div id="lobby-player-you-name" style="font-size: 1.3em; font-weight: bold; color: #00ffff; font-family: sans-serif;">Guest (YOU)</div>
+                <div style="font-size: 0.9em; color: #aaa; background: rgba(0,255,255,0.1); padding: 3px 10px; border-radius: 10px; font-weight: bold; font-family: monospace;">READY</div>
+            </div>
+
+            <!-- VS Divider -->
+            <div style="font-size: 2.5em; font-weight: bold; color: #ff007f; text-shadow: 0 0 10px rgba(255,0,127,0.5); font-style: italic;">VS</div>
+
+            <!-- Player 2 (Opponent) -->
+            <div id="lobby-player-opponent" style="width: 250px; background: rgba(255,255,255,0.02); border: 2px dashed rgba(255,255,255,0.15); border-radius: 15px; padding: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 15px; transition: all 0.5s ease; box-sizing: border-box;">
+                <div id="opponent-icon" style="font-size: 4em; opacity: 0.3;">❓</div>
+                <div id="opponent-name" style="font-size: 1.3em; font-weight: bold; color: #666; font-family: sans-serif;">SEARCHING...</div>
+                <div id="opponent-status" style="font-size: 0.9em; color: #555; background: rgba(255,255,255,0.05); padding: 3px 10px; border-radius: 10px; font-weight: bold; font-family: monospace;">WAITING</div>
+            </div>
+        </div>
+
+        <!-- Matching Indicator -->
+        <div id="matching-status-text" style="font-size: 1.2em; color: #ff007f; font-family: monospace; animation: pulse-text 1.5s infinite; letter-spacing: 1px; margin-bottom: 35px;">
+            WAITING FOR OPPONENT...
+        </div>
+
+        <div style="display: flex; gap: 20px;">
+            <!-- Bypass Button for Testing -->
+            <button id="btn-lobby-bypass" style="padding: 10px 30px; font-size: 1.1em; background: rgba(0, 255, 255, 0.1); border: 2px solid #00ffff; color: #00ffff; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-weight: bold; letter-spacing: 1px;">
+                FORCE START (TEST)
+            </button>
+            <button id="btn-close-lobby" style="padding: 10px 30px; font-size: 1.1em; background: rgba(255, 255, 255, 0.05); border: 2px solid #555; color: #aaa; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-weight: bold;">
+                LEAVE LOBBY
+            </button>
+        </div>
+    </div>
+
     <!-- Ranked Mode (Dani Nintei) Overlay -->
     <div id="dani-select-overlay"
-        style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 100; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; padding: 40px;">
-        <h1 style="color: #ff0000; font-size: 3em; margin: 0 0 20px 0; text-shadow: 0 0 10px #ff0000; font-family: 'Sawarabi Mincho', serif;">段位認定</h1>
-        <div id="dani-list" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; max-width: 1000px; padding: 20px; overflow-y: auto; max-height: 70vh;">
-            <!-- Ranks will be populated here -->
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, #1a0808, #050101); z-index: 100; flex-direction: row; align-items: center; justify-content: center; box-sizing: border-box; padding: 40px; gap: 40px;">
+        
+        <!-- Left Side: Dani Vertical Scroll List -->
+        <div style="display: flex; flex-direction: column; align-items: flex-start; height: 100%; width: 350px; justify-content: center;">
+            <h1 style="color: #ff3d00; font-size: 2.5em; margin: 0 0 25px 20px; text-shadow: 0 0 15px rgba(255,61,0,0.5); font-family: 'Sawarabi Mincho', serif; font-weight: bold; letter-spacing: 2px;">段位認定</h1>
+            <div id="dani-scroll-list">
+                <!-- Populated dynamically via TypeScript -->
+            </div>
+            <button id="btn-close-dani"
+                style="margin-top: 25px; margin-left: 20px; padding: 8px 30px; background: none; border: 2px solid #ff3d00; color: #ff3d00; font-size: 1.1em; cursor: pointer; transition: all 0.3s; font-family: 'Sawarabi Mincho', serif; border-radius: 6px; font-weight: bold; letter-spacing: 1px;">戻る</button>
         </div>
-        <button id="btn-close-dani"
-            style="margin-top: 30px; padding: 10px 40px; background: none; border: 2px solid #ff0000; color: #ff0000; font-size: 1.2em; cursor: pointer; transition: all 0.3s;">BACK TO TITLE</button>
+
+        <!-- Right Side: Selected Dani Info Panel -->
+        <div id="dani-info-panel" style="flex: 1; max-width: 600px; height: 80%; background: rgba(255,255,255,0.02); border: 2px solid rgba(255,61,0,0.15); border-radius: 20px; box-sizing: border-box; padding: 40px; display: flex; flex-direction: column; justify-content: flex-start; backdrop-filter: blur(10px); box-shadow: 0 15px 35px rgba(0,0,0,0.7); position: relative; overflow: hidden;">
+            <!-- Decorative border glow -->
+            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 5px; background: linear-gradient(90deg, #ff3d00, #ff9100);"></div>
+            
+            <!-- Dani Title and Star difficulty -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+                <div id="dani-info-title" style="font-size: 2.2em; color: #ff3d00; font-family: 'Sawarabi Mincho', serif; font-weight: bold; text-shadow: 0 0 10px rgba(255,61,0,0.3);">海伝</div>
+                <div id="dani-info-level" style="font-size: 1.4em; color: #ff9100; font-weight: bold; font-family: monospace;">★10+</div>
+            </div>
+
+            <!-- Songs List Section -->
+            <h3 style="color: rgba(255,255,255,0.5); font-size: 1.0em; text-transform: uppercase; margin: 0 0 15px 0; letter-spacing: 2px;">COURSE TRACKS</h3>
+            <div id="dani-info-songs" style="display: flex; flex-direction: column; gap: 12px; flex: 1;">
+                <!-- Populated dynamically via TypeScript (3 Songs) -->
+            </div>
+
+            <!-- Guide bottom -->
+            <div style="margin-top: 30px; font-size: 0.8em; color: rgba(255,61,0,0.4); font-family: monospace; letter-spacing: 1px; text-align: center;">
+                PRESS [D / K] OR [↑ / ↓] TO NAVIGATE &nbsp;|&nbsp; PRESS [ENTER] TO DECIDE
+            </div>
+        </div>
+
     </div>
 
     <!-- Song Select Overlay -->
@@ -697,6 +954,14 @@
         </div>
 
         <div id="song-list" style="flex: 1; overflow-y: auto;"></div>
+    </div>
+
+    <!-- Intro Overlay -->
+    <div id="intro-overlay"
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); backdrop-filter: blur(10px); z-index:350; flex-direction:column; justify-content:center; align-items:center; opacity:0; transition: opacity 0.5s;">
+        <video id="intro-video" autoplay muted playsinline style="position: absolute; top:0; left:0; width:100%; height:100%; object-fit: cover; z-index: -1; display: none;"></video>
+        <h1 id="intro-song-title" style="color:white; font-size:4em; margin-bottom:20px; text-shadow:0 0 20px rgba(255,255,255,0.5); font-family: sans-serif; text-align: center; animation: none; z-index: 1;">Song Title</h1>
+        <div id="intro-song-level" style="font-size:2.5em; padding:10px 30px; border-radius:10px; border:2px solid; color:white; background:rgba(0,0,0,0.5); font-family: sans-serif; text-shadow:0 0 10px rgba(0,0,0,1); animation: none; z-index: 1;">Level 10</div>
     </div>
 
     <!-- Calibration Overlay -->
@@ -725,7 +990,7 @@
         </div>
     </div>
 
-    <script src="magusic.js?v=26"></script>
+    <script src="magusic.js?v=33"></script>
 </body>
 
 </html>

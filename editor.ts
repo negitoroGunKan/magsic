@@ -343,8 +343,9 @@
                         tr.onmouseover = () => tr.style.background = '#333';
                         tr.onmouseout = () => tr.style.background = '#222';
 
+                        const hiddenBadge = song.enabled === false ? ' <span style="color:#ff5555; font-size:0.8em; font-weight:bold;">(Hidden)</span>' : '';
                         tr.innerHTML = `
-                        <td style="padding: 4px;">${song.title}</td>
+                        <td style="padding: 4px;">${song.title}${hiddenBadge}</td>
                         <td style="padding: 4px;">${diff.toUpperCase()}</td>
                         <td style="padding: 4px; text-align: center; color: ${mode === '8key' ? '#e040fb' : '#00bcd4'};">${mode.toUpperCase()}</td>
                     `;

@@ -352,9 +352,10 @@
                             diff: diff.toUpperCase()
                         });
 
+                        const hiddenBadge = song.enabled === false ? ' <span style="color:#ff5555; font-size:0.8em; font-weight:bold;">(Hidden)</span>' : '';
                         const tr = document.createElement('tr');
                         tr.innerHTML = `
-                            <td>${song.title}</td>
+                            <td>${song.title}${hiddenBadge}</td>
                             <td>${diff.toUpperCase()}</td>
                             <td style="color: ${mode === '8key' ? '#e040fb' : '#00bcd4'};">${mode.toUpperCase()}</td>
                         `;

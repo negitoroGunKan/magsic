@@ -20,7 +20,7 @@ export interface ChartNote {
 
 export type JudgmentType = 'critical' | 'great' | 'good' | 'fail' | 'miss';
 
-export type GaugeType = 'norma' | 'life' | 'life_hard';
+export type GaugeType = 'norma_easy' | 'norma' | 'life' | 'life_hard' | 'life_ex' | 'sudden_death';
 
 export type KeyMode = '4key' | '6key' | '8key' | '12key';
 

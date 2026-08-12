@@ -3,10 +3,10 @@ import { SCORE_WEIGHTS, calculateMaxScore, calculateLoss, calculateScore } from 
 
 describe('SCORE_WEIGHTS', () => {
   it('has correct values matching magusic.ts', () => {
-    expect(SCORE_WEIGHTS.perfect).toBe(9);
-    expect(SCORE_WEIGHTS.great).toBe(8);
-    expect(SCORE_WEIGHTS.nice).toBe(2);
-    expect(SCORE_WEIGHTS.bad).toBe(1);
+    expect(SCORE_WEIGHTS.critical).toBe(10);
+    expect(SCORE_WEIGHTS.great).toBe(6);
+    expect(SCORE_WEIGHTS.good).toBe(2);
+    expect(SCORE_WEIGHTS.fail).toBe(1);
     expect(SCORE_WEIGHTS.miss).toBe(0);
   });
 });
@@ -16,53 +16,53 @@ describe('calculateMaxScore', () => {
     expect(calculateMaxScore([])).toBe(1);
   });
 
-  it('counts regular notes as 9 points each', () => {
+  it('counts regular notes as 10 points each', () => {
     const notes = [
       { duration: 0 },
       { duration: 0 },
       { duration: 0 },
     ];
-    expect(calculateMaxScore(notes)).toBe(27); // 3 * 9
+    expect(calculateMaxScore(notes)).toBe(30); // 3 * 10
   });
 
-  it('counts long notes as 18 points each', () => {
+  it('counts long notes as 10 points each', () => {
     const notes = [
       { duration: 500 },
       { duration: 1000 },
     ];
-    expect(calculateMaxScore(notes)).toBe(36); // 2 * 18
+    expect(calculateMaxScore(notes)).toBe(20); // 2 * 10
   });
 
   it('handles mix of regular and long notes', () => {
     const notes = [
-      { duration: 0 },     // 9
-      { duration: 500 },   // 18
-      { duration: 0 },     // 9
-      { duration: 1000 },  // 18
+      { duration: 0 },     // 10
+      { duration: 500 },   // 10
+      { duration: 0 },     // 10
+      { duration: 1000 },  // 10
     ];
-    expect(calculateMaxScore(notes)).toBe(54); // 9 + 18 + 9 + 18
+    expect(calculateMaxScore(notes)).toBe(40); // 4 * 10
   });
 });
 
 describe('calculateLoss', () => {
-  it('perfect has 0 loss', () => {
-    expect(calculateLoss('perfect')).toBe(0);
+  it('critical has 0 loss', () => {
+    expect(calculateLoss('critical')).toBe(0);
   });
 
-  it('great has 1 loss', () => {
-    expect(calculateLoss('great')).toBe(1);
+  it('great has 4 loss', () => {
+    expect(calculateLoss('great')).toBe(4);
   });
 
-  it('nice has 7 loss', () => {
-    expect(calculateLoss('nice')).toBe(7);
+  it('good has 8 loss', () => {
+    expect(calculateLoss('good')).toBe(8);
   });
 
-  it('bad has 8 loss', () => {
-    expect(calculateLoss('bad')).toBe(8);
+  it('fail has 9 loss', () => {
+    expect(calculateLoss('fail')).toBe(9);
   });
 
-  it('miss has 9 loss', () => {
-    expect(calculateLoss('miss')).toBe(9);
+  it('miss has 10 loss', () => {
+    expect(calculateLoss('miss')).toBe(10);
   });
 });
 

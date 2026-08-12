@@ -3,10 +3,10 @@
 
 import { JudgmentType } from './types';
 
-/** Weight of each judgment type for scoring. Max per note = 9. */
+/** Weight of each judgment type for scoring. Max per note = 10. */
 export const SCORE_WEIGHTS: Record<JudgmentType, number> = {
-  critical: 9,
-  great: 8,
+  critical: 10,
+  great: 6,
   good: 2,
   fail: 1,
   miss: 0,
@@ -22,21 +22,20 @@ export interface ScoreResult {
 
 /**
  * Calculate the max possible score for a chart.
- * Regular notes = 9 pts, Long notes (duration > 0) = 18 pts (head 9 + tail 9).
+ * All notes = 10 pts.
  * Returns 1 for empty arrays to avoid division by zero (matches original behavior).
  */
 export function calculateMaxScore(notes: { duration: number }[]): number {
   if (notes.length === 0) return 1;
-  const maxWeight = SCORE_WEIGHTS.critical;
-  return notes.reduce((acc, n) => acc + (n.duration > 0 ? maxWeight * 2 : maxWeight), 0);
+  return notes.length * 10;
 }
 
 /**
  * Calculate the score loss for a single judgment.
- * Loss = maxWeightPerNote(9) - actualWeight
+ * Loss = maxWeightPerNote(10) - actualWeight
  */
 export function calculateLoss(judgmentType: JudgmentType): number {
-  return 9 - SCORE_WEIGHTS[judgmentType];
+  return 10 - SCORE_WEIGHTS[judgmentType];
 }
 
 /**

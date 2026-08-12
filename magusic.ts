@@ -41,7 +41,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     let currentPlayer = localStorage.getItem('magsic_player') || 'Guest';
     let globalOffset = 0;
     let visualOffset = 0;
-    let currentLaneWidth = 100;
+    let currentLaneWidth = 200;
     let isLaneCoverEnabled = false;
     let laneCoverHeight = 300;
     let laneCoverSpeedMult = 1.0;
@@ -50,6 +50,25 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     let isMVLayout = false;
     let laneOpacity = 1.0;
     let currentSkin = 'default';
+
+    // Rival State
+    interface RivalScoreEvent {
+        time: number;
+        weight: number;
+    }
+    let rivalPercent = 90;
+    let isRivalShowEnabled = true;
+    let scoreDisplayType: 'percent' | 'value' = 'percent';
+    let rivalScoreEvents: RivalScoreEvent[] = [];
+    let isRivalBarEnabled = true;
+    let playerNickname = '';
+    let playerBio = '';
+    let rivalEventIndex = 0;
+    let currentModeIndex = 0;
+    let currentDaniIndex = 0;
+    let rivalPassedMaxScore = 0;
+    let playerIconBase64 = '';
+    let battleServerUrl = '';
 
     // Ranked Mode (Dani Nintei) State
     let isDaniMode = false;
@@ -69,7 +88,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     let currentLayoutType: 'type-a' | 'type-b' | 'default' = 'default';
     let targetLayoutType: 'type-a' | 'type-b' = 'type-a';
     let LERP_SPEED = 0.15;
-    let currentLaneWidthState = 100;
+    let currentLaneWidthState = 200;
 
     // --- UI Elements ---
     const startScreen = document.getElementById('start-screen') as HTMLDivElement;
@@ -82,6 +101,10 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     const pauseOverlay = document.getElementById('pause-overlay') as HTMLDivElement;
     const loadingOverlay = document.getElementById('loading-overlay') as HTMLDivElement;
     const shutterOverlay = document.getElementById('shutter-overlay') as HTMLDivElement;
+    const introOverlay = document.getElementById('intro-overlay') as HTMLDivElement;
+    const introSongTitle = document.getElementById('intro-song-title') as HTMLHeadingElement;
+    const introSongLevel = document.getElementById('intro-song-level') as HTMLDivElement;
+    let introBGM: HTMLAudioElement | null = null;
     const debugLog = document.getElementById('debug-log') as HTMLDivElement;
     const daniSelectOverlay = document.getElementById('dani-select-overlay') as HTMLDivElement;
     const daniListDiv = document.getElementById('dani-list') as HTMLDivElement;
@@ -121,6 +144,23 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     const chartInput = document.getElementById('chart-input') as HTMLInputElement;
     const laneOpacityInput = document.getElementById('lane-opacity-input') as HTMLInputElement;
     const laneOpacityDisplay = document.getElementById('lane-opacity-display') as HTMLSpanElement;
+
+    const rivalScoreInput = document.getElementById('rival-score-input') as HTMLInputElement;
+    const rivalScoreDisplay = document.getElementById('rival-score-display') as HTMLSpanElement;
+    const rivalShowCheckbox = document.getElementById('rival-show-checkbox') as HTMLInputElement;
+    const scoreDisplayTypeSelect = document.getElementById('score-display-type-select') as HTMLSelectElement;
+    const nicknameInput = document.getElementById('nickname-input') as HTMLInputElement;
+    const bioInput = document.getElementById('bio-input') as HTMLInputElement;
+
+    const optIconInput = document.getElementById('opt-icon-input') as HTMLInputElement;
+    const optIconPreview = document.getElementById('opt-icon-preview') as HTMLImageElement;
+    const optIconPlaceholder = document.getElementById('opt-icon-placeholder') as HTMLSpanElement;
+    const lobbyPlayerYouIcon = document.getElementById('lobby-player-you-icon') as HTMLImageElement;
+    const lobbyPlayerYouPlaceholder = document.getElementById('lobby-player-you-placeholder') as HTMLSpanElement;
+    const rivalBarCheckbox = document.getElementById('rival-bar-checkbox') as HTMLInputElement;
+    const btnGaugeRoll = document.getElementById('btn-gauge-roll') as HTMLButtonElement;
+    const gaugeRollName = document.getElementById('gauge-roll-name') as HTMLDivElement;
+    const gaugeRollDesc = document.getElementById('gauge-roll-desc') as HTMLDivElement;
 
     const btnCalibrate = document.getElementById('btn-calibrate') as HTMLButtonElement;
     const btnCancelCalibration = document.getElementById('btn-cancel-calibration') as HTMLButtonElement;
@@ -313,6 +353,20 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             shutterHeight = 0;
             if (canvas) canvas.style.display = 'block'; // Restore canvas for next time
 
+            if (isBattleSelectMode) {
+                if (wsBattle) {
+                    wsBattle.close();
+                    wsBattle = null;
+                }
+                isBattleSelectMode = false;
+                if (songSelectOverlay) {
+                    songSelectOverlay.style.display = 'none';
+                    songSelectOverlay.classList.remove('battle-mode');
+                }
+                openBattleLobby();
+                return;
+            }
+
             if (isDaniMode && currentDaniCourse) {
                 daniSongIndex++;
                 if (daniSongIndex < 4) {
@@ -338,85 +392,114 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
 
     // --- Select Menu State ---
     const menuOverlay = document.getElementById('menu-overlay') as HTMLDivElement;
-    const menuBtnPlay = document.getElementById('menu-btn-play') as HTMLDivElement;
-    const menuBtnDani = document.getElementById('menu-btn-dani') as HTMLDivElement;
-    const menuBtnRecords = document.getElementById('menu-btn-records') as HTMLDivElement;
-    const menuBtnBack = document.getElementById('menu-btn-back') as HTMLDivElement;
-    const menuItems = [menuBtnPlay, menuBtnDani, menuBtnRecords, menuBtnBack];
-    let selectedMenuIndex = 0;
 
-    function updateMenuSelection() {
-        menuItems.forEach((item, index) => {
-            if (!item) return;
-            if (index === selectedMenuIndex) {
-                item.classList.add('selected');
-            } else {
-                item.classList.remove('selected');
-            }
-        });
-    }
-
-    function executeMenuAction() {
-        if (!menuOverlay || menuOverlay.style.display === 'none') return;
-
-        playSE('se_select');
-
-        if (selectedMenuIndex === 0) { // PLAY
-            menuOverlay.style.display = 'none';
-            performImageShutterTransition(() => {
-                openSongSelectForReal();
-            }).then(() => {
-                playBGM('bgm_select');
-            });
-        } else if (selectedMenuIndex === 1) { // 段位認定
-            menuOverlay.style.display = 'none';
-            performImageShutterTransition(() => {
-                showStartScreen(false);
-                if (daniSelectOverlay) daniSelectOverlay.style.display = 'flex';
-                loadDaniCourses();
-            }).then(() => {
-                playBGM('bgm_select'); // Or specific dani bgm
-            });
-        } else if (selectedMenuIndex === 2) { // 記録
-            openRecords();
-        } else if (selectedMenuIndex === 3) { // 戻る
-            menuOverlay.style.display = 'none';
-        }
-    }
-
-    if (menuOverlay) {
-        menuItems.forEach((item, index) => {
-            if (item) {
-                item.addEventListener('mouseenter', () => {
-                    selectedMenuIndex = index;
-                    updateMenuSelection();
-                    playSE('se_select'); // Optional hover sound
-                });
-                item.addEventListener('click', () => {
-                    selectedMenuIndex = index;
-                    updateMenuSelection();
-                    executeMenuAction();
-                });
-            }
-        });
-    }
-
-    // Global Keyboard Navigation for Select Menu
+    // Global Keyboard Navigation for Play Mode Select Menu
     document.addEventListener('keydown', (e) => {
-        if (menuOverlay && menuOverlay.style.display === 'flex') {
-            if (e.key === 'ArrowLeft') {
-                selectedMenuIndex = (selectedMenuIndex - 1 + menuItems.length) % menuItems.length;
-                updateMenuSelection();
+        if (menuOverlay && (menuOverlay.style.display === 'flex' || menuOverlay.style.display === 'block')) {
+            const activeEl = document.activeElement;
+            const isInputField = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+            if (isInputField) return;
+
+            const keyLower = e.key.toLowerCase();
+            if (keyLower === 's' || e.key === 'ArrowLeft') {
+                e.preventDefault();
+                currentModeIndex = (currentModeIndex - 1 + PLAY_MODES_INFO.length) % PLAY_MODES_INFO.length;
+                renderModeCarousel();
                 playSE('se_select');
-            } else if (e.key === 'ArrowRight') {
-                selectedMenuIndex = (selectedMenuIndex + 1) % menuItems.length;
-                updateMenuSelection();
+            } else if (keyLower === 'l' || e.key === 'ArrowRight') {
+                e.preventDefault();
+                currentModeIndex = (currentModeIndex + 1) % PLAY_MODES_INFO.length;
+                renderModeCarousel();
                 playSE('se_select');
-            } else if (e.key === 'Enter') {
-                executeMenuAction();
+            } else if (keyLower === 'd' || keyLower === 'j' || e.key === 'Enter') {
+                e.preventDefault();
+                executePlayModeAction();
             } else if (e.key === 'Escape') {
+                e.preventDefault();
                 menuOverlay.style.display = 'none';
+                showStartScreen(true);
                 playSE('se_back');
+            }
+        }
+    });
+
+    // Global Keyboard Navigation for Dani Select Menu
+    document.addEventListener('keydown', (e) => {
+        if (daniSelectOverlay && (daniSelectOverlay.style.display === 'flex' || daniSelectOverlay.style.display === 'block')) {
+            const activeEl = document.activeElement;
+            const isInputField = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+            if (isInputField) return;
+
+            const keyLower = e.key.toLowerCase();
+            if (keyLower === 'd' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                currentDaniIndex = (currentDaniIndex - 1 + DANI_COURSES_DUMMY.length) % DANI_COURSES_DUMMY.length;
+                renderDaniScrollList();
+                playSE('se_select');
+            } else if (keyLower === 'k' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                currentDaniIndex = (currentDaniIndex + 1) % DANI_COURSES_DUMMY.length;
+                renderDaniScrollList();
+                playSE('se_select');
+            } else if (keyLower === 'f' || keyLower === 'j' || e.key === 'Enter') {
+                e.preventDefault();
+                const activeCourse = DANI_COURSES_DUMMY[currentDaniIndex];
+                if (isDaniLocked(activeCourse.title)) {
+                    playSE('se_cancel');
+                    alert(`「${activeCourse.title}」はロックされています。1つ前の段位をクリアしてください。`);
+                } else {
+                    playSE('se_decide');
+                    const confirmClear = confirm(`このダミー段位「${activeCourse.title}」に合格（クリア）したことにしますか？\n（クリアすると曲名が公開され、上位段位が解放されます）`);
+                    if (confirmClear) {
+                        setDaniCleared(activeCourse.title);
+                        renderDaniScrollList();
+                        alert(`「${activeCourse.title}」をクリアしました！`);
+                    } else {
+                        alert(`「${activeCourse.title}」コースは近々実装予定です。`);
+                    }
+                }
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                playSE('se_cancel');
+                if (daniSelectOverlay) daniSelectOverlay.style.display = 'none';
+                if (menuOverlay) {
+                    menuOverlay.style.display = 'flex';
+                    renderModeCarousel();
+                }
+            }
+        }
+    });
+
+    // Global Keyboard Navigation for Battle Matching Lobby
+    document.addEventListener('keydown', (e) => {
+        if (battleLobbyOverlay && (battleLobbyOverlay.style.display === 'flex' || battleLobbyOverlay.style.display === 'block')) {
+            const activeEl = document.activeElement;
+            const isInputField = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+            if (isInputField) return;
+
+            const keyLower = e.key.toLowerCase();
+            if (keyLower === 'enter' || keyLower === 'f' || keyLower === 'j') {
+                e.preventDefault();
+                if (isMatched) {
+                    playSE('se_decide');
+                    enterBattleSelectScreen();
+                } else {
+                    // Force start shortcut for testing convenience
+                    playSE('se_decide');
+                    triggerMatchFound();
+                    setTimeout(() => {
+                        enterBattleSelectScreen();
+                    }, 800);
+                }
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                playSE('se_cancel');
+                if (matchingTimer) clearTimeout(matchingTimer);
+                if (battleLobbyOverlay) battleLobbyOverlay.style.display = 'none';
+                if (menuOverlay) {
+                    menuOverlay.style.display = 'flex';
+                    renderModeCarousel();
+                }
             }
         }
     });
@@ -430,8 +513,8 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             } catch (e) { console.error('Audio Init Error:', e); }
 
             playSE('se_start');
-            selectedMenuIndex = 0;
-            updateMenuSelection();
+            currentModeIndex = 0;
+            renderModeCarousel();
             if (menuOverlay) {
                 menuOverlay.style.display = 'flex';
             }
@@ -452,6 +535,11 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
 
         if (songSelectOverlay) {
             songSelectOverlay.style.display = 'flex'; // Fix: Use FLEX not BLOCK
+            if (isBattleSelectMode) {
+                songSelectOverlay.classList.add('battle-mode');
+            } else {
+                songSelectOverlay.classList.remove('battle-mode');
+            }
             console.log('songSelectOverlay display set to FLEX'); // DEBUG
         } else {
             console.error('songSelectOverlay NOT FOUND');
@@ -546,66 +634,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         songSelectOverlay.insertBefore(container, songListDiv);
     }
 
-    // --- Dani (Ranked) Logic ---
-    async function loadDaniCourses() {
-        try {
-            const res = await fetch('songs/courses.json');
-            daniCourses = await res.json();
-            initDaniSelect();
-        } catch (e) {
-            console.error('Failed to load dani courses', e);
-        }
-    }
 
-    function initDaniSelect() {
-        if (!daniListDiv) return;
-        daniListDiv.innerHTML = '';
-        daniCourses.forEach(course => {
-            const btn = document.createElement('div');
-            btn.className = 'dani-course-card'; // Add styling in CSS later or style here
-            btn.style.width = '200px';
-            btn.style.padding = '20px';
-            btn.style.background = '#222';
-            btn.style.border = '2px solid #ff0000';
-            btn.style.borderRadius = '10px';
-            btn.style.cursor = 'pointer';
-            btn.style.textAlign = 'center';
-            btn.style.transition = 'transform 0.2s';
-
-            btn.innerHTML = `
-                <div style="font-size: 1.5em; color: #ff0000; font-family: 'Sawarabi Mincho', serif; margin-bottom: 10px;">${course.title}</div>
-                <div style="font-size: 0.8em; color: #aaa;">4 SONGS SURVIVAL</div>
-            `;
-
-            btn.onmouseenter = () => {
-                btn.style.transform = 'scale(1.05)';
-                btn.style.boxShadow = '0 0 15px rgba(255, 0, 0, 0.5)';
-            };
-            btn.onmouseleave = () => {
-                btn.style.transform = 'scale(1)';
-                btn.style.boxShadow = 'none';
-            };
-
-            btn.onclick = () => {
-                playSE('se_decide');
-                startDaniCourse(course);
-            };
-            daniListDiv.appendChild(btn);
-        });
-    }
-
-    function startDaniCourse(course: any) {
-        isDaniMode = true;
-        currentDaniCourse = course;
-        daniSongIndex = 0;
-        daniHealth = 100;
-
-        if (daniSelectOverlay) daniSelectOverlay.style.display = 'none';
-        if (controlsDiv) controlsDiv.style.display = 'none';
-
-        const song = course.songs[0];
-        loadSong(song.folder, song.chart, song.audio);
-    }
 
     // Records Overlay Logic
     const recordsBody = document.getElementById('records-body') as HTMLTableSectionElement;
@@ -762,6 +791,536 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     if (playerDisplayInSelect) playerDisplayInSelect.textContent = `Player: ${currentPlayer} ▼`;
 
 
+    // --- Gauge Roll Setup ---
+    const GAUGE_ROLL_ORDER: GaugeType[] = ['norma_easy', 'norma', 'life', 'life_hard', 'life_ex', 'sudden_death'];
+    const GAUGE_ROLL_INFO: Record<GaugeType, { name: string; desc: string }> = {
+        norma_easy: { name: 'NORMA-EASY', desc: '65%スタート。perfect +1%、great/good +0.5%、BAD -1%、MISS -3%。65%以上でクリア。' },
+        norma: { name: 'NORMA', desc: '80%スタート。perfect +0.5%、great/good +0.2%、BAD -2%、MISS -6%。80%以上でクリア。' },
+        life: { name: 'LIFE', desc: '100%スタート。perfect +0.5%、great/good +0.2%、BAD -6%、MISS -8%。0%で終了、完走でクリア。' },
+        life_hard: { name: 'LIFE HARD', desc: '100%スタート。perfect +0.5%、great/good +0.2%、BAD -10%、MISS -15%。0%で終了、完走でクリア。' },
+        life_ex: { name: 'LIFE EX', desc: '100%スタート。perfect +0.5%、great/good +0.2%、BAD -25%、MISS -50%。0%で終了、完走でクリア。' },
+        sudden_death: { name: '即死 (SUDDEN DEATH)', desc: '100%スタート。BADまたはMISSを1回でも出すと即死終了、完走でクリア。' }
+    };
+
+    function updateGaugeDisplay() {
+        if (gaugeRollName && gaugeRollDesc) {
+            const info = GAUGE_ROLL_INFO[gaugeType];
+            if (info) {
+                gaugeRollName.textContent = info.name;
+                gaugeRollDesc.textContent = info.desc;
+            }
+        }
+    }
+
+
+    // --- Play Mode & Dani Redesign Setup ---
+    interface PlayModeInfo {
+        id: string;
+        title: string;
+        desc: string;
+        disabled: boolean;
+    }
+
+    const PLAY_MODES_INFO: PlayModeInfo[] = [
+        { id: 'single', title: 'SINGLE', desc: '今までの普通のプレイをおこないます。', disabled: false },
+        { id: 'battle', title: 'バトル', desc: 'オンラインで人とマッチし戦います。（マッチ準備室デモ）', disabled: false },
+        { id: 'express', title: 'EXPRESS', desc: '決められたルールやお題の曲のミッションを達成していき、クリアを目指すアドベンチャーモード。（近々実装予定）', disabled: true },
+        { id: 'dani', title: '段位認定', desc: '実力測定用コースを連続プレイします。（形だけ実装済み）', disabled: false },
+        { id: 'training', title: 'トレーニング', desc: 'しばらくは実装しません。', disabled: true }
+    ];
+
+    interface DaniCourseDummy {
+        title: string;
+        level: string;
+        songs: string[];
+        color: string;
+    }
+
+    const DANI_COURSES_DUMMY: DaniCourseDummy[] = [
+        { title: '海伝', level: '★10+', songs: ['Sinking Feeling', 'Forbidden Ritual', 'Antigravity', '漁火'], color: '#ff3d00' },
+        { title: '河伝', level: '★10', songs: ['Magusic Flow', 'Cyber Stream', 'Undercurrent', 'Ceviche'], color: '#ff9100' },
+        { title: '水伝', level: '★9+', songs: ['Hydro Rhythm', 'Splash Wave', 'Raindrop Drop', 'Ocean Breeze'], color: '#2979ff' },
+        { title: 'Ⅶ', level: '★9', songs: ['Seven Seals', 'Lucky Strike', 'Rainbow Road', 'Seventh Heaven'], color: '#e040fb' },
+        { title: 'Ⅵ', level: '★8+', songs: ['Hexa Force', 'Six Degrees', 'Prism Dance', 'Hexagon'], color: '#00e5ff' },
+        { title: 'Ⅴ', level: '★8', songs: ['Pentagram', 'High Five', 'Vivid Lights', 'Starry Sky'], color: '#00e676' },
+        { title: 'Ⅳ', level: '★7', songs: ['Square One', 'Crossroad', 'Windmill', 'Gravity Fall'], color: '#ffea00' },
+        { title: 'Ⅲ', level: '★6', songs: ['Triangle', 'Triple Play', 'Three Wishes', 'Trio'], color: '#ff9100' },
+        { title: 'Ⅱ', level: '★5', songs: ['Dual Core', 'Double Time', 'Echoes', 'Binary Star'], color: '#ff5722' },
+        { title: 'Ⅰ', level: '★4', songs: ['First Step', 'Beginning', 'Tutorial', 'Introduction'], color: '#9e9e9e' }
+    ];
+
+    // Helper functions for Dani clear / lock states
+    function isDaniCleared(courseTitle: string): boolean {
+        const key = `magsic_dani_cleared_${currentPlayer}`;
+        try {
+            const saved = localStorage.getItem(key);
+            if (saved) {
+                const clearedList = JSON.parse(saved);
+                return Array.isArray(clearedList) && clearedList.includes(courseTitle);
+            }
+        } catch (e) { console.error(e); }
+        return false;
+    }
+
+    function isDaniLocked(courseTitle: string): boolean {
+        if (courseTitle === '海伝') return !isDaniCleared('河伝');
+        if (courseTitle === '河伝') return !isDaniCleared('水伝');
+        if (courseTitle === '水伝') return !isDaniCleared('Ⅶ');
+        return false; // Ⅶ以下はロックされない
+    }
+
+    function setDaniCleared(courseTitle: string) {
+        const key = `magsic_dani_cleared_${currentPlayer}`;
+        try {
+            const saved = localStorage.getItem(key);
+            let clearedList = saved ? JSON.parse(saved) : [];
+            if (!Array.isArray(clearedList)) clearedList = [];
+            if (!clearedList.includes(courseTitle)) {
+                clearedList.push(courseTitle);
+                localStorage.setItem(key, JSON.stringify(clearedList));
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    const modeCardsWrapper = document.getElementById('mode-cards-wrapper');
+    const modeDescTitle = document.getElementById('mode-desc-title');
+    const modeDescText = document.getElementById('mode-desc-text');
+
+    function renderModeCarousel() {
+        if (!modeCardsWrapper) return;
+        modeCardsWrapper.innerHTML = '';
+        
+        PLAY_MODES_INFO.forEach((mode, idx) => {
+            const card = document.createElement('div');
+            card.className = 'mode-card';
+            if (idx === currentModeIndex) card.classList.add('active');
+            if (mode.disabled) card.classList.add('disabled');
+            
+            card.innerHTML = `<div>${mode.title}</div>`;
+            
+            card.addEventListener('click', () => {
+                currentModeIndex = idx;
+                renderModeCarousel();
+                playSE('se_select');
+            });
+            
+            modeCardsWrapper.appendChild(card);
+        });
+
+        const activeMode = PLAY_MODES_INFO[currentModeIndex];
+        if (modeDescTitle) modeDescTitle.textContent = activeMode.title;
+        if (modeDescText) modeDescText.textContent = activeMode.desc;
+    }
+
+    const daniScrollList = document.getElementById('dani-scroll-list');
+    const daniInfoTitle = document.getElementById('dani-info-title');
+    const daniInfoLevel = document.getElementById('dani-info-level');
+    const daniInfoSongs = document.getElementById('dani-info-songs');
+
+    function renderDaniScrollList() {
+        if (!daniScrollList) return;
+        daniScrollList.innerHTML = '';
+        
+        DANI_COURSES_DUMMY.forEach((course, idx) => {
+            const card = document.createElement('div');
+            card.className = 'dani-card';
+            if (idx === currentDaniIndex) card.classList.add('active');
+            
+            const locked = isDaniLocked(course.title);
+            const cleared = isDaniCleared(course.title);
+            
+            let titleText = course.title;
+            let levelText = course.level;
+            
+            if (locked) {
+                titleText += ' 🔒';
+                card.style.opacity = '0.4';
+            } else if (cleared) {
+                card.classList.add('cleared'); // Apply Gold style
+            }
+            
+            card.innerHTML = `
+                <span style="font-weight: bold; border-left: 4px solid ${course.color}; padding-left: 10px;">${titleText}</span>
+                <span style="font-size: 0.85em; color: ${course.color}; font-family: monospace; font-weight: bold;">${levelText}</span>
+            `;
+
+            card.addEventListener('click', () => {
+                currentDaniIndex = idx;
+                renderDaniScrollList();
+                playSE('se_select');
+            });
+
+            daniScrollList.appendChild(card);
+        });
+
+        const activeEl = daniScrollList.children[currentDaniIndex] as HTMLElement;
+        if (activeEl) {
+            activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        const activeCourse = DANI_COURSES_DUMMY[currentDaniIndex];
+        const isLocked = isDaniLocked(activeCourse.title);
+        const isCleared = isDaniCleared(activeCourse.title);
+        
+        if (daniInfoTitle) {
+            // Remove text suffixes like (LOCKED) or (CLEARED)
+            daniInfoTitle.textContent = activeCourse.title;
+            daniInfoTitle.style.color = activeCourse.color;
+        }
+        if (daniInfoLevel) {
+            daniInfoLevel.textContent = activeCourse.level;
+            daniInfoLevel.style.color = activeCourse.color;
+        }
+        
+        if (daniInfoSongs) {
+            daniInfoSongs.innerHTML = '';
+            
+            if (isLocked) {
+                const lockDiv = document.createElement('div');
+                lockDiv.style.cssText = 'flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.4); text-align: center; gap: 15px; border: 2px dashed rgba(255,61,0,0.2); border-radius: 12px; padding: 30px; box-sizing: border-box; height: 100%;';
+                lockDiv.innerHTML = `
+                    <span style="font-size: 3em; filter: drop-shadow(0 0 10px rgba(255,61,0,0.3));">🔒</span>
+                    <span style="font-weight: bold; font-size: 1.2em; color: #ff3d00; letter-spacing: 1px;">ロックされています</span>
+                    <span style="font-size: 0.85em; line-height: 1.6; color: rgba(255,255,255,0.5);">このコースに挑戦するには、<br>1つ前の段位をクリアする必要があります。</span>
+                `;
+                daniInfoSongs.appendChild(lockDiv);
+            } else {
+                activeCourse.songs.forEach((song, sIdx) => {
+                    const songDiv = document.createElement('div');
+                    songDiv.style.cssText = 'background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); padding: 12px 20px; border-radius: 8px; font-family: sans-serif; display: flex; align-items: center; justify-content: space-between;';
+                    
+                    const displaySongName = isCleared ? song : '？？？';
+                    
+                    songDiv.innerHTML = `
+                        <span style="color: rgba(255,255,255,0.5); font-family: monospace; font-size: 0.9em; margin-right: 15px;">STAGE ${sIdx + 1}</span>
+                        <span style="color: #fff; font-weight: bold; flex: 1;">${displaySongName}</span>
+                        <span style="color: ${activeCourse.color}; font-size: 0.8em; font-family: monospace;">★ DUMMY</span>
+                    `;
+                    daniInfoSongs.appendChild(songDiv);
+                });
+            }
+        }
+    }
+
+    // --- Online Battle Lobby Setup ---
+    const battleLobbyOverlay = document.getElementById('battle-lobby-overlay') as HTMLDivElement;
+    const opponentIcon = document.getElementById('opponent-icon') as HTMLDivElement;
+    const opponentName = document.getElementById('opponent-name') as HTMLDivElement;
+    const opponentStatus = document.getElementById('opponent-status') as HTMLDivElement;
+    const matchingStatusText = document.getElementById('matching-status-text') as HTMLDivElement;
+    const btnLobbyBypass = document.getElementById('btn-lobby-bypass') as HTMLButtonElement;
+    const btnCloseLobby = document.getElementById('btn-close-lobby') as HTMLButtonElement;
+    
+    let isMatched = false;
+    let isBattleSelectMode = false;
+    let wsBattle: WebSocket | null = null;
+    let myBattleRole: 'p1' | 'p2' | null = null;
+    let hasOpponentFinished = false;
+    let opponentResultData: any = null;
+
+    function connectBattleSocket() {
+        if (wsBattle) {
+            wsBattle.close();
+            wsBattle = null;
+        }
+
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${wsProtocol}//${window.location.host}`;
+        
+        wsBattle = new WebSocket(wsUrl);
+        myBattleRole = null;
+        hasOpponentFinished = false;
+        opponentResultData = null;
+
+        wsBattle.onopen = () => {
+            console.log('[WS] Connected to battle transit');
+            wsBattle?.send(JSON.stringify({
+                type: 'join',
+                nickname: playerNickname || 'Guest',
+                icon: playerIconBase64 || ''
+            }));
+        };
+
+        wsBattle.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                handleBattleSocketMessage(data);
+            } catch(e) { console.error('[WS] Message parse error:', e); }
+        };
+
+        wsBattle.onerror = (e) => {
+            console.error('[WS] Socket error:', e);
+        };
+
+        wsBattle.onclose = () => {
+            console.log('[WS] Socket closed');
+        };
+    }
+
+    function handleBattleSocketMessage(data: any) {
+        switch(data.type) {
+            case 'waiting':
+                isMatched = false;
+                if (opponentIcon) { opponentIcon.textContent = '❓'; opponentIcon.style.opacity = '0.3'; }
+                if (opponentName) { opponentName.textContent = 'SEARCHING...'; opponentName.style.color = '#666'; }
+                if (opponentStatus) { opponentStatus.textContent = 'WAITING'; opponentStatus.style.color = '#555'; opponentStatus.style.background = 'rgba(255,255,255,0.05)'; }
+                if (matchingStatusText) { matchingStatusText.textContent = 'WAITING FOR OPPONENT...'; matchingStatusText.style.color = '#ff007f'; }
+                break;
+
+            case 'matched':
+                isMatched = true;
+                myBattleRole = data.role;
+                playSE('se_decide');
+
+                if (opponentIcon) {
+                    if (data.opponent.icon) {
+                        opponentIcon.innerHTML = `<img src="${data.opponent.icon}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+                    } else {
+                        opponentIcon.textContent = '👽';
+                    }
+                    opponentIcon.style.opacity = '1.0';
+                }
+                if (opponentName) {
+                    opponentName.textContent = data.opponent.nickname;
+                    opponentName.style.color = '#ff007f';
+                }
+                if (opponentStatus) {
+                    opponentStatus.textContent = 'READY';
+                    opponentStatus.style.color = '#fff';
+                    opponentStatus.style.background = 'rgba(255,0,127,0.3)';
+                }
+                if (matchingStatusText) {
+                    if (myBattleRole === 'p1') {
+                        matchingStatusText.textContent = 'MATCH FOUND! PRESS ENTER TO CHOOSE SONG';
+                    } else {
+                        matchingStatusText.textContent = 'MATCH FOUND! WAITING FOR HOST TO CHOOSE SONG';
+                    }
+                    matchingStatusText.style.color = '#00ffff';
+                }
+                break;
+
+            case 'opponent_left':
+                alert('対戦相手が退出しました。');
+                isMatched = false;
+                if (isPlaying) {
+                    isPlaying = false;
+                    if (wsBattle) wsBattle.close();
+                    wsBattle = null;
+                    if (canvas) canvas.style.display = 'block';
+                    if (songSelectOverlay) {
+                        songSelectOverlay.style.display = 'none';
+                        songSelectOverlay.classList.remove('battle-mode');
+                    }
+                    if (menuOverlay) {
+                        menuOverlay.style.display = 'flex';
+                        renderModeCarousel();
+                    }
+                } else {
+                    exitBattleSelectAndReturnToLobby();
+                }
+                break;
+
+            case 'cursor_move':
+                if (myBattleRole === 'p2' && songSelectOverlay && songSelectOverlay.style.display !== 'none') {
+                    selectedSongIndex = data.index;
+                    renderSongSelectInternal();
+                }
+                break;
+
+            case 'diff_change':
+                if (myBattleRole === 'p2' && songSelectOverlay && songSelectOverlay.style.display !== 'none') {
+                    selectedDiffIndex = data.index;
+                    renderRightColumn();
+                }
+                break;
+
+            case 'song_decide':
+                if (myBattleRole === 'p2') {
+                    playSE('se_decide');
+                    isBattleSelectMode = true;
+                    if (songSelectOverlay) {
+                        songSelectOverlay.style.display = 'none';
+                    }
+                    loadSong(data.songFolder, data.chartName, data.audioName);
+                }
+                break;
+
+            case 'play_state':
+                if (isPlaying) {
+                    rivalPassedMaxScore = data.score;
+                }
+                break;
+
+            case 'results':
+                hasOpponentFinished = true;
+                opponentResultData = data;
+                if (!isPlaying && customResultScreen && customResultScreen.style.display === 'flex') {
+                    refreshBattleWinnerDisplay();
+                }
+                break;
+        }
+    }
+
+    function exitBattleSelectAndReturnToLobby() {
+        isBattleSelectMode = false;
+        if (songSelectOverlay) {
+            songSelectOverlay.style.display = 'none';
+            songSelectOverlay.classList.remove('battle-mode');
+        }
+        openBattleLobby();
+    }
+
+    function openBattleLobby() {
+        isMatched = false;
+        if (battleLobbyOverlay) battleLobbyOverlay.style.display = 'flex';
+        
+        // Sync custom icon
+        updateIconElements();
+        
+        // Connect to WS Matching
+        connectBattleSocket();
+    }
+
+    function triggerMatchFound() {
+        if (isMatched) return;
+        isMatched = true;
+        myBattleRole = 'p1'; // Assume P1 role for test bypass
+        playSE('se_decide');
+        
+        if (opponentIcon) { opponentIcon.textContent = '😈'; opponentIcon.style.opacity = '1.0'; }
+        if (opponentName) { opponentName.textContent = 'CPU_Rival_99'; opponentName.style.color = '#ff007f'; }
+        if (opponentStatus) { opponentStatus.textContent = 'READY'; opponentStatus.style.color = '#fff'; opponentStatus.style.background = 'rgba(255,0,127,0.3)'; }
+        if (matchingStatusText) { matchingStatusText.textContent = 'MATCH FOUND (TEST)! PRESS ENTER TO START'; matchingStatusText.style.color = '#00ffff'; }
+    }
+
+    function enterBattleSelectScreen() {
+        if (matchingTimer) clearTimeout(matchingTimer);
+        if (battleLobbyOverlay) battleLobbyOverlay.style.display = 'none';
+        
+        isBattleSelectMode = true;
+        performImageShutterTransition(() => {
+            showStartScreen(false);
+            if (songSelectOverlay) {
+                songSelectOverlay.style.display = 'flex';
+                songSelectOverlay.classList.add('battle-mode');
+            }
+            loadSongList();
+        }).then(() => {
+            playBGM('bgm_select');
+        });
+    }
+
+    function broadcastPlayState() {
+        if (isBattleSelectMode && wsBattle && wsBattle.readyState === WebSocket.OPEN) {
+            const currentRatio = totalMaxScore > 0 ? (totalMaxScore - lostScore) / totalMaxScore : 0;
+            const clearRate = currentRatio * 100;
+            const currentScore = Math.floor(currentRatio * 1000000);
+            
+            wsBattle.send(JSON.stringify({
+                type: 'play_state',
+                score: currentScore,
+                health: currentHealth,
+                combo: combo,
+                clearRate: clearRate
+            }));
+        }
+    }
+
+    function refreshBattleWinnerDisplay() {
+        if (!resultStatusTitle) return;
+        if (hasOpponentFinished && opponentResultData) {
+            const userRatio = totalMaxScore > 0 ? (totalMaxScore - lostScore) / totalMaxScore : 0;
+            const cpuRatio = opponentResultData.clearRate / 100;
+
+            if (userRatio >= cpuRatio) {
+                resultStatusTitle.textContent = "YOU WIN! 🏆";
+                resultStatusTitle.style.color = "#ffd700"; // Gold
+            } else {
+                resultStatusTitle.textContent = "YOU LOSE... 😢";
+                resultStatusTitle.style.color = "#ff3d00"; // Red
+            }
+        }
+    }
+
+    function executePlayModeAction() {
+        const activeMode = PLAY_MODES_INFO[currentModeIndex];
+        playSE('se_decide');
+        
+        if (activeMode.id === 'single') {
+            if (menuOverlay) menuOverlay.style.display = 'none';
+            performImageShutterTransition(() => {
+                openSongSelectForReal();
+            }).then(() => {
+                playBGM('bgm_select');
+            });
+        } else if (activeMode.id === 'battle') {
+            if (menuOverlay) menuOverlay.style.display = 'none';
+            performImageShutterTransition(() => {
+                showStartScreen(false);
+                openBattleLobby();
+            });
+        } else if (activeMode.id === 'dani') {
+            if (menuOverlay) menuOverlay.style.display = 'none';
+            performImageShutterTransition(() => {
+                showStartScreen(false);
+                if (daniSelectOverlay) daniSelectOverlay.style.display = 'flex';
+                renderDaniScrollList();
+            }).then(() => {
+                playBGM('bgm_select');
+            });
+        } else {
+            alert(`「${activeMode.title}」モードは現在開発中（もしくは実装予定なし）です。`);
+        }
+    }
+
+    function updateIconElements() {
+        if (playerIconBase64) {
+            if (optIconPreview) { optIconPreview.src = playerIconBase64; optIconPreview.style.display = 'block'; }
+            if (optIconPlaceholder) { optIconPlaceholder.style.display = 'none'; }
+            if (lobbyPlayerYouIcon) { lobbyPlayerYouIcon.src = playerIconBase64; lobbyPlayerYouIcon.style.display = 'block'; }
+            if (lobbyPlayerYouPlaceholder) { lobbyPlayerYouPlaceholder.style.display = 'none'; }
+        } else {
+            if (optIconPreview) { optIconPreview.style.display = 'none'; }
+            if (optIconPlaceholder) { optIconPlaceholder.style.display = 'block'; }
+            if (lobbyPlayerYouIcon) { lobbyPlayerYouIcon.style.display = 'none'; }
+            if (lobbyPlayerYouPlaceholder) { lobbyPlayerYouPlaceholder.style.display = 'block'; }
+        }
+    }
+
+    function cropAndSaveIcon(file: File) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = 128;
+                canvas.height = 128;
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    const size = Math.min(img.width, img.height);
+                    const sourceX = (img.width - size) / 2;
+                    const sourceY = (img.height - size) / 2;
+                    ctx.drawImage(img, sourceX, sourceY, size, size, 0, 0, 128, 128);
+                    
+                    playerIconBase64 = canvas.toDataURL('image/png');
+                    updateIconElements();
+                    savePlayerSettings();
+                }
+            };
+            img.src = event.target?.result as string;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    if (optIconInput) {
+        optIconInput.addEventListener('change', (e: any) => {
+            const file = e.target.files?.[0];
+            if (file) {
+                cropAndSaveIcon(file);
+            }
+        });
+    }
+
     // --- Per-Player Settings Logic ---
     function loadPlayerSettings() {
         const key = `magsic_settings_${currentPlayer}`;
@@ -836,6 +1395,56 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                     if (skinSelect) skinSelect.value = currentSkin;
                 }
 
+                // Rival settings
+                if (settings.rivalPercent !== undefined) {
+                    rivalPercent = parseInt(settings.rivalPercent);
+                    if (rivalScoreInput) rivalScoreInput.value = rivalPercent.toString();
+                    if (rivalScoreDisplay) rivalScoreDisplay.textContent = rivalPercent.toString();
+                }
+                if (settings.isRivalShowEnabled !== undefined) {
+                    isRivalShowEnabled = !!settings.isRivalShowEnabled;
+                    if (rivalShowCheckbox) rivalShowCheckbox.checked = isRivalShowEnabled;
+                }
+                if (settings.scoreDisplayType !== undefined) {
+                    scoreDisplayType = settings.scoreDisplayType as 'percent' | 'value';
+                    if (scoreDisplayTypeSelect) scoreDisplayTypeSelect.value = scoreDisplayType;
+                }
+                if (settings.isRivalBarEnabled !== undefined) {
+                    isRivalBarEnabled = !!settings.isRivalBarEnabled;
+                    if (rivalBarCheckbox) rivalBarCheckbox.checked = isRivalBarEnabled;
+                }
+
+                // Nickname & Bio
+                if (settings.playerNickname !== undefined) {
+                    playerNickname = settings.playerNickname;
+                    if (nicknameInput) nicknameInput.value = playerNickname;
+                } else {
+                    playerNickname = '';
+                    if (nicknameInput) nicknameInput.value = '';
+                }
+                if (settings.playerBio !== undefined) {
+                    playerBio = settings.playerBio;
+                    if (bioInput) bioInput.value = playerBio;
+                } else {
+                    playerBio = '';
+                    if (bioInput) bioInput.value = '';
+                }
+
+                if (settings.icon !== undefined) {
+                    playerIconBase64 = settings.icon;
+                } else {
+                    playerIconBase64 = '';
+                }
+                updateIconElements();
+
+                // Gauge Type
+                if (settings.gaugeType !== undefined) {
+                    gaugeType = settings.gaugeType as GaugeType;
+                } else {
+                    gaugeType = 'norma';
+                }
+                updateGaugeDisplay();
+
                 resize(); // Apply loaded lane width
             } else {
                 // Default fallback if no settings for this user
@@ -853,6 +1462,23 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 if (visualOffsetInput) visualOffsetInput.value = '0';
                 if (visualOffsetDisplay) visualOffsetDisplay.textContent = '0';
 
+                rivalPercent = 90;
+                if (rivalScoreInput) rivalScoreInput.value = '90';
+                if (rivalScoreDisplay) rivalScoreDisplay.textContent = '90';
+                isRivalShowEnabled = true;
+                if (rivalShowCheckbox) rivalShowCheckbox.checked = true;
+                scoreDisplayType = 'percent';
+                if (scoreDisplayTypeSelect) scoreDisplayTypeSelect.value = 'percent';
+                isRivalBarEnabled = true;
+                if (rivalBarCheckbox) rivalBarCheckbox.checked = true;
+                playerNickname = '';
+                if (nicknameInput) nicknameInput.value = '';
+                playerBio = '';
+                if (bioInput) bioInput.value = '';
+                playerIconBase64 = '';
+                updateIconElements();
+                gaugeType = 'norma';
+                updateGaugeDisplay();
             }
         } catch (e) {
             console.error('Failed to load settings', e);
@@ -877,9 +1503,17 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             },
             laneOpacity: laneOpacity,
             judgementHeight: judgementHeightOffset,
-            currentSkin: currentSkin
+            currentSkin: currentSkin,
+            rivalPercent: rivalPercent,
+            isRivalShowEnabled: isRivalShowEnabled,
+            scoreDisplayType: scoreDisplayType,
+            isRivalBarEnabled: isRivalBarEnabled,
+            playerNickname: playerNickname,
+            playerBio: playerBio,
+            gaugeType: gaugeType,
+            icon: playerIconBase64
         };
-        localStorage.setItem(key, JSON.stringify(settings)); // Changed to 'magusic_custom_settings' in the instruction, but keeping 'key' for consistency with per-player settings. If the instruction intended a global setting, this would need to be 'magusic_custom_settings'. Assuming the instruction meant to add to the existing per-player settings structure.
+        localStorage.setItem(key, JSON.stringify(settings));
     }
 
     // Load initially
@@ -972,10 +1606,13 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         btnCloseSelect.addEventListener('click', () => {
             playSE('se_cancel');
             songSelectOverlay.style.display = 'none';
-            showStartScreen(true);
-
-            // Return to Title BGM
-            playBGM('bgm_title');
+            if (isBattleSelectMode) {
+                songSelectOverlay.classList.remove('battle-mode');
+                openBattleLobby();
+            } else {
+                showStartScreen(true);
+                playBGM('bgm_title');
+            }
         });
     }
 
@@ -983,8 +1620,10 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         btnCloseDani.addEventListener('click', () => {
             playSE('se_cancel');
             if (daniSelectOverlay) daniSelectOverlay.style.display = 'none';
-            showStartScreen(true);
-            playBGM('bgm_title');
+            if (menuOverlay) {
+                menuOverlay.style.display = 'flex';
+                renderModeCarousel();
+            }
         });
     }
 
@@ -1000,6 +1639,59 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             currentSkin = skinSelect.value;
             console.log('Skin changed to:', currentSkin);
             loadSkin(); // Reload assets
+            savePlayerSettings();
+        });
+    }
+
+    if (rivalScoreInput && rivalScoreDisplay) {
+        rivalScoreInput.addEventListener('input', () => {
+            rivalPercent = parseInt(rivalScoreInput.value);
+            rivalScoreDisplay.textContent = rivalPercent.toString();
+            savePlayerSettings();
+        });
+    }
+
+    if (rivalShowCheckbox) {
+        rivalShowCheckbox.addEventListener('change', () => {
+            isRivalShowEnabled = rivalShowCheckbox.checked;
+            savePlayerSettings();
+        });
+    }
+
+    if (scoreDisplayTypeSelect) {
+        scoreDisplayTypeSelect.addEventListener('change', () => {
+            scoreDisplayType = scoreDisplayTypeSelect.value as 'percent' | 'value';
+            savePlayerSettings();
+        });
+    }
+
+    if (nicknameInput) {
+        nicknameInput.addEventListener('input', () => {
+            playerNickname = nicknameInput.value;
+            savePlayerSettings();
+        });
+    }
+
+    if (bioInput) {
+        bioInput.addEventListener('input', () => {
+            playerBio = bioInput.value;
+            savePlayerSettings();
+        });
+    }
+
+    if (rivalBarCheckbox) {
+        rivalBarCheckbox.addEventListener('change', () => {
+            isRivalBarEnabled = rivalBarCheckbox.checked;
+            savePlayerSettings();
+        });
+    }
+
+    if (btnGaugeRoll) {
+        btnGaugeRoll.addEventListener('click', () => {
+            let idx = GAUGE_ROLL_ORDER.indexOf(gaugeType);
+            idx = (idx + 1) % GAUGE_ROLL_ORDER.length;
+            gaugeType = GAUGE_ROLL_ORDER[idx];
+            updateGaugeDisplay();
             savePlayerSettings();
         });
     }
@@ -1322,6 +2014,11 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             });
             songPreviewBGM = null;
         }
+        if (introBGM) {
+            introBGM.pause();
+            introBGM.src = '';
+            introBGM = null;
+        }
     }
 
     function playSE(key: string) {
@@ -1383,6 +2080,10 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         chart?: string; // legacy support
         video?: string;
         icon?: string;
+        enabled?: boolean;
+        previewBgm?: string;
+        introAudio?: string;
+        introVideo?: string;
     }
 
     let audio: HTMLAudioElement = new Audio();
@@ -1458,6 +2159,35 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         // Calculate Max Score based on current chart
         totalMaxScore = calculateMaxScore(chartData || []);
 
+        // Initialize rival events
+        rivalScoreEvents = [];
+        let rivalWeight = 9.0;
+        if (isBattleSelectMode) {
+            isRivalShowEnabled = true;
+            isRivalBarEnabled = true;
+            
+            // Adjust Rival AI Strength based on difficulty
+            const buttonOrder = ['no', 'st', 'ad', 'pr', 'et'];
+            const diffKey = buttonOrder[selectedDiffIndex];
+            if (diffKey === 'no') rivalWeight = 7.5; // ~75%
+            else if (diffKey === 'st') rivalWeight = 8.2; // ~82%
+            else if (diffKey === 'ad') rivalWeight = 8.8; // ~88%
+            else if (diffKey === 'pr') rivalWeight = 9.3; // ~93%
+            else if (diffKey === 'et') rivalWeight = 9.6; // ~96%
+        }
+
+        (chartData || []).forEach(note => {
+            if (note.duration > 0) {
+                rivalScoreEvents.push({ time: note.time, weight: rivalWeight });
+                rivalScoreEvents.push({ time: note.time + note.duration, weight: rivalWeight });
+            } else {
+                rivalScoreEvents.push({ time: note.time, weight: rivalWeight });
+            }
+        });
+        rivalScoreEvents.sort((a, b) => a.time - b.time);
+        rivalEventIndex = 0;
+        rivalPassedMaxScore = 0;
+
         if (debugLog) {
             debugLog.innerHTML = '<div>Debug Log Started</div>';
         }
@@ -1496,6 +2226,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 }
             }
         }
+        broadcastPlayState();
     }
 
     function applyDaniHit(type: keyof typeof DANI_PENALTIES) {
@@ -1895,6 +2626,12 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         const currentTime = getAudioTime(); // In seconds
         const currentTimeMs = currentTime * 1000;
 
+        // Update rival progress based on passed notes
+        while (rivalEventIndex < rivalScoreEvents.length && currentTimeMs >= rivalScoreEvents[rivalEventIndex].time) {
+            rivalPassedMaxScore += rivalScoreEvents[rivalEventIndex].weight;
+            rivalEventIndex++;
+        }
+
         // 0. Update Layout Targets (Default Mode)
         if (currentLayoutType === 'default' && layoutChanges.length > 0) {
             let activeType: 'type-a' | 'type-b' = 'type-a'; // Default
@@ -1962,6 +2699,8 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         notes.forEach(note => {
             if (!note.active) return;
 
+            const assistVal = assistSelect?.value || 'none';
+
             // MISS Detection Logic
             if (note.isLong && note.beingHeld) {
                 const tailTime = note.scheduledTime + note.duration;
@@ -1972,12 +2711,12 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                     addHit('critical');
                     spawnHitEffect(note.laneIndex, '#00ffff');
 
-                    if (isAutoPlay || (assistSelect.value === 'auto_space' && note.laneIndex === 4)) {
+                    if (isAutoPlay || (assistVal === 'auto_space' && note.laneIndex === 4)) {
                         pressedKeys[note.laneIndex] = false;
                         heldNotes[note.laneIndex] = null;
                     }
                 }
-            } else if ((isAutoPlay || (assistSelect.value === 'auto_space' && note.laneIndex === 4)) && !note.isLong && !note.processed && currentTimeMs >= note.scheduledTime) {
+            } else if ((isAutoPlay || (assistVal === 'auto_space' && note.laneIndex === 4)) && !note.isLong && !note.processed && currentTimeMs >= note.scheduledTime) {
                 // AUTO PLAY HIT (Head)
                 note.active = false;
                 judgementText = `CRITICAL\nAUTO`;
@@ -1990,7 +2729,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 pressedKeys[note.laneIndex] = true;
                 setTimeout(() => pressedKeys[note.laneIndex] = false, 50);
 
-            } else if ((isAutoPlay || (assistSelect.value === 'auto_space' && note.laneIndex === 4)) && note.isLong && !note.processed && currentTimeMs >= note.scheduledTime && !note.beingHeld) {
+            } else if ((isAutoPlay || (assistVal === 'auto_space' && note.laneIndex === 4)) && note.isLong && !note.processed && currentTimeMs >= note.scheduledTime && !note.beingHeld) {
                 // AUTO PLAY HOLD START
                 note.processed = true;
                 note.beingHeld = true;
@@ -2006,7 +2745,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 pressedKeys[note.laneIndex] = true;
                 // We don't release key yet
 
-            } else if ((isAutoPlay || (assistSelect.value === 'auto_space' && note.laneIndex === 4)) && note.isLong && note.beingHeld && currentTimeMs >= note.scheduledTime + note.duration) {
+            } else if ((isAutoPlay || (assistVal === 'auto_space' && note.laneIndex === 4)) && note.isLong && note.beingHeld && currentTimeMs >= note.scheduledTime + note.duration) {
                 // AUTO PLAY HOLD END
                 // The first block (line 536 in original) handles the end of hold if it's being held.
                 // But we need to ensure the key is released.
@@ -2105,7 +2844,9 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     function draw() {
         if (!ctx) return;
 
-        if (!isPlaying) {
+        const isIntroActive = introOverlay && introOverlay.style.display === 'flex';
+
+        if (!isPlaying && !isIntroActive) {
             // Title or Song Select screen: Clear canvas to show background video
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             requestAnimationFrame(draw);
@@ -2116,7 +2857,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         const currentTimeMs = currentTime * 1000;
 
         // Clear / Draw Background
-        if (isPlaying) {
+        if (isPlaying || isIntroActive) {
             // Game BG
             if (bgVideo && isVideoReady) {
                 // Draw MV full screen as background
@@ -2324,8 +3065,8 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         ctx.fillText(stats.combo.toString(), canvas.width / 2, canvas.height / 2);
 
         // Subtraction Score Display (Under Combo)
-        ctx.font = 'bold 30px Arial';
         if (isAutoPlay) {
+            ctx.font = 'bold 30px Arial';
             ctx.fillText('AUTO PLAY', canvas.width / 2, (canvas.height / 2) + 50);
         } else {
             let pct = 0;
@@ -2333,8 +3074,56 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 pct = ((totalMaxScore - lostScore) / totalMaxScore) * 100;
             }
             if (pct < 0) pct = 0;
-            const scoreText = pct.toFixed(4) + '%';
-            ctx.fillText(scoreText, canvas.width / 2, (canvas.height / 2) + 50);
+            
+            if (scoreDisplayType === 'percent') {
+                if (isRivalShowEnabled) {
+                    const playerAddPct = totalMaxScore > 0 ? (rawScore / totalMaxScore) * 100 : 0;
+                    const rivalAddPct = totalMaxScore > 0 ? ((rivalPassedMaxScore * (rivalPercent / 100)) / totalMaxScore) * 100 : 0;
+                    const diffPct = playerAddPct - rivalAddPct;
+
+                    // Main Score %
+                    ctx.font = 'bold 30px Arial';
+                    ctx.fillStyle = '#fff';
+                    const scoreText = pct.toFixed(4) + '%';
+                    ctx.fillText(scoreText, canvas.width / 2, (canvas.height / 2) + 40);
+
+                    // Difference %
+                    ctx.font = 'bold 20px Arial';
+                    ctx.fillStyle = diffPct >= 0 ? '#ffffff' : '#ff0000'; // プラスなら白、マイナスなら赤
+                    const diffSign = diffPct >= 0 ? '+' : '';
+                    const diffText = `${diffSign}${diffPct.toFixed(4)}%`;
+                    ctx.fillText(diffText, canvas.width / 2, (canvas.height / 2) + 70);
+                } else {
+                    ctx.font = 'bold 30px Arial';
+                    ctx.fillStyle = '#fff';
+                    const scoreText = pct.toFixed(4) + '%';
+                    ctx.fillText(scoreText, canvas.width / 2, (canvas.height / 2) + 50);
+                }
+            } else {
+                // VALUE (数値) 表示
+                const playerVal = rawScore;
+                const rivalVal = Math.round(rivalPassedMaxScore * (rivalPercent / 100));
+                
+                if (isRivalShowEnabled) {
+                    const diffVal = playerVal - rivalVal;
+
+                    // Main Score Value
+                    ctx.font = 'bold 30px Arial';
+                    ctx.fillStyle = '#fff';
+                    ctx.fillText(playerVal.toString(), canvas.width / 2, (canvas.height / 2) + 40);
+
+                    // Difference Value
+                    ctx.font = 'bold 20px Arial';
+                    ctx.fillStyle = diffVal >= 0 ? '#ffffff' : '#ff0000'; // プラスなら白、マイナスなら赤
+                    const diffSign = diffVal >= 0 ? '+' : '';
+                    const diffText = `${diffSign}${diffVal}`;
+                    ctx.fillText(diffText, canvas.width / 2, (canvas.height / 2) + 70);
+                } else {
+                    ctx.font = 'bold 30px Arial';
+                    ctx.fillStyle = '#fff';
+                    ctx.fillText(playerVal.toString(), canvas.width / 2, (canvas.height / 2) + 50);
+                }
+            }
         }
 
         ctx.globalAlpha = 1.0;
@@ -2433,8 +3222,91 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             }
         }
 
+        // Draw Score Bars (Vertical, Right of Lanes)
+        if (laneEndX > 0 && totalMaxScore > 0) {
+            const barW = 15;
+            const barH = 400; // Fixed height (matches health bar)
+            const barY = (canvas.height / 2) - 200; // Centered vertically (matches health bar)
+            
+            const barX_player = laneEndX + 10;
+            const barX_rival = laneEndX + 30;
+
+            // --- 1. Player Score Bar ---
+            // Background
+            ctx.fillStyle = '#1a1a24';
+            ctx.fillRect(barX_player, barY, barW, barH);
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.4)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(barX_player, barY, barW, barH);
+
+            // Fill (加算方式のプレイヤー現在の獲得スコア割合)
+            const playerAddPct = totalMaxScore > 0 ? (rawScore / totalMaxScore) * 100 : 0;
+            const fillH_player = Math.min(barH, (playerAddPct / 100) * barH);
+            const fillY_player = barY + (barH - fillH_player);
+
+            // Gradient: Cyan to Royal Blue
+            const grad_player = ctx.createLinearGradient(barX_player, barY, barX_player, barY + barH);
+            grad_player.addColorStop(0, '#00ffff'); // Top
+            grad_player.addColorStop(1, '#0055ff'); // Bottom
+            ctx.fillStyle = grad_player;
+            ctx.fillRect(barX_player, fillY_player, barW, fillH_player);
+
+            // --- 2. Rival Score Bar ---
+            let rivalScoreVal = 0;
+            let rivalAddPct = 0;
+            if (isRivalBarEnabled) {
+                // Background
+                ctx.fillStyle = '#1a1a24';
+                ctx.fillRect(barX_rival, barY, barW, barH);
+                ctx.strokeStyle = 'rgba(255, 152, 0, 0.4)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(barX_rival, barY, barW, barH);
+
+                // Fill (加算方式のライバル進行度)
+                rivalScoreVal = Math.round(rivalPassedMaxScore * (rivalPercent / 100));
+                rivalAddPct = totalMaxScore > 0 ? (rivalScoreVal / totalMaxScore) * 100 : 0;
+                const fillH_rival = Math.min(barH, (rivalAddPct / 100) * barH);
+                const fillY_rival = barY + (barH - fillH_rival);
+
+                // Gradient: Orange to Red
+                const grad_rival = ctx.createLinearGradient(barX_rival, barY, barX_rival, barY + barH);
+                grad_rival.addColorStop(0, '#ff9800'); // Top
+                grad_rival.addColorStop(1, '#ff3d00'); // Bottom
+                ctx.fillStyle = grad_rival;
+                ctx.fillRect(barX_rival, fillY_rival, barW, fillH_rival);
+            }
+
+            // --- 3. Text Labels (P / R) & Value / Percentages ---
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('P', barX_player + barW / 2, barY + barH + 15);
+            if (isRivalBarEnabled) {
+                ctx.fillText('R', barX_rival + barW / 2, barY + barH + 15);
+            }
+
+            // Text above the bars (Percent or Value)
+            ctx.font = 'bold 10px Arial';
+            if (scoreDisplayType === 'percent') {
+                ctx.fillStyle = '#00ffff';
+                ctx.fillText(`${Math.floor(playerAddPct)}%`, barX_player + barW / 2, barY - 8);
+                if (isRivalBarEnabled) {
+                    ctx.fillStyle = '#ff9800';
+                    ctx.fillText(`${Math.floor(rivalAddPct)}%`, barX_rival + barW / 2, barY - 8);
+                }
+            } else {
+                ctx.fillStyle = '#00ffff';
+                ctx.fillText(rawScore.toString(), barX_player + barW / 2, barY - 8);
+                if (isRivalBarEnabled) {
+                    ctx.fillStyle = '#ff9800';
+                    ctx.fillText(rivalScoreVal.toString(), barX_rival + barW / 2, barY - 8);
+                }
+            }
+        }
+
         // Draw Notes (Multi-pass: White -> Blue -> Space)
         function drawNotesForLane(targetLaneIdx: number) {
+            const assistVal = assistSelect?.value || 'none';
             notes.forEach(note => {
                 if (note.laneIndex !== targetLaneIdx) return;
                 const config = LANE_CONFIGS[note.laneIndex];
@@ -2443,7 +3315,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 let bodyColor = 'rgba(255, 255, 255, 0.5)';
                 if (config.color === '#7CA4FF') bodyColor = 'rgba(124, 164, 255, 0.5)';
                 else if (config.color === '#e040fb') {
-                    if (assistSelect.value === 'auto_space') bodyColor = 'rgba(0, 255, 0, 0.5)'; // Green for Auto
+                    if (assistVal === 'auto_space') bodyColor = 'rgba(0, 255, 0, 0.5)'; // Green for Auto
                     else bodyColor = 'rgba(224, 64, 251, 0.5)';
                 }
 
@@ -2460,7 +3332,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 // Determine Skin Image
                 let skinImg = null;
                 if (config.label === 'SPACE') {
-                    if (assistSelect.value === 'auto_space') skinImg = null; // Use code color for Green
+                    if (assistVal === 'auto_space') skinImg = null; // Use code color for Green
                     else skinImg = SKIN.space;
                 }
                 else if (config.color === '#7CA4FF') skinImg = SKIN.blue;
@@ -2494,7 +3366,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                     if (skinImg && !isSpecial) {
                         ctx!.drawImage(skinImg, x + H_GAP, headY - (drawHeight / 2), w - (H_GAP * 2), drawHeight);
                     } else {
-                        if (config.label === 'SPACE' && assistSelect.value === 'auto_space') ctx!.fillStyle = '#00ff00';
+                        if (config.label === 'SPACE' && assistVal === 'auto_space') ctx!.fillStyle = '#00ff00';
                         else ctx!.fillStyle = config.color;
 
                         if (note.type === 'sinking') {
@@ -2516,7 +3388,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                     if (skinImg && !isSpecial) {
                         ctx!.drawImage(skinImg, x + H_GAP, noteY - (drawHeight / 2), w - (H_GAP * 2), drawHeight);
                     } else {
-                        if (config.label === 'SPACE' && assistSelect.value === 'auto_space') ctx!.fillStyle = '#00ff00';
+                        if (config.label === 'SPACE' && assistVal === 'auto_space') ctx!.fillStyle = '#00ff00';
                         else ctx!.fillStyle = config.color;
 
                         // Special Note Rendering
@@ -2658,134 +3530,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         }
     }
 
-    function drawPreview(deltaTime: number) {
-        const previewCanvas = document.getElementById('preview-canvas') as HTMLCanvasElement;
-        if (!previewCanvas) return;
-        const pCtx = previewCanvas.getContext('2d');
-        if (!pCtx) return;
 
-        // Determine lane count from UI
-        const modeRadios = document.getElementsByName('preview-mode') as NodeListOf<HTMLInputElement>;
-        let previewLanes = 4;
-        for (const radio of modeRadios) {
-            if (radio.checked && radio.value === '6key') previewLanes = 6;
-        }
-
-        const laneW = currentLaneWidth;
-        const totalW = laneW * previewLanes;
-        
-        // Match exact game height
-        if (previewCanvas.height !== window.innerHeight) previewCanvas.height = window.innerHeight;
-        if (previewCanvas.width !== totalW) previewCanvas.width = totalW;
-
-        pCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
-
-        const nowMs = performance.now();
-
-        if (nowMs - lastPreviewSpawnTime > PREVIEW_INTERVAL) {
-            lastPreviewSpawnTime = nowMs;
-            previewNotes.push({ timeMs: nowMs + 2000, active: true, hit: false });
-        }
-
-        previewNotes = previewNotes.filter(n => n.timeMs > nowMs - 1000 && !n.hit);
-
-        const hitY = previewCanvas.height - 100; // Same calculation as HIT_Y in main game
-        const w = previewCanvas.width;
-        const h = previewCanvas.height;
-
-        // BG
-        pCtx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-        pCtx.fillRect(0, 0, w, h);
-
-        // Hit Line
-        pCtx.fillStyle = '#ff00ff';
-        pCtx.fillRect(0, hitY, w, 2);
-
-        // Draw lane separators
-        pCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-        pCtx.lineWidth = 1;
-        pCtx.beginPath();
-        for (let i = 1; i < previewLanes; i++) {
-            pCtx.moveTo(i * laneW, 0);
-            pCtx.lineTo(i * laneW, h);
-        }
-        pCtx.stroke();
-
-        const effectiveSpeed = currentNoteSpeed * (isLaneCoverEnabled ? laneCoverSpeedMult : 1.0);
-        const currentVisualTime = nowMs + visualOffset;
-        const noteHeight = 15;
-
-        for (const note of previewNotes) {
-            if (note.hit) continue;
-            const y = hitY - (note.timeMs - currentVisualTime) * effectiveSpeed;
-            if (y > -50 && y < h + 50) {
-                // Draw a note spanning across all lanes just for visual preview
-                // Or draw one note per lane? Let's just draw one wide note, or alternate lanes.
-                // We'll draw notes in all lanes to clearly show lane widths.
-                for (let i = 0; i < previewLanes; i++) {
-                    const gap = 2;
-                    pCtx.fillStyle = (i % 2 === 0) ? '#ffffff' : '#7CA4FF'; // alternate white/blue
-                    // simulate note bodies
-                    pCtx.fillRect((i * laneW) + gap, y, laneW - gap * 2, noteHeight);
-                }
-            }
-        }
-
-        // Lane Cover - exact pixel height
-        if (isLaneCoverEnabled) {
-            pCtx.fillStyle = 'rgba(0,0,0,0.8)';
-            pCtx.fillRect(0, 0, w, laneCoverHeight);
-            pCtx.fillStyle = '#00ffff';
-            pCtx.fillRect(0, laneCoverHeight - 2, w, 2);
-        }
-
-        // Judgement Text
-        if (previewJudgementTimer > 0) {
-            previewJudgementTimer -= deltaTime;
-            pCtx.fillStyle = previewJudgementColor;
-            pCtx.font = 'bold 24px Arial';
-            pCtx.textAlign = 'center';
-            // Use judgementHeightOffset similar to main game
-            pCtx.fillText(previewJudgementText, w / 2, hitY - (judgementHeightOffset / 2));
-        }
-    }
-
-    function testPreviewHit() {
-        const nowMs = performance.now();
-        let nearestNote = null;
-        let minDiff = 9999;
-        
-        for (const n of previewNotes) {
-            if (n.hit) continue;
-            const msError = Math.abs(nowMs - n.timeMs - globalOffset);
-            if (msError < minDiff) {
-                minDiff = msError;
-                nearestNote = n;
-            }
-        }
-
-        const THRESHOLD_CRITICAL = 40;
-        const THRESHOLD_GREAT = 80;
-        const THRESHOLD_GOOD = 133;
-        const THRESHOLD_FAIL = 150;
-        const MISS_BOUNDARY = 180;
-
-        if (nearestNote && minDiff <= MISS_BOUNDARY) {
-            nearestNote.hit = true;
-            let result = 'MISS';
-            let color = '#ff0000';
-            
-            if (minDiff <= THRESHOLD_CRITICAL) { result = 'CRITICAL'; color = '#ffff00'; }
-            else if (minDiff <= THRESHOLD_GREAT) { result = 'GREAT'; color = '#00ff00'; }
-            else if (minDiff <= THRESHOLD_GOOD) { result = 'GOOD'; color = '#00ffff'; }
-            else if (minDiff <= THRESHOLD_FAIL) { result = 'BAD'; color = '#ff00ff'; }
-            
-            previewJudgementText = result;
-            previewJudgementColor = color;
-            previewJudgementTimer = 1000;
-            playSE('se_tap');
-        }
-    }
 
     function loop(timestamp: number) {
         if (!lastTime) lastTime = timestamp;
@@ -2830,9 +3575,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             ctx.fillText(countdownValue.toString(), canvas.width / 2, canvas.height / 2);
         }
 
-        if (controlsDiv && controlsDiv.classList.contains('show-options')) {
-            drawPreview(deltaTime);
-        }
+
 
         requestAnimationFrame(loop);
     }
@@ -2981,9 +3724,59 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         else if (randomSelect?.value === 'shuffle_chaos') descriptiveModifiers += "-CHAOS";
         else if (randomSelect?.value === 'mirror') descriptiveModifiers += "-MIRROR";
 
-        // Send to Server (Skip if AutoPlay)
+        // Save Personal Best Score (Skip if AutoPlay)
         if (currentSongData && !isAutoPlay) {
-            // ... (keeping score send logic)
+            const buttonOrder = ['no', 'st', 'ad', 'pr', 'et'];
+            const diffKey = buttonOrder[selectedDiffIndex];
+            const matchingKey = Object.keys(currentSongData.charts || {}).find(k => {
+                const filename = currentSongData.charts[k];
+                let mode = '8key';
+                if (filename.toLowerCase().includes('4k')) mode = '4key';
+                else if (filename.toLowerCase().includes('6k')) mode = '6key';
+                else if (filename.toLowerCase().includes('12k')) mode = '12key';
+                if (mode !== selectedModeFilter) return false;
+                
+                const chartInfos = (currentSongData as any).chartInfos || {};
+                let effectiveDiff = chartInfos[filename]?.difficulty || k.split('_')[0];
+                return effectiveDiff === diffKey;
+            });
+
+            if (matchingKey) {
+                const filename = currentSongData.charts[matchingKey];
+                const scoreKey = `${currentSongData.id}_${filename}`;
+                const bestScoresKey = `magsic_best_scores_${currentPlayer}`;
+
+                try {
+                    const saved = localStorage.getItem(bestScoresKey);
+                    let bestScores = saved ? JSON.parse(saved) : {};
+                    const prevBest = bestScores[scoreKey];
+                    const clearRateValue = scoreResult.ratio * 100;
+
+                    if (!prevBest || scaledScore > prevBest.score) {
+                        bestScores[scoreKey] = {
+                            score: scaledScore,
+                            clearRate: clearRateValue,
+                            maxCombo: stats.maxCombo,
+                            isClear: isClear,
+                            rank: rank,
+                            updatedAt: Date.now()
+                        };
+                        localStorage.setItem(bestScoresKey, JSON.stringify(bestScores));
+                    }
+                } catch(e) { console.error('Failed to save best score', e); }
+            }
+        }
+
+        // Send final results to opponent if in battle
+        if (isBattleSelectMode && wsBattle && wsBattle.readyState === WebSocket.OPEN) {
+            wsBattle.send(JSON.stringify({
+                type: 'results',
+                score: scaledScore,
+                clearRate: scoreResult.ratio * 100,
+                maxCombo: stats.maxCombo,
+                isClear: isClear,
+                rank: rank
+            }));
         }
 
         // Show New Premium Result Screen
@@ -2997,14 +3790,51 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             if (valResScore) valResScore.textContent = scaledScore.toLocaleString();
 
             if (resultStatusTitle) {
-                if (isClear) {
-                    resultStatusTitle.textContent = "TRACK CLEAR";
-                    resultStatusTitle.style.color = "#00ffff";
-                    playSE('se_clear');
+                if (isBattleSelectMode) {
+                    if (hasOpponentFinished && opponentResultData) {
+                        const userRatio = scoreResult.ratio;
+                        const cpuRatio = opponentResultData.clearRate / 100;
+                        
+                        if (userRatio >= cpuRatio) {
+                            resultStatusTitle.textContent = "YOU WIN! 🏆";
+                            resultStatusTitle.style.color = "#ffd700"; // Gold
+                            playSE('se_clear');
+                        } else {
+                            resultStatusTitle.textContent = "YOU LOSE... 😢";
+                            resultStatusTitle.style.color = "#ff3d00"; // Orange-Red
+                            playSE('se_fail');
+                        }
+                    } else if (opponentName && opponentName.textContent === 'CPU_Rival_99') {
+                        // Fallback for CPU solo matching test
+                        const userRatio = scoreResult.ratio;
+                        const cpuRatio = totalMaxScore > 0 ? (rivalPassedMaxScore / totalMaxScore) : 0;
+                        
+                        if (userRatio >= cpuRatio) {
+                            resultStatusTitle.textContent = "YOU WIN! 🏆";
+                            resultStatusTitle.style.color = "#ffd700";
+                            playSE('se_clear');
+                        } else {
+                            resultStatusTitle.textContent = "YOU LOSE... 😢";
+                            resultStatusTitle.style.color = "#ff3d00";
+                            playSE('se_fail');
+                        }
+                    } else {
+                        // Real opponent not finished yet: wait for results
+                        resultStatusTitle.textContent = "WAITING FOR OPPONENT...";
+                        resultStatusTitle.style.color = "#888";
+                        if (isClear) playSE('se_clear');
+                        else playSE('se_fail');
+                    }
                 } else {
-                    resultStatusTitle.textContent = "TRACK FAILED";
-                    resultStatusTitle.style.color = "#ff0000";
-                    playSE('se_fail');
+                    if (isClear) {
+                        resultStatusTitle.textContent = "TRACK CLEAR";
+                        resultStatusTitle.style.color = "#00ffff";
+                        playSE('se_clear');
+                    } else {
+                        resultStatusTitle.textContent = "TRACK FAILED";
+                        resultStatusTitle.style.color = "#ff0000";
+                        playSE('se_fail');
+                    }
                 }
             }
 
@@ -3170,6 +4000,16 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     window.addEventListener('keydown', (e) => {
         // Fix: Allow 'flex' or just check not hidden
         if (songSelectOverlay.style.display !== 'none') {
+            const activeEl = document.activeElement;
+            const isInputField = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+            if (isInputField) return; // Prevent key events while typing inside text fields
+
+            if (isBattleSelectMode && myBattleRole === 'p2') {
+                if (e.key !== 'Escape') {
+                    e.preventDefault();
+                    return;
+                }
+            }
 
             // ESCAPE to Close
             if (e.key === 'Escape') {
@@ -3177,8 +4017,17 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
 
                 playSE('se_cancel');
                 songSelectOverlay.style.display = 'none';
-                if (startScreen) startScreen.style.display = 'flex';
-                playBGM('bgm_title');
+                if (isBattleSelectMode) {
+                    songSelectOverlay.classList.remove('battle-mode');
+                    if (wsBattle) {
+                        wsBattle.close();
+                        wsBattle = null;
+                    }
+                    openBattleLobby();
+                } else {
+                    if (startScreen) startScreen.style.display = 'flex';
+                    playBGM('bgm_title');
+                }
                 return;
             }
 
@@ -3190,6 +4039,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             };
 
             const startSelected = () => {
+
                 const song = availableSongs[selectedSongIndex];
                 if (!song || !song.charts) return;
                 
@@ -3212,6 +4062,14 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
 
                 if (matchingKey) {
                     playSE('se_decide');
+                    if (isBattleSelectMode && wsBattle && wsBattle.readyState === WebSocket.OPEN && myBattleRole === 'p1') {
+                        wsBattle.send(JSON.stringify({
+                            type: 'song_decide',
+                            songFolder: song.folder,
+                            chartName: song.charts[matchingKey],
+                            audioName: song.audio
+                        }));
+                    }
                     loadSong(song.folder, song.charts[matchingKey], song.audio);
                 }
             };
@@ -3221,23 +4079,41 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 selectedSongIndex = (selectedSongIndex + 1) % availableSongs.length;
                 renderSongSelectInternal();
                 playSE('se_select');
+                if (isBattleSelectMode && wsBattle && wsBattle.readyState === WebSocket.OPEN && myBattleRole === 'p1') {
+                    wsBattle.send(JSON.stringify({ type: 'cursor_move', index: selectedSongIndex }));
+                }
             } else if (e.key.toLowerCase() === 'd' || e.key === 'ArrowUp') {
                 e.preventDefault();
                 selectedSongIndex = (selectedSongIndex - 1 + availableSongs.length) % availableSongs.length;
                 renderSongSelectInternal();
                 playSE('se_select');
+                if (isBattleSelectMode && wsBattle && wsBattle.readyState === WebSocket.OPEN && myBattleRole === 'p1') {
+                    wsBattle.send(JSON.stringify({ type: 'cursor_move', index: selectedSongIndex }));
+                }
             } else if (e.key.toLowerCase() === 'l' || e.key === 'ArrowRight') {
                 e.preventDefault();
                 updateDiff(1);
+                if (isBattleSelectMode && wsBattle && wsBattle.readyState === WebSocket.OPEN && myBattleRole === 'p1') {
+                    wsBattle.send(JSON.stringify({ type: 'diff_change', index: selectedDiffIndex }));
+                }
             } else if (e.key.toLowerCase() === 's' || e.key === 'ArrowLeft') {
                 e.preventDefault();
                 updateDiff(-1);
+                if (isBattleSelectMode && wsBattle && wsBattle.readyState === WebSocket.OPEN && myBattleRole === 'p1') {
+                    wsBattle.send(JSON.stringify({ type: 'diff_change', index: selectedDiffIndex }));
+                }
             } else if (e.key === 'Enter' || e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'j') {
                 e.preventDefault();
                 startSelected();
             } else if (e.key === ' ' && !e.repeat) {
                 if (controlsDiv) {
-                    controlsDiv.classList.add('show-options');
+                    const isShown = controlsDiv.classList.contains('show-options');
+                    if (isShown) {
+                        controlsDiv.classList.remove('show-options');
+                    } else {
+                        controlsDiv.classList.add('show-options');
+                        playSE('se_option');
+                    }
                 }
                 e.preventDefault();
             }
@@ -3266,7 +4142,8 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
 
         try {
             const res = await fetch(`songs/list.json?t=${Date.now()}`);
-            const list = await res.json();
+            const fullList = await res.json();
+            const list = fullList.filter((song: any) => song.enabled !== false);
 
             // Fetch Chart Details (Difficulty)
             // We need to fetch every chart to know its internal difficulty setting
@@ -3457,8 +4334,11 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             banner.style.zIndex = isSelected ? '10' : '5';
             
             if (isSelected) {
-                banner.style.border = '4px solid #e040fb';
-                banner.style.boxShadow = '0 0 40px rgba(224, 64, 251, 0.8)';
+                const buttonOrder = ['no', 'st', 'ad', 'pr', 'et'];
+                const diffKey = buttonOrder[selectedDiffIndex] || 'no';
+                const diffColor = DIFF_COLORS[diffKey] || '#e040fb';
+                banner.style.border = `4px solid ${diffColor}`;
+                banner.style.boxShadow = `0 0 40px ${diffColor}`;
             } else {
                 banner.style.border = '2px solid rgba(255,255,255,0.2)';
                 banner.style.boxShadow = 'none';
@@ -3666,6 +4546,70 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
 
                 btnContainer.appendChild(btn);
             });
+
+            // --- Premium Personal Best Display Panel ---
+            const diffKey = buttonOrder[selectedDiffIndex];
+            const charts = song.charts || {};
+            const matchingKey = Object.keys(charts).find(k => {
+                const filename = charts[k];
+                let mode = '8key';
+                if (filename.toLowerCase().includes('4k')) mode = '4key';
+                else if (filename.toLowerCase().includes('6k')) mode = '6key';
+                else if (filename.toLowerCase().includes('12k')) mode = '12key';
+                if (mode !== selectedModeFilter) return false;
+                let effectiveDiff = chartInfos[filename]?.difficulty || k.split('_')[0];
+                return effectiveDiff === diffKey;
+            });
+
+            if (matchingKey) {
+                const filename = charts[matchingKey];
+                const scoreKey = `${song.id}_${filename}`;
+                const bestScoresKey = `magsic_best_scores_${currentPlayer}`;
+                let bestData = null;
+                try {
+                    const saved = localStorage.getItem(bestScoresKey);
+                    if (saved) {
+                        const parsed = JSON.parse(saved);
+                        bestData = parsed[scoreKey];
+                    }
+                } catch(e) { console.error(e); }
+
+                const bestPanel = document.createElement('div');
+                bestPanel.style.cssText = 'width: 80%; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; padding: 15px 25px; margin-top: 25px; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; font-family: sans-serif; box-shadow: 0 5px 15px rgba(0,0,0,0.5);';
+
+                if (bestData) {
+                    const rankColor = bestData.isClear ? '#ffd700' : '#ff4444';
+                    const statusText = bestData.isClear ? 'CLEAR' : 'FAILED';
+                    
+                    bestPanel.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 4px;">
+                            <span style="font-weight: bold; color: #aaa; font-size: 0.85em; letter-spacing: 1px;">PERSONAL BEST</span>
+                            <span style="font-weight: bold; color: ${rankColor}; font-size: 0.9em; letter-spacing: 1px; text-shadow: 0 0 8px ${rankColor}44;">${statusText} (Rank ${bestData.rank})</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: #888; font-size: 0.9em;">Score:</span>
+                            <span style="color: #fff; font-weight: bold; font-family: monospace; font-size: 1.1em;">${bestData.score.toLocaleString()}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: #888; font-size: 0.9em;">Clear Rate:</span>
+                            <span style="color: #00ffff; font-weight: bold; font-family: monospace; font-size: 1.1em;">${bestData.clearRate.toFixed(2)}%</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: #888; font-size: 0.9em;">Max Combo:</span>
+                            <span style="color: #ff9100; font-weight: bold; font-family: monospace; font-size: 1.1em;">${bestData.maxCombo}</span>
+                        </div>
+                    `;
+                } else {
+                    bestPanel.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 4px;">
+                            <span style="font-weight: bold; color: #888; font-size: 0.85em; letter-spacing: 1px;">PERSONAL BEST</span>
+                            <span style="font-weight: bold; color: #555; font-size: 0.9em; letter-spacing: 1px;">NO PLAY DATA</span>
+                        </div>
+                        <div style="text-align: center; color: #555; font-size: 0.85em; padding: 10px 0;">Play this chart to save your personal best!</div>
+                    `;
+                }
+                rightCol.appendChild(bestPanel);
+            }
         }
     }
 
@@ -3681,7 +4625,13 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         const currentSong = availableSongs[selectedSongIndex];
         if (currentSong) {
             let previewSrc = '';
-            if (currentSong.title === '漁火') {
+            if (currentSong.previewBgm) {
+                if (currentSong.previewBgm.startsWith('assets/')) {
+                    previewSrc = currentSong.previewBgm;
+                } else {
+                    previewSrc = `songs/${currentSong.folder}/${currentSong.previewBgm}`;
+                }
+            } else if (currentSong.title === '漁火') {
                 previewSrc = 'assets/曲/漁火_選曲画面.m4a';
             } else if (currentSong.title === 'Ceviche') {
                 previewSrc = 'assets/曲/Ceviche_選曲画面.m4a';
@@ -3693,18 +4643,31 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                     // Stop current preview if exists
                     if (songPreviewBGM) {
                         const prev = songPreviewBGM;
-                        fadeVolume(prev, 0, 800, () => {
+                        fadeVolume(prev, 0, 300, () => {
                             prev.pause();
                         });
                     }
                     // Fade out general selection BGM
                     if (currentBGM) {
-                        fadeVolume(currentBGM, 0, 800);
+                        fadeVolume(currentBGM, 0, 300);
                     }
                     
                     songPreviewBGM = new Audio(previewSrc);
-                    songPreviewBGM.loop = true;
+                    songPreviewBGM.loop = false; // Do not loop preview
                     songPreviewBGM.volume = 0;
+
+                    // When the preview ends, fade the main selection BGM back in
+                    songPreviewBGM.addEventListener('ended', () => {
+                        if (AUDIO_ASSETS.bgm_select) {
+                            if (AUDIO_ASSETS.bgm_select.paused) {
+                                AUDIO_ASSETS.bgm_select.volume = 0;
+                                playBGM('bgm_select');
+                            } else {
+                                fadeVolume(AUDIO_ASSETS.bgm_select, 0.5, 800);
+                            }
+                        }
+                    });
+
                     songPreviewBGM.play().catch(e => console.log('Preview play blocked', e));
                     fadeVolume(songPreviewBGM, 0.5, 800);
                 }
@@ -3712,7 +4675,7 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 // No special preview: stop any songPreviewBGM and resume general BGM
                 if (songPreviewBGM) {
                     const prev = songPreviewBGM;
-                    fadeVolume(prev, 0, 800, () => {
+                    fadeVolume(prev, 0, 300, () => {
                         prev.pause();
                     });
                     songPreviewBGM = null;
@@ -3879,27 +4842,128 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     let currentSongAudio = '';
 
     async function loadSong(songFolder: string, chartFilename: string, audioFilename: string) {
-        performImageShutterTransition(async () => {
-            stopBGM(); // Stop selection BGM before loading game song
-            currentSongFolder = songFolder;
-            currentChartFilename = chartFilename;
-            currentSongAudio = audioFilename;
-            currentSongBackground = null; // Reset background
-            isMVLayout = false; // Reset layout [NEW]
+        stopBGM(); // Stop selection BGM immediately
+        const song = availableSongs.find(s => s.folder === songFolder);
+        currentSongFolder = songFolder;
+        currentChartFilename = chartFilename;
+        currentSongAudio = audioFilename;
+        currentSongBackground = null; // Reset background
+        isMVLayout = false; // Reset layout [NEW]
 
-            // Show internal loading if transition takes time
-            if (loadingOverlay) {
-                loadingOverlay.style.display = 'flex';
-                if (loadingText) loadingText.textContent = `LOADING...`;
+        // 1. Immediately switch to play screen behind the scenes
+        currentMode = 'chart';
+        
+        // Determine KeyMode immediately based on filename
+        if (chartFilename.toLowerCase().includes('4k')) currentKeyMode = '4key';
+        else if (chartFilename.toLowerCase().includes('6k')) currentKeyMode = '6key';
+        else if (chartFilename.toLowerCase().includes('8k')) currentKeyMode = '8key';
+        else if (chartFilename.toLowerCase().includes('12k')) currentKeyMode = '12key';
+        else currentKeyMode = '8key';
+        
+        resize(); // Instantly update lane layout
+
+        resetStats();
+        notes.length = 0;
+        nextNoteIndex = 0;
+        
+        songSelectOverlay.style.display = 'none';
+        if (resultsOverlay) resultsOverlay.style.display = 'none';
+        if (startScreen) startScreen.style.display = 'none';
+        if (controlsDiv) controlsDiv.style.display = 'none';
+
+        isPaused = false;
+        isCountdown = false;
+        pausedOffset = 0;
+        if (btnPauseUI) btnPauseUI.style.display = 'block';
+
+        // 2. Immediately show opaque intro screen over it
+        if (introOverlay) {
+            // Determine difficulty info
+            const chartInfos = song ? (song as any).chartInfos : {};
+            const info = chartInfos ? chartInfos[chartFilename] : null;
+            
+            let diffKey = '';
+            if (song && song.charts) {
+                diffKey = Object.keys(song.charts).find(k => song.charts![k] === chartFilename)?.split('_')[0] || '';
+            }
+            
+            if (info && info.difficulty) diffKey = info.difficulty;
+
+            const label = DIFF_LABELS[diffKey] || diffKey.toUpperCase();
+            const color = DIFF_COLORS[diffKey] || '#ffffff';
+            const levelStr = (info && info.level) ? info.level.toString() : '?';
+            
+            if (introSongTitle) introSongTitle.textContent = song ? song.title : 'Unknown Song';
+            if (introSongLevel) {
+                introSongLevel.textContent = `${label} ${levelStr}`;
+                introSongLevel.style.borderColor = color;
+                introSongLevel.style.color = color;
+                introSongLevel.style.textShadow = `0 0 10px ${color}`;
             }
 
+            introOverlay.style.display = 'flex';
+            // Trigger reflow
+            void introOverlay.offsetWidth;
+            introOverlay.style.opacity = '1';
+            
+            if (introSongTitle) introSongTitle.style.animation = 'introZoom 5s ease-out forwards';
+            if (introSongLevel) introSongLevel.style.animation = 'introZoom 5s ease-out forwards';
+        }
+
+        // 2. Play intro audio & video & wait for 5 seconds in parallel
+        const introPromise = (async () => {
+            if (introOverlay) {
+                // Play intro video if configured
+                const introVideoElement = document.getElementById('intro-video') as HTMLVideoElement;
+                if (introVideoElement) {
+                    if (song && song.introVideo) {
+                        introVideoElement.src = `songs/${songFolder}/${song.introVideo}`;
+                        introVideoElement.style.display = 'block';
+                        introVideoElement.play().catch(e => console.log('Intro video play blocked', e));
+                    } else {
+                        introVideoElement.style.display = 'none';
+                        introVideoElement.src = '';
+                    }
+                }
+
+                // Play intro audio
+                introBGM = new Audio();
+                introBGM.volume = 0.8;
+                
+                const playIntro = (src: string): Promise<boolean> => {
+                    return new Promise((resolve) => {
+                        introBGM!.src = encodeURI(src);
+                        introBGM!.play().then(() => {
+                            resolve(true);
+                        }).catch(() => {
+                            resolve(false);
+                        });
+                    });
+                };
+                
+                let successAudio = false;
+                if (song && song.introAudio) {
+                    successAudio = await playIntro(`songs/${songFolder}/${song.introAudio}`);
+                }
+                if (!successAudio) {
+                    const successWav = await playIntro(`songs/${songFolder}/intro.wav`);
+                    if (!successWav) {
+                        const successMp3 = await playIntro(`songs/${songFolder}/intro.mp3`);
+                        if (!successMp3) {
+                            await playIntro(`songs/デフォルト開始前画面.mp3`);
+                        }
+                    }
+                }
+            }
+            // Wait for 5 seconds
+            await new Promise(r => setTimeout(r, 5000));
+        })();
+
+        // 3. Load game resources in background
+        const loadResourcesPromise = (async () => {
             try { initAudio(); } catch (e) { alert(e); return; }
 
-            // 1. Fetch Audio & Chart
             try {
-                // Find the song object from availableSongs
-                const song = availableSongs.find(s => s.folder === songFolder);
-
                 // Load Video if exists
                 if (song && song.video) {
                     isMVLayout = true; // [NEW]
@@ -3919,7 +4983,6 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                     });
                     bgVideo.load();
                 }
-
 
                 // Load Background Image if exists
                 if (song && (song as any).background) {
@@ -3955,17 +5018,14 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                 resize();
 
                 if (!json.notes || !Array.isArray(json.notes)) {
-                    alert('Invalid Chart Data');
-                    return;
+                    throw new Error('Invalid Chart Data');
                 }
                 chartData = parseChart(json);
 
-                // 1.5. Pre-load Keysounds
+                // Pre-load Keysounds
                 keysoundBank.clear();
                 const uniqueSoundIds = Array.from(new Set(chartData.map(n => n.soundId).filter(s => !!s))) as string[];
                 if (uniqueSoundIds.length > 0) {
-                    if (loadingText) loadingText.textContent = `LOADING KEYSOUNDS (0/${uniqueSoundIds.length})...`;
-                    let loadedCount = 0;
                     await Promise.all(uniqueSoundIds.map(async (soundId) => {
                         try {
                             const res = await fetch(`songs/${songFolder}/${soundId}`);
@@ -3977,47 +5037,51 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
                         } catch (e) {
                             console.error(`Failed to load keysound: ${soundId}`, e);
                         }
-                        loadedCount++;
-                        if (loadingText) loadingText.textContent = `LOADING KEYSOUNDS (${loadedCount}/${uniqueSoundIds.length})...`;
                     }));
                 }
 
                 // Apply Modifiers
-                if (assistSelect && randomSelect) {
-                    const assistMode = assistSelect.value;
-                    const randomMode = randomSelect.value;
-                    if (assistMode !== 'none' || randomMode !== 'none') {
-                        chartData = applyModifiers(chartData, assistMode, randomMode);
-                    }
+                const assistMode = assistSelect?.value || 'none';
+                const randomMode = randomSelect?.value || 'none';
+                if (assistMode !== 'none' || randomMode !== 'none') {
+                    chartData = applyModifiers(chartData, assistMode, randomMode);
                 }
 
-                // 2. Prepare Game State
-                if (loadingOverlay) loadingOverlay.style.display = 'none';
-
-                currentMode = 'chart';
-                resetStats();
-                notes.length = 0;
-                nextNoteIndex = 0;
-
-                songSelectOverlay.style.display = 'none';
-                if (resultsOverlay) resultsOverlay.style.display = 'none';
-                if (startScreen) startScreen.style.display = 'none';
-                if (controlsDiv) controlsDiv.style.display = 'none';
-
-                isPaused = false;
-                isCountdown = false;
-                pausedOffset = 0;
-                if (btnPauseUI) btnPauseUI.style.display = 'block';
-
+                // Data is loaded, gameplay will begin after intro fades out
             } catch (e) {
-                if (loadingOverlay) loadingOverlay.style.display = 'none';
                 alert('Error loading song: ' + e);
             }
-        }).then(() => {
-            // 3. Start Delay Sequence AFTER Shutter Opens
-            // isStarting = true, START_DELAY_MS = 3000
+        })();
+
+        // 4. Wait for both intro (5s) and resources loading to finish
+        await Promise.all([introPromise, loadResourcesPromise]);
+
+        // Reset stats now that chartData is fully loaded to avoid incorrect totalMaxScore
+        resetStats();
+
+        // 5. Fade out and transition to game start
+        if (introOverlay) {
+            introOverlay.style.opacity = '0';
+            setTimeout(() => {
+                introOverlay.style.display = 'none';
+                if (introSongTitle) introSongTitle.style.animation = 'none';
+                if (introSongLevel) introSongLevel.style.animation = 'none';
+                const introVideoElement = document.getElementById('intro-video') as HTMLVideoElement;
+                if (introVideoElement) {
+                    introVideoElement.pause();
+                    introVideoElement.src = '';
+                    introVideoElement.style.display = 'none';
+                }
+                if (introBGM) {
+                    introBGM.pause();
+                    introBGM.src = '';
+                    introBGM = null;
+                }
+                startCountdown();
+            }, 500); // 0.5s fade out
+        } else {
             startCountdown();
-        });
+        }
     }
 
     function startCountdown() {
@@ -4265,14 +5329,14 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
 
     // Input handling
     window.addEventListener('keydown', (e) => {
-        if (controlsDiv && controlsDiv.classList.contains('show-options')) {
-            const keyLower = e.key.toLowerCase();
-            if (['d', 'f', 'j', 'k'].includes(keyLower) && !e.repeat) {
-                testPreviewHit();
-                e.preventDefault();
-                return;
-            }
-        }
+        const activeEl = document.activeElement;
+        const isInputField = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+
+
+
+
+
+
 
         if (isCalibrating) {
             if (e.code === 'Space') {
@@ -4290,8 +5354,6 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
             e.preventDefault();
             return;
         }
-
-        if (e.code === 'Space') e.preventDefault();
 
         const now = performance.now();
         const keyLower = e.key.toLowerCase();
@@ -4466,12 +5528,6 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
     });
 
     window.addEventListener('keyup', (e) => {
-        if (e.key === ' ') {
-            if (controlsDiv) {
-                controlsDiv.classList.remove('show-options');
-            }
-        }
-
         const keyLower = e.key.toLowerCase();
         if (keyLower === 'n') {
             const now = performance.now();
@@ -4537,13 +5593,49 @@ import { applyModifiers as _applyModifiers, AssistMode, RandomMode } from './src
         });
     }
 
+    const modeArrowLeft = document.getElementById('mode-arrow-left');
+    const modeArrowRight = document.getElementById('mode-arrow-right');
+    if (modeArrowLeft) {
+        modeArrowLeft.addEventListener('click', () => {
+            currentModeIndex = (currentModeIndex - 1 + PLAY_MODES_INFO.length) % PLAY_MODES_INFO.length;
+            renderModeCarousel();
+        });
+    }
+    if (modeArrowRight) {
+        modeArrowRight.addEventListener('click', () => {
+            currentModeIndex = (currentModeIndex + 1) % PLAY_MODES_INFO.length;
+            renderModeCarousel();
+        });
+    }
+    if (btnLobbyBypass) {
+        btnLobbyBypass.addEventListener('click', () => {
+            playSE('se_decide');
+            triggerMatchFound();
+            setTimeout(() => {
+                enterBattleSelectScreen();
+            }, 800);
+        });
+    }
+    if (btnCloseLobby) {
+        btnCloseLobby.addEventListener('click', () => {
+            playSE('se_cancel');
+            if (matchingTimer) clearTimeout(matchingTimer);
+            if (battleLobbyOverlay) battleLobbyOverlay.style.display = 'none';
+            if (menuOverlay) {
+                menuOverlay.style.display = 'flex';
+                renderModeCarousel();
+            }
+        });
+    }
+
     // Attach to UI Buttons
     const uiButtons = [
         btnSelectSong, btnCloseSelect, // btnStartSelect removed
         btnResume, btnRetry, btnQuit, btnCloseResults,
         btnPauseUI, btnCalibrate, btnCancelCalibration,
         btnOptionsToggle, btnRandom, btnChart,
-        btnAddPlayer, btnClosePlayer, playerDisplay, playerDisplayInSelect
+        btnAddPlayer, btnClosePlayer, playerDisplay, playerDisplayInSelect,
+        btnGaugeRoll, modeArrowLeft, modeArrowRight, btnLobbyBypass, btnCloseLobby
     ];
 
     uiButtons.forEach(btn => {

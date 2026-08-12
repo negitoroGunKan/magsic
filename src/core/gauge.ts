@@ -13,9 +13,12 @@ export interface GaugeRecoveryTable {
 
 /** Recovery values per gauge type and judgment */
 export const GAUGE_RECOVERY: Record<GaugeType, GaugeRecoveryTable> = {
-  norma:     { critical:  2.0, great:  1.0, good: 0.2, fail: -2.0, miss:  -5.0 },
-  life:      { critical:  0.2, great:  0.1, good: 0.0, fail: -4.0, miss:  -5.0 },
-  life_hard: { critical:  0.2, great:  0.1, good: 0.0, fail: -5.0, miss: -10.0 },
+  norma_easy:   { critical:  1.0, great:  0.5, good: 0.5, fail:  -1.0, miss:  -3.0 },
+  norma:        { critical:  0.5, great:  0.2, good: 0.2, fail:  -2.0, miss:  -6.0 },
+  life:         { critical:  0.5, great:  0.2, good: 0.2, fail:  -6.0, miss:  -8.0 },
+  life_hard:    { critical:  0.5, great:  0.2, good: 0.2, fail: -10.0, miss: -15.0 },
+  life_ex:      { critical:  0.5, great:  0.2, good: 0.2, fail: -25.0, miss: -50.0 },
+  sudden_death: { critical:  0.0, great:  0.0, good: 0.0, fail: -100.0, miss: -100.0 },
 };
 
 export interface GaugeState {
@@ -38,17 +41,19 @@ export function applyGaugeHit(
 ): GaugeState {
   const recovery = GAUGE_RECOVERY[gaugeType][judgmentType];
   const newHealth = Math.max(0, Math.min(100, currentHealth + recovery));
-  const isDead = (gaugeType === 'life' || gaugeType === 'life_hard') && newHealth <= 0;
+  const isDead = (gaugeType === 'life' || gaugeType === 'life_hard' || gaugeType === 'life_ex' || gaugeType === 'sudden_death') && newHealth <= 0;
   return { health: newHealth, isDead };
 }
 
 /**
  * Get initial health for a gauge type.
- * Norma starts at 0 (build up to 70% to clear).
- * Life gauges start at 100 (survive to clear).
+ * Norma easy starts at 65, Norma starts at 80.
+ * Life gauges start at 100.
  */
 export function getInitialHealth(gaugeType: GaugeType): number {
-  return (gaugeType === 'life' || gaugeType === 'life_hard') ? 100 : 0;
+  if (gaugeType === 'norma_easy') return 65;
+  if (gaugeType === 'norma') return 80;
+  return 100;
 }
 
 /**
@@ -64,7 +69,8 @@ export function isTrackCleared(
   isDead: boolean,
 ): boolean {
   if (isDead) return false;
-  if (gaugeType === 'norma') return finalHealth >= 70;
-  // life and life_hard: clear if survived (not dead)
+  if (gaugeType === 'norma_easy') return finalHealth >= 65;
+  if (gaugeType === 'norma') return finalHealth >= 80;
+  // life, life_hard, life_ex, sudden_death clear if survived (not dead)
   return true;
 }
